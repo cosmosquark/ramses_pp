@@ -1,0 +1,165 @@
+'''
+Based on Pymses.py from the Hamu project https://github.com/samgeen/Hamu
+
+@author dsullivan
+'''
+
+from .. import Snapshot
+import sys, os
+
+#from yt.config import ytcfg; ytcfg["yt","loglevel"] = "20"
+import yt
+from yt.mods import *
+from yt.analysis_modules.halo_finding.api import *
+from yt.utilities.physical_constants import \
+	boltzmann_constant_cgs, \
+	mass_hydrogen_cgs, \
+	mass_sun_cgs, \
+	mh
+
+verbose = True
+
+def rho_crit_now(data, units='cgs'):
+	if units == 'SI':
+		G = 6.6743E-11
+	else:
+		G = 6.6743E-8 # cgs
+	H0 = (data.pf['H0'] * 1000) / 3.08567758E22 # s^-1
+	rho_crit_0 = (3 * H0**2) / (8 * np.pi * G)
+	return rho_crit_0
+
+#Add some useful fields
+def _Temperature(field, data):
+	rv = data["Pressure"]/data["Density"]
+	rv *= mass_hydrogen_cgs/boltzmann_constant_cgs
+	return rv
+
+def _NumDens(field, data):
+	rv = data["Density"]/mass_hydrogen_cgs
+	return rv
+
+def _OverDensity(field, data):
+	omega_baryon_now = data.pf['omega_b']	
+	#return data['Density'] / (omega_baryon_now * rho_crit_now * (data.pf.hubble_constant**2) * ((1+data.pf.current_redshift)**3))
+	return data['Density'] / (omega_baryon_now * rho_crit_now(data) * ((1+data.pf.current_redshift)**3))
+
+def load(folder, ioutput):
+	add_field(("gas", "Temperature"), function=_Temperature, units=r"\rm{K}")
+	add_field(("gas", "Number Density"), function=_NumDens, units=r"\rm{cm}^{-3}")
+	add_field(("gas", "Baryon Overdensity"), function=_OverDensity,
+          units=r"")
+	return YTSnapshot(folder, ioutput)
+
+class YTSnapshot(Snapshot.Snapshot):
+	def __init__(self, folder, ioutput):
+		Snapshot.Snapshot.__init__(self, "yt")
+		'''
+		Load the snapshot
+		'''
+		self._path = folder
+		self._ioutput = ioutput
+		self._snapshot = yt.mods.load(os.path.join('%s/output_%05d/info_%05d.txt'%(folder, ioutput, ioutput)))
+
+		#Implement abstract methods from Snapshot.py
+
+	def output_number(self):
+		'''
+		Return the output number for this snapshot
+		'''
+		return self._ioutput
+
+	def path(self):
+		'''
+		Return the path to this snapshot
+		'''
+		return os.path.join(os.path.dirname(self._path), 'output_%05d/'%ioutput)
+
+	def ncpu(self):
+		'''
+		Return the number of CPUs used
+		'''
+		pf = self.raw_snapshot()
+		return pf.parameters['ncpu']
+
+	def current_redshift(self):
+		'''
+		Return the current redshift
+		'''
+		pf = self.raw_snapshot()
+		return pf.current_redshift
+
+	def cosmology(self):
+		'''
+		Return an object with cosmological parameters
+		'''
+		pf = self.raw_snapshot()
+		info = pf.parameters
+		omega_m_0 = info['omega_m']
+		omega_l_0 = info['omega_l']
+		omega_k_0 = info['omega_k']
+		omega_b_0 = info['omega_b']
+		aexp = info['aexp']
+		h = info['H0']/100
+
+		cosmology = {
+			'omega_m_0':omega_m_0,
+			'omega_l_0':omega_l_0,
+			'omega_k_0':omega_k_0,
+			'omega_b_0':omega_b_0,
+			'h':h,
+			'aexp':aexp
+		}
+		return cosmology
+
+	def info(self):
+		'''
+		Return info object
+		'''
+		return self.raw_snapshot().parameters
+
+	def hop_path(self):
+		hop_dir = os.path.join('%s/'%self._path, 'hop_dir')
+		return hop_dir
+
+	def raw_snapshot(self):
+		'''
+		Return the raw snapshot object
+		'''
+		return self._snapshot
+
+	#Return the HOP halo catalogue. Can override run_hop to force re-running
+	def halos(self, run_hop=False):
+		pf = self._snapshot
+
+		#Check if HOP file exists (note we will adopt a naming convention here)
+		hop_dir = self.hop_path()
+
+		#if not os.path.isdir(hop_dir): os.mkdir(hop_dir)
+
+		if (verbose): print 'Loading halos from directory: %s'%hop_dir
+
+		#Check if out_%05d_hop.h5, .out and .txt exist
+		prefix = 'out_%05d_hop'%self._ioutput
+		extensions = ['h5', 'txt', 'out']
+
+		if run_hop == False:
+			for ext in extensions:
+				if not os.path.isfile('%s/%s.%s'%(hop_dir, prefix, ext)):
+					run_hop = True
+					break
+
+		#Return the halos
+		if run_hop:
+			dump_fname = '%s/%s'%(hop_dir, prefix)
+			print 'No hop catalogue found, running hop...'
+			print 'Will dump halos in: %s'%dump_fname
+			halos = HaloFinder(pf, threshold=200)
+			#Dump the halos for next time
+			halos.dump(dump_fname)
+		else:
+			halo_file = '%s/%s'%(hop_dir, prefix)
+			if (verbose): print 'Loading halo file: %s'%halo_file
+			halos = LoadHaloes(pf, halo_file)
+			if (verbose): print 'Loaded %d halos'%len(halos)
+
+		return halos
