@@ -3,26 +3,23 @@ from .. import Projection
 
 from pymses.analysis.visualization import *
 
-import matplotlib.pylab as plt
-import os, binascii
+#import matplotlib.pylab as plt
+#import os, binascii
 
-def default_camera():
-	center = [0.5, 0.5, 0.5]
-        region_size = [1., 1.]
-
-        cam = Camera(center=center, line_of_sight_axis='x', up_vector='z',
+def camera(center=[0.5, 0.5, 0.5], region_size=[1., 1.], los_axis='x',
+		up_vector='z', log_sensitive=True):
+	return Camera(center=center, line_of_sight_axis='x', up_vector='z',
                                 region_size=region_size, log_sensitive=True)
-	return cam
 
-def default_operator(field):
-	func = lambda dset: dset[field]
+def scalar_operator(field, factor=1):
+	func = lambda dset: dset[field] * factor
 	op = ScalarOperator(func)
 	return op
 
-def load(snapshot, source_type, fields, operator=None, camera=default_camera()):
+def load(snapshot, source_type, fields, operator=None, camera=camera()):
 	if (operator is None):
 		#Default to ScalarOperator of first field
-		operator = default_operator(fields[0])
+		operator = scalar_operator(fields[0])
 	return PymsesProjection(snapshot, source_type, fields, operator, camera)
 
 def save_HDF5(map, mapname, camera, scale=None, units=None, unit_range=None, path="./", color_map="jet"):
@@ -32,8 +29,8 @@ def save_HDF5(map, mapname, camera, scale=None, units=None, unit_range=None, pat
 	h5fname = save_map_HDF5(map, camera, map_name=mapname)
 
 	# Save into PNG image file
-	save_HDF5_to_plot(h5fname, map_unit=units, axis_unit=scale, img_path=path, cmap=color_map, cmap_range=unit_range)
-	save_HDF5_to_img(h5fname, img_path=path, cmap=color_map, cmap_range=unit_range)
+	save_HDF5_to_plot(h5fname, map_unit=units, axis_unit=scale, img_path=path, cmap=color_map)#, cmap_range=unit_range)
+	save_HDF5_to_img(h5fname, img_path=path, cmap=color_map)#, cmap_range=unit_range)
 
 class PymsesProjection(Projection.Projection):
 	def __init__(self, snapshot, source_type, fields, operator, camera):
@@ -54,7 +51,7 @@ class PymsesProjection(Projection.Projection):
 		self._info = ro.info
 		self._fields = fields
 
-	def slice(self, depth=0.5):
+	def Slice(self, depth=0.5):
 		'''
 		Returns a simple slice of the snapshot. Defaults depth to centre of box
 		'''		

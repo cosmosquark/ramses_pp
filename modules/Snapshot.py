@@ -71,7 +71,7 @@ class Snapshot():
 		'''
 		return
 
-	def tform(self, propertform):
+	def tform(self, tform, rt=False):
 
 		if hasattr(self, '_friedman') is False:
 			self.integrate_friedman(store=True)
@@ -91,19 +91,22 @@ class Snapshot():
 
 		unit_t = self.info()['unit_t']
 
+		if rt:
+			return (time_simu - tform)/(h0*1e5/3.08e24)/(365.*24.*3600.*1e9)
+
 		ntable = len(axp_out)-1
 		if config.verbose: print 'ntable = %d'%ntable
 
-		output = np.zeros(len(propertform))
-		for j in range(0, len(propertform)-1):
+		output = np.zeros(len(tform))
+		for j in range(0, len(tform)-1):
 
 			i = 1
-			while ( (tau_out[i] > propertform[j]) and (i < ntable) ):
+			while ( (tau_out[i] > tform[j]) and (i < ntable) ):
 				i+=1
 
 			#Interpolate time
-			time = t_out[i] * (propertform[j] - tau_out[i-1]) / (tau_out[i] - tau_out[i-1]) + \
-				t_out[i-1] * (propertform[j] - tau_out[i]) / (tau_out[i-1] - tau_out[i])
+			time = t_out[i] * (tform[j] - tau_out[i-1]) / (tau_out[i] - tau_out[i-1]) + \
+				t_out[i-1] * (tform[j] - tau_out[i]) / (tau_out[i-1] - tau_out[i])
 
 			#time = max( (time_simu - time)/(h0*1e5/3.08e24)/(365*24*3600*1e9), 0 )
 			#output[j] = time
@@ -153,14 +156,3 @@ class Snapshot():
 			self._friedman = friedman
 
 		return friedman
-
-
-def dadtau(axp_tau, omega_m_0, omega_l_0, omega_k_0):
-	dadtau = axp_tau**2 * (omega_m_0 + omega_l_0 * axp_tau**3 + omega_k_0 * axp_tau)
-	dadtau = np.sqrt(dadtau)
-	return dadtau
-
-def dadt(axp_t, omega_m_0, omega_l_0, omega_k_0):
-	dadt = (1.0/axp_t) * (omega_m_0 + omega_l_0 * axp_t**3 + omega_k_0 * axp_t)
-	dadt = np.sqrt(dadt)
-	return dadt

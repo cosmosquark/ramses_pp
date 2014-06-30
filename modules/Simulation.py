@@ -8,14 +8,13 @@ TODO: Add features similar to Hamu i.e Automatic generation of axis labels for p
 
 @author: dsullivan
 '''
-quick_import = True
 from ramses_pp import config
 
 pymses_loaded = config.pymses_enabled
 pynbody_loaded = config.pynbody_enabled
 yt_loaded = config.yt_enabled
 
-if quick_import:
+if config.quick_import:
 	from .pymses import Pymses
 	from .pynbody import Pynbody
 	from .yt import YT
@@ -200,7 +199,7 @@ class Simulation():
 		'''
 		return self._path
 
-	def snapshot(self, ioutput, module='yt'):
+	def snapshot(self, ioutput, module=config.default_module):
 		'''
 		Return a snapshot from the simulation
 		'''
@@ -238,7 +237,7 @@ class Simulation():
 			i += 1
 
 		idx = np.argmin(np.abs(redshifts - z))
-		if config.verbose: print 'ioutput %05d closest to redshift %d'%(idx+1, z)
+		if config.verbose: print 'ioutput %05d closest to redshift %f'%(idx+1, z)
 
 		return idx+1
 
