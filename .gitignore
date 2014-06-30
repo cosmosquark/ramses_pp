@@ -1,0 +1,5 @@
+#Remove python compile files
+*.py[cod]
+
+#Remove temporary files
+*~
