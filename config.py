@@ -3,6 +3,8 @@ Module config object to store app wide settings
 '''
 
 #Enable/disable modules
+quick_import = True
+
 yt_enabled = True
 pymses_enabled = True
 pynbody_enabled = True
