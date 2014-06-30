@@ -55,7 +55,7 @@ def projection(snapshot, source_type, field, method='RayTracer', cmap='jet'):
 if __name__ == "__main__":
 
 	if len(sys.argv) == 1:
-		print 'Usage: python %s <sim_dir> <i_min> <i_max> <field> <fps> <outname>'
+		print 'Usage: python %s <sim_name> <field> <fps> <outname>'
 		sys.exit(1)
 
 	sim_name = sys.argv[1]
