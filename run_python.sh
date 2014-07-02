@@ -14,10 +14,12 @@ SCRIPTPATH="`dirname $SCRIPT`"
 
 echo "Location of ramses_pp"
 echo $SCRIPTPATH
-
+PYTHONPATH=$SCRIPTPATH
 # now we want parent directory of this script, i.e the ramses_pp root name
 
 parentdir="$(dirname $SCRIPTPATH)"
+
+echo $parentdir
 
 PYTHONPATH=$parentdir
 export PYTHONPATH

@@ -1,7 +1,7 @@
-from ramses_pp.modules import Simulation
-from ramses_pp.modules.pymses import Pymses
-from ramses_pp.modules.pymses import PymsesProjection
-from pymses.analysis.visualization import *
+from modules import Simulation
+from modules.pymses import Pymses
+from modules.pymses import PymsesProjection
+from analysis.visualization import *
 import matplotlib.pyplot as plt
 from pymses.utils import constants as C
 

@@ -5,7 +5,7 @@ Based on Snapshot.py from the Hamu project https://github.com/samgeen/Hamu
 '''
 
 import abc
-from ramses_pp import config
+import config
 import numpy as np
 
 #Abstract snapshot class for loading a ramses output
@@ -116,7 +116,7 @@ class Snapshot():
 		return output
 
 	def integrate_friedman(self, aexp=None, store=False):
-		from ramses_pp.fortran import friedman as fm
+		from fortran import friedman as fm
 
 		cosmology = self.cosmology()
 		omega_m_0 = cosmology['omega_m_0']

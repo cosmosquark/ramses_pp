@@ -8,8 +8,7 @@ TODO: Add features similar to Hamu i.e Automatic generation of axis labels for p
 
 @author: dsullivan
 '''
-from ramses_pp import config
-
+import config
 
 pymses_loaded = config.pymses_enabled
 pynbody_loaded = config.pynbody_enabled
