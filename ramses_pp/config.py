@@ -9,8 +9,10 @@ yt_enabled = False
 pymses_enabled = True
 pynbody_enabled = True
 
-ramses_f90_dir='/home/d/ds/ds381/Code/ramses-rt/trunk/ramses/utils/f90/'
-json_dir = '/home/d/ds/ds381/.local/lib/python2.6/site-packages/ramses_pp/data'
+default_module='pynbody'
+
+ramses_f90_dir='../ramses_f90'
+json_dir = '../data'
 override = True
 verbose = True
 

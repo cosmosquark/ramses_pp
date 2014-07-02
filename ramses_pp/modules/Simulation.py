@@ -65,11 +65,12 @@ def load(name):
 	else:
 		raise Exception("No simulation with the name: %s"%name)
 
-def init(name):
+def init(name,path=None):
 	'''
 	Create a simulation from the current directory
 	'''
-	path = os.getcwd()
+	if path == None:
+		path = os.getcwd()
 	return create(name, path)
 
 def create(name, path):

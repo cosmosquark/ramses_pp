@@ -10,3 +10,4 @@
 .mydepend
 *.out
 python/yt/yt*
+simulations/*
