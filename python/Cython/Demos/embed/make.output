@@ -1,0 +1,4 @@
+Cleaning Demos/embed
+gcc -pthread -c embedded.c -I/applications/enthought_canopy/canopy-1.4.0-full-rh5-64/appdata/canopy-1.4.0.1938.rh5-x86_64/include/python2.7 -I/applications/enthought_canopy/canopy-1.4.0-full-rh5-64/appdata/canopy-1.4.0.1938.rh5-x86_64/include/python2.7
+gcc -pthread -o embedded embedded.o -L/applications/enthought_canopy/canopy-1.4.0-full-rh5-64/appdata/canopy-1.4.0.1938.rh5-x86_64/lib -L/applications/enthought_canopy/canopy-1.4.0-full-rh5-64/appdata/canopy-1.4.0.1938.rh5-x86_64/lib/python2.7/config -lpython2.7 -lpthread -ldl  -lutil -lm -Xlinker -export-dynamic
+./embedded > test.output

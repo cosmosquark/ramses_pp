@@ -3,3 +3,10 @@
 
 #Remove temporary files
 *~
+
+*~
+*.o
+*.prog
+.mydepend
+*.out
+python/yt/yt*
