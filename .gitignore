@@ -13,3 +13,4 @@
 python/yt/yt*
 simulations/*
 applications/*
+data/*
