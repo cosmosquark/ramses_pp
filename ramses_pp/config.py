@@ -11,8 +11,8 @@ pynbody_enabled = True
 
 default_module='pynbody'
 
-ramses_f90_dir='../ramses_f90'
-json_dir = '../data'
+ramses_f90_dir='/quasar4/work/bthompson/ramses_pp/ramses_pp/ramses_f90'
+json_dir = '/quasar4/work/bthompson/ramses_pp/ramses_pp//data'
 override = True
 verbose = True
 

@@ -65,6 +65,7 @@ def load(name):
 	else:
 		raise Exception("No simulation with the name: %s"%name)
 
+
 def init(name,path=None):
 	'''
 	Create a simulation from the current directory

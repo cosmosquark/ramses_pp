@@ -11,3 +11,4 @@
 *.out
 python/yt/yt*
 simulations/*
+applications/*
