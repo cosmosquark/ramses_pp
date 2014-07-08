@@ -1,6 +1,6 @@
 import numpy as np
-from fortran import test
-from modules import Simulation
+from ramses_pp.fortran import test
+from ramses_pp.modules import Simulation
 
 
 sim = Simulation.load('4Mpc_aton_256')

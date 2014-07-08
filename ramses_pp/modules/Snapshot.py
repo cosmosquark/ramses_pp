@@ -116,7 +116,7 @@ class Snapshot():
 		return output
 
 	def integrate_friedman(self, aexp=None, store=False):
-		from fortran import friedman as fm
+		from ramses_pp.fortran import friedman as fm
 
 		cosmology = self.cosmology()
 		omega_m_0 = cosmology['omega_m_0']

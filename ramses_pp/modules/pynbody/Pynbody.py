@@ -7,6 +7,7 @@ Based on Pymses.py from the Hamu project https://github.com/samgeen/Hamu
 import pynbody
 from .. import Snapshot
 import sys, os
+import numpy as np
 
 def load(folder, ioutput=None):
 	return PynbodySnapshot(folder, ioutput)
@@ -65,14 +66,30 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		'''
 		s = self.raw_snapshot()
 		info = s.properties
+		aexp = info['a']
 		omega_m_0 = info['omegaM0']
 		omega_l_0 = info['omegaL0']
 		h = info['h']
 
+# pynbody does not natively load omega_k and omega_b... processing these now from the last snapshot (since these values do not change)
+		n = self.output_number()
+		info_file = ("%s/output_%05d/info_%05d.txt" % (self._path, n, n))
+		print info_file
+		f = open(info_file, 'r')
+		nline = 1
+		while nline <= 18:
+			line = f.readline()
+			if(nline == 14): omega_k_0 = np.float32(line.split("=")[1])
+			if(nline == 15): omega_b_0 = np.float32(line.split("=")[1])
+			nline += 1
+	
 		cosmology = {
 			'omega_m_0':omega_m_0,
 			'omega_l_0':omega_l_0,
-			'h':h
+			'omega_k_0':omega_k_0,
+			'omega_b_0':omega_b_0,
+			'h':h,
+			'aexp':aexp,
 		}
 		return cosmology
 

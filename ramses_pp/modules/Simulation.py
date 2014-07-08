@@ -70,9 +70,20 @@ def init(name,path=None):
 	'''
 	Create a simulation from the current directory
 	'''
-	if path == None:
+
+	if path == None and config_path==False:
 		path = os.getcwd()
 	return create(name, path)
+
+def new(name,rename=None):
+	'''
+	Create a simulation from the Simulation Directory
+	'''
+	path = config.simulation_dir + '/' + name
+	if rename != None:
+		name = rename # if you wish to call your simulation in the database by a different name
+	return create(name, path)
+
 
 def create(name, path):
 	'''
