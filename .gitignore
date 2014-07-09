@@ -3,7 +3,7 @@
 
 #Remove temporary files
 *~
-
+_*
 *~
 *.o
 *.so

@@ -8,6 +8,7 @@ import abc
 from ramses_pp import config
 import numpy as np
 
+
 #Abstract snapshot class for loading a ramses output
 
 class Snapshot():
@@ -70,6 +71,7 @@ class Snapshot():
 		Return info object
 		'''
 		return
+		
 
 	def tform(self, tform, rt=False):
 

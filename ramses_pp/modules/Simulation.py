@@ -231,6 +231,7 @@ class Simulation():
 			print 'pynbody loaded: ', pynbody_loaded
 			raise Exception("Unknown module: %s or not loaded"%module)
 
+
 	def initial_conditions(self):
 		'''
 		Returns the cosmology at z=0

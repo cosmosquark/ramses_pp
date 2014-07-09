@@ -11,9 +11,14 @@ pynbody_enabled = True
 
 default_module='pynbody'
 
-ramses_f90_dir='/home/ben/phd/software/ramses_pp/ramses_pp/ramses_f90'
-json_dir = '/home/ben/phd/software/ramses_pp/ramses_pp/data'
-simulation_dir = '/home/ben/phd/software/ramses_pp/ramses_pp/simulations'
+ramses_f90_dir='/quasar4/work/bthompson/ramses_pp/ramses_pp/ramses_f90'
+json_dir = '/quasar4/work/bthompson/ramses_pp/ramses_pp/data'
+simulation_dir = '/quasar4/work/bthompson/ramses_pp/ramses_pp/simulations'
+applications_dir = '/quasar4/work/bthompson/ramses_pp/ramses_pp/applications'
+root_dir = '/quasar4/work/bthompson/ramses_pp/ramses_pp'
+ramses_pp_dir = '/quasar4/work/bthompson/ramses_pp/ramses_pp/ramses_pp'
+ramses_pp_apps_dir = '/quasar4/work/bthompson/ramses_pp/ramses_pp/ramses_pp/applications'
+
 
 override = True
 verbose = True
