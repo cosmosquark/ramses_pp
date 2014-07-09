@@ -119,9 +119,13 @@ class Simulation():
 			print oid 
 			self._oid = str(oid)
 
+# calculate box size
+
+		
+
 		self._name = name
 		self._path = path
-		self._boxsize = 100 #in Mpc h^-1
+		self._boxsize = self.box_size() #100   #100 #in Mpc h^-1
 		self._halomaker = {  # store input parameters for HaloMaker
 				'_method': 'MSM',  
 				'_b': 0.2,
@@ -146,12 +150,29 @@ class Simulation():
 	def set_path(self, path):
 		self._path = path
 
-	def set_boxsize(self, boxsize):
-		if isinstance(boxsize, int):
-			self._boxsize = int(boxsize)  # may mess up with your simulation if this is incorrect
-		else:
-			print "Invalid boxsize, boxsize needs to be an integer"
-			return
+#	def set_boxsize(self, boxsize):
+#		if isinstance(boxsize, int):
+#			self._boxsize = int(boxsize)  # may mess up with your simulation if this is incorrect
+#		else:
+#			print "Invalid boxsize, boxsize needs to be an integer"
+#			return
+	def box_size(self):
+		cmtokpc = 3.24077929e-22
+		kpctompc = 0.001
+		last_snap = self.num_snapshots()
+		info = ("%s/output_%05d/info_%05d.txt" % (self._path, last_snap, last_snap))
+		f = open(info, 'r')
+		nline = 1  # read the last info file
+		while nline <= 18:
+			line = f.readline()
+			if(nline == 11): h0 = np.float32(line.split("=")[1])
+			if(nline == 16): lunit = np.float32(line.split("=")[1])
+			nline += 1
+		h = h0 / 100
+		boxsize = lunit * cmtokpc * kpctompc * h
+		return boxsize
+		
+
 
 	def set_periodic(self, periodic):
 		if isinstance(boxsize, bool):
@@ -276,7 +297,7 @@ class Simulation():
 		while nline <= 18:
 			line = f.readline()
 			if(nline == 10): faexp = np.float32(line.split("=")[1])
-			if(nline == 11): h = np.float32(line.split("=")[1])
+			if(nline == 11): h0 = np.float32(line.split("=")[1]) / 100
 			if(nline == 12): omega_m_0 = np.float32(line.split("=")[1])
 			if(nline == 13): omega_l_0 = np.float32(line.split("=")[1])
 			if(nline == 14): omega_k_0 = np.float32(line.split("=")[1])
@@ -285,6 +306,8 @@ class Simulation():
 			if(nline == 17): dunit = np.float32(line.split("=")[1])
 			if(nline == 18): tunit = np.float32(line.split("=")[1])
 			nline += 1
+
+		h = h0 / 100.0
 
 		first_snap = 1
 		info = ("%s/output_%05d/info_%05d.txt" % (self._path, first_snap, first_snap))
@@ -309,7 +332,10 @@ class Simulation():
 			'omega_l_0':omega_l_0,
 			'omega_k_0':omega_k_0,
 			'omega_b_0':omega_b_0,
-			'h':h,			
+			'h':h,
+			'lunit':lunit,
+			'dunit':dunit,
+			'tunit':tunit,
 		}
 		
 		return initial_cons
