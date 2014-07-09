@@ -6,7 +6,7 @@ quite a drain on resources....
 
 TODO: Add features similar to Hamu i.e Automatic generation of axis labels for plots etc
 
-@author: dsullivan
+@author: dsullivan, bthompson
 '''
 from ramses_pp import config
 
@@ -61,7 +61,7 @@ def load(name):
 	if os.path.isfile(filename):
 		with open(filename, 'rb') as fp:
 			data = json.load(fp)
-		return Simulation(str(data['_name']), str(data['_path']), data['_oid'])
+		return Simulation(str(data['_name']), str(data['_path']), str(data['_boxsize']), data['_halomaker'], data['_periodic'], data['_oid'])
 	else:
 		raise Exception("No simulation with the name: %s"%name)
 
@@ -112,7 +112,7 @@ def list():
 
 
 class Simulation():
-	def __init__(self, name, path, oid=None):
+	def __init__(self, name, path, boxsize=100, halomaker=None, periodic=True, oid=None):
 		# This should never change
 		if oid is None: self._oid = str(uuid.uuid4())
 		else:
@@ -121,12 +121,45 @@ class Simulation():
 
 		self._name = name
 		self._path = path
+		self._boxsize = 100 #in Mpc h^-1
+		self._halomaker = {  # store input parameters for HaloMaker
+				'_method': 'MSM',  
+				'_b': 0.2,
+				'_cdm' : ".false.",
+				'adaptahop' : {
+					'nvoisins' : 32,
+					'nhop' : 16,
+					'rhot' : 80,
+					'fudge' : 4.0,
+					'fudgeepsilon' : 0.0,
+					'alphap' : 3.0,
+					'megaverbose' : ".false.",	
+					} ,
+				'verbose' : ".true.",
+			} ,
+		self._periodic = True,
+
 
 	def set_name(self, name):
 		self._name = name
 
 	def set_path(self, path):
 		self._path = path
+
+	def set_boxsize(self, boxsize):
+		if isinstance(boxsize, int):
+			self._boxsize = int(boxsize)  # may mess up with your simulation if this is incorrect
+		else:
+			print "Invalid boxsize, boxsize needs to be an integer"
+			return
+
+	def set_periodic(self, periodic):
+		if isinstance(boxsize, bool):
+			self._periodic = periodic
+		else:
+			print "Invalid input, True or False"
+			return
+		
 
 	def jdefault(self, o):
 		if isinstance(o, set):
@@ -285,6 +318,17 @@ class Simulation():
 		'''
 		Locate the snapshot closest to the given redshift
 		'''
+		redshifts = self.avail_redshifts()		
+
+		idx = np.argmin(np.abs(redshifts - z))
+		if config.verbose: print 'ioutput %05d closest to redshift %f'%(idx+1, z)
+
+		return idx+1
+
+	def redshift_deprecated(self, z):
+		'''
+		Locate the snapshot closest to the given redshift, deprecated since it assumes you have all the snapshots in one location, replaced by redshift and avail_redshift
+		'''
 		#First, gather list of redshifts
 		num_snapshots = self.num_snapshots()
 		redshifts = np.zeros(num_snapshots)
@@ -306,6 +350,27 @@ class Simulation():
 		if config.verbose: print 'ioutput %05d closest to redshift %f'%(idx+1, z)
 
 		return idx+1
+
+	def avail_redshifts(self, zmin=0, zmax=1000):
+		'''
+		Return a list of the available redshifts between some range
+		'''
+		redshifts = []
+		outputs = self.ordered_outputs()
+		for output in outputs:
+			info = '%s/info_%s.txt'%(output, output[-5:])
+			f = open(info, 'r')
+			nline = 1
+			while nline <= 10:
+				line = f.readline()
+				if(nline == 10): aexp = np.float32(line.split("=")[1])
+				nline += 1
+			redshift = 1.0/aexp -1.0
+			if (redshift >= zmin) and (redshift < zmax):
+				redshifts.append(float(redshift))
+
+		return np.array(redshifts)
+
 
 	def info(self):
 		'''

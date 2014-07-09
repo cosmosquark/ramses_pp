@@ -21,3 +21,4 @@ python/Python-2.7.8/*
 python/scipy/*
 python/Cython/*
 python/mpi4py/*
+movie/*

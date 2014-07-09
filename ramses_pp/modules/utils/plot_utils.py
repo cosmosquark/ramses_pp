@@ -2,11 +2,13 @@
 import numpy as np
 
 #Okamoto et al. 2008 gas fraction fitting formula (Hoeft et al. 2006 use same equation)
-def okamoto(ax, mhalo, Mc, z, f_bar, alpha):
+def okamoto(ax, mhalo, Mc, z, f_bar, alpha, label=None):
+	if label == None:
+		label = r'Ok+08 $M_{c} = %1.2e M_{\odot} h^{-1}$ $\alpha = %1.2f$'%(Mc, alpha)
 	#Okamoto 2008: f_B(M,z) = <f_b> {1 + (2^{alpha/3} - 1) * (M/M_c(z))^{-alpha}}^{-3/alpha}
 	mhalo = np.sort(mhalo, axis=None)
 	fb_ok = f_bar * ( 1 + ( 2**(float(alpha)/3.) - 1 ) * ( mhalo / Mc )**-alpha )**(-3./float(alpha))
-	ax.plot(np.log10(mhalo), fb_ok, label=r'Ok+08 $M_{c} = %1.2e M_{\odot} h^{-1}$'%Mc, linewidth=2.0)
+	ax.plot(np.log10(mhalo), fb_ok, label=label, linewidth=2.0)
 
 def legend(ax):
 	box = ax.get_position()

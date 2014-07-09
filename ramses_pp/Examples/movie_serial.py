@@ -59,7 +59,7 @@ if __name__ == "__main__":
 		sys.exit(1)
 
 	sim_name = sys.argv[1]
-	field = sys.argv[2]  # rho = gas density field, #vel = gas velocity field, #P = gas pressure field, #g = gravitational acceleration field
+	field = sys.argv[2]
 	fps = int(sys.argv[3])
 	outname = sys.argv[4]
 	start = (sys.argv[5])

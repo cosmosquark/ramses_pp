@@ -11,6 +11,7 @@ def del_c(z, omega_m=0.3):
 
 #Hoeft et al. 2006 characteristic mass
 def hoeft_Mc(z):
+	if z < 0: z = 0
 	#Tau encodes evolution of min. virial temp.
 	tau_z = 0.73 * (z + 1)**0.18 * np.exp(-(0.25 * z)**2.1)
 	del_c_z = del_c(z)
