@@ -231,6 +231,55 @@ class Simulation():
 			print 'pynbody loaded: ', pynbody_loaded
 			raise Exception("Unknown module: %s or not loaded"%module)
 
+	def initial_conditions(self):
+		'''
+		Returns the cosmology at z=0
+		'''
+		last_snap = self.num_snapshots()
+		info = ("%s/output_%05d/info_%05d.txt" % (self._path, last_snap, last_snap))
+		f = open(info, 'r')
+		nline = 1  # read the last info file
+		while nline <= 18:
+			line = f.readline()
+			if(nline == 10): faexp = np.float32(line.split("=")[1])
+			if(nline == 11): h = np.float32(line.split("=")[1])
+			if(nline == 12): omega_m_0 = np.float32(line.split("=")[1])
+			if(nline == 13): omega_l_0 = np.float32(line.split("=")[1])
+			if(nline == 14): omega_k_0 = np.float32(line.split("=")[1])
+			if(nline == 15): omega_b_0 = np.float32(line.split("=")[1])
+			if(nline == 16): lunit = np.float32(line.split("=")[1])
+			if(nline == 17): dunit = np.float32(line.split("=")[1])
+			if(nline == 18): tunit = np.float32(line.split("=")[1])
+			nline += 1
+
+		first_snap = 1
+		info = ("%s/output_%05d/info_%05d.txt" % (self._path, first_snap, first_snap))
+		f = open(info, 'r')
+		nline = 1  # read the last info file
+		while nline <= 18:
+			line = f.readline()
+			if(nline == 10): iaexp = np.float32(line.split("=")[1])
+			nline += 1
+
+		# store variables into a dictionary
+
+		iz = 1.0/iaexp -1.0
+		fz = 1.0/faexp -1.0
+
+		initial_cons = {
+			'iaexp':iaexp,		# initial a
+			'faexp':faexp,		# final a
+			'iz':iz, 			# initial z
+			'fz':fz, 			# final z
+			'omega_m_0':omega_m_0,
+			'omega_l_0':omega_l_0,
+			'omega_k_0':omega_k_0,
+			'omega_b_0':omega_b_0,
+			'h':h,			
+		}
+		
+		return initial_cons
+
 	def redshift(self, z):
 		'''
 		Locate the snapshot closest to the given redshift
