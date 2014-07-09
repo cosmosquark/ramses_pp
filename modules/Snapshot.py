@@ -89,7 +89,7 @@ class Snapshot():
 		#age_simu = friedman['age_simu']
 		time_simu = friedman['time_simu']
 
-		unit_t = self.info()['unit_t']
+		#unit_t = self.info()['unit_t']
 
 		if rt:
 			return (time_simu - tform)/(h0*1e5/3.08e24)/(365.*24.*3600.*1e9)
@@ -108,10 +108,10 @@ class Snapshot():
 			time = t_out[i] * (tform[j] - tau_out[i-1]) / (tau_out[i] - tau_out[i-1]) + \
 				t_out[i-1] * (tform[j] - tau_out[i]) / (tau_out[i-1] - tau_out[i])
 
-			#time = max( (time_simu - time)/(h0*1e5/3.08e24)/(365*24*3600*1e9), 0 )
-			#output[j] = time
+			time = max( (time_simu - time)/(h0*1e5/3.08e24)/(365*24*3600*1e9), 0 )
+			output[j] = time
 
-			output[j] = (time_simu - time)*unit_t/(365 * 24 * 3600 * 1e9)
+			#output[j] = (time_simu - time)*unit_t/(365 * 24 * 3600 * 1e9)
 
 		return output
 

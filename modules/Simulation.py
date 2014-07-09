@@ -8,8 +8,8 @@ TODO: Add features similar to Hamu i.e Automatic generation of axis labels for p
 
 @author: dsullivan
 '''
-from ramses_pp import config
-
+from .. import config
+from .utils import string_utils
 
 pymses_loaded = config.pymses_enabled
 pynbody_loaded = config.pynbody_enabled
@@ -220,6 +220,17 @@ class Simulation():
 		'''
 		Locate the snapshot closest to the given redshift
 		'''
+		redshifts = self.avail_redshifts()		
+
+		idx = np.argmin(np.abs(redshifts - z))
+		if config.verbose: print 'ioutput %05d closest to redshift %f'%(idx+1, z)
+
+		return idx+1
+
+	def redshift_deprecated(self, z):
+		'''
+		Locate the snapshot closest to the given redshift
+		'''
 		#First, gather list of redshifts
 		num_snapshots = self.num_snapshots()
 		redshifts = np.zeros(num_snapshots)
@@ -241,6 +252,34 @@ class Simulation():
 		if config.verbose: print 'ioutput %05d closest to redshift %f'%(idx+1, z)
 
 		return idx+1
+
+	def avail_redshifts(self, zmin=0, zmax=1000):
+		'''
+		Return a list of the available redshifts between some range
+		'''
+		redshifts = []
+		outputs = self.ordered_outputs()
+		for output in outputs:
+			info = '%s/info_%s.txt'%(output, output[-5:])
+			f = open(info, 'r')
+			nline = 1
+			while nline <= 10:
+				line = f.readline()
+				if(nline == 10): aexp = np.float32(line.split("=")[1])
+				nline += 1
+			redshift = 1.0/aexp -1.0
+			if (redshift >= zmin) and (redshift < zmax):
+				redshifts.append(float(redshift))
+
+		return np.array(redshifts)
+
+	def ordered_outputs(self):
+		'''
+		Return an ordered list of outputs
+		'''
+		outputs = glob.glob('%s/output_00*'%self.path())
+		outputs.sort(key=string_utils.natural_keys)
+		return outputs
 
 	def info(self):
 		'''
