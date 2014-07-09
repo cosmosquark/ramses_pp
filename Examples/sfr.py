@@ -60,7 +60,7 @@ def make_twin(s, host, thebins, age):
 	twin.set_xticks(tick_pos)
 	twin.set_xticklabels(redshift_ticks)
 
-def main(name, z, rt=True):
+def main(name, z):
 	fig, ax0 = plt.subplots(nrows=1, sharex=True)
 	plt.xlabel(r'Lookback Time [Gyr]')
 	plt.ylabel(r'Star Formation Rate [M$_{\odot}$/yr]')
@@ -138,5 +138,4 @@ def main(name, z, rt=True):
 if __name__ == "__main__":
 	name = sys.argv[1]
 	z = float(sys.argv[2])
-	rt = 'rt' in name
-	main(name, z, rt=rt)
+	main(name, z)
