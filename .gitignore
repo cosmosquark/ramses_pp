@@ -14,3 +14,10 @@ python/yt/yt*
 simulations/*
 applications/*
 data/*
+ramses_pp/config.py
+python/pynbody/*
+python/pymses_4.0.0/*
+python/Python-2.7.8/*
+python/scipy/*
+python/Cython/*
+python/mpi4py/*

@@ -74,7 +74,6 @@ class PynbodySnapshot(Snapshot.Snapshot):
 # pynbody does not natively load omega_k and omega_b... processing these now from the last snapshot (since these values do not change)
 		n = self.output_number()
 		info_file = ("%s/output_%05d/info_%05d.txt" % (self._path, n, n))
-		print info_file
 		f = open(info_file, 'r')
 		nline = 1
 		while nline <= 18:
