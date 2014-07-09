@@ -5,6 +5,7 @@ Based on Pymses.py from the Hamu project https://github.com/samgeen/Hamu
 '''
 
 import pynbody
+from pynbody.units import Unit
 from .. import Snapshot
 import sys, os
 
@@ -57,7 +58,8 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		Return the current redshift
 		'''
 		s = self.raw_snapshot()
-		return s.properties['z']
+		aexp = s.properties['a']
+		return (1/aexp) - 1
 
 	def cosmology(self):
 		'''
@@ -68,11 +70,14 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		omega_m_0 = info['omegaM0']
 		omega_l_0 = info['omegaL0']
 		h = info['h']
+		aexp = info['a']
 
 		cosmology = {
 			'omega_m_0':omega_m_0,
 			'omega_l_0':omega_l_0,
-			'h':h
+			'omega_k_0':0,
+			'h':h,
+			'aexp':aexp
 		}
 		return cosmology
 
@@ -80,10 +85,161 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		'''
 		Return info object
 		'''
-		return self.raw_snapshot().properties
+		#return self.raw_snapshot().properties
+		return self.raw_snapshot()._info
 
-	def halos(self):
-		return self._snapshot.halos()
+	def tipsy_dir(self):
+		path = self.path()
+		ioutput = self.output_number()
+		output_str = 'output_%05d'%ioutput
+
+		tipsy_dir = '%s/%s/%s_tipsy/'%(path, output_str, output_str)
+		return tipsy_dir
+
+	def tipsy_fname(self):
+		ioutput = self.output_number()
+		output_str = 'output_%05d'%ioutput
+
+		ftipsy = '%s/%s_fullbox.tipsy'%(self.tipsy_dir(), output_str)
+		return ftipsy
+
+	def tipsy_units(self):
+		import numpy as np
+		from ..utils import constants
+		s = self.raw_snapshot()
+
+		# figure out the units			 
+		cmtokpc = constants.cmtokpc
+		G_u = constants.G_u
+
+		lenunit  = s._info['unit_l']/s.properties['a']*cmtokpc
+		massunit = pynbody.analysis.cosmology.rho_crit(s, z=0, unit='Msol kpc^-3')*lenunit**3
+		timeunit = np.sqrt(1/G_u * lenunit**3/massunit)
+
+		return lenunit, massunit, timeunit
+
+	def tipsy(self, convert=True):
+		#Grab the tipsy output for this snapshot, if it exists
+		ftipsy = self.tipsy_fname()
+
+		if os.path.exists(ftipsy):
+			t = load(ftipsy)
+			setattr(t, '_ioutput', self.output_number())
+			return t
+		else:
+			if convert:
+				"""
+				Credit to Rok Roskar (roskar@physik.uzh.ch)
+				"""
+				s = self.raw_snapshot()
+
+				newdir = self.tipsy_dir()
+				if not os.path.exists(newdir):
+					os.mkdir(newdir)
+				newfile = self.tipsy_fname()
+
+				lenunit, massunit, timeunit = self.tipsy_units()
+
+				l_unit = Unit('%f kpc'%lenunit)
+				m_unit = Unit('%f Msol'%massunit)
+				#t_unit = Unit('%f Gyr'%timeunit)
+
+				#l_unit = Unit('Mpc')
+				#m_unit = Unit('1e10 Msol')
+				t_unit = Unit('%f Gyr'%timeunit)
+				v_unit = l_unit/t_unit
+
+				#write_param_file(newfile, s, lenunit, massunit)
+				f = open('%s.param'%newfile, 'w')
+				f.write('dHubble0 = %f\n'%(s.properties['h']*100))
+				f.write('dOmega0 = %f\n'%s.properties['omegaM0'])
+				f.write('dLambda = %f\n'%s.properties['omegaL0'])
+				f.write('dMsolUnit = %f\n'%massunit)
+				f.write('dKpcUnit = %f\n'%lenunit)
+				f.close()
+			 
+				#newfile = "%s_tipsy/%s_fullbox.tipsy"%(s.filename[:-1],outname)
+				print 'Writing file %s'%newfile
+				#s['mass'].convert_units('%f Msol'%massunit)
+				s['mass'].convert_units('%f Msol'%massunit)
+				s.g['rho'].convert_units(m_unit/l_unit**3)
+				s.g['temp']
+				s.g['metals'] = s.g['metal']
+				s['pos'].convert_units(l_unit)
+				s['vel'].convert_units(v_unit)
+				s['eps'] = s.g['smooth'].min()
+				s['eps'].units = s['pos'].units
+				del(s.g['metal'])
+				del(s['smooth'])
+				
+				s.write(filename='%s'%newfile, fmt=pynbody.tipsy.TipsySnap, binary_aux_arrays = True)
+				t = load(newfile)
+				setattr(t, '_ioutput', self.output_number())
+				return t
+			else:
+				raise Exception("Tipsy file not found: %s"%ftipsy)
+
+	def halos(self, nmin_per_halo = 150, num_threads=16):
+		import glob
+		s = self.raw_snapshot()
+		snap = self
+		isTipsy = (type(s) == pynbody.tipsy.TipsySnap)
+
+		fname = self.path() if isTipsy else self.tipsy_fname()
+
+		if len(glob.glob('%s.*.AHF_*'%fname)) == 0:
+			if os.path.exists(fname) is False and isTipsy is False: self.tipsy()
+			if isTipsy:
+				#Switch to the raw ramses output to run AHF
+				ramses_path = os.path.abspath(os.path.join(self.path(), '../../../'))
+				snap = load(ramses_path, self.output_number())
+				s = snap.raw_snapshot()
+			else:
+				print 'Warning: Analysis of RAMSES output with tipsy halos can result in unexpected results...'
+
+			print 'No AHF files found, running...'
+			#Run AHF. Pynbody has some hooks for this I think, but for now will use existing code (Rok Roskar)
+			lenunit, massunit, timeunit = snap.tipsy_units()
+
+			l_unit = Unit('%f kpc'%lenunit)
+			t_unit = Unit('%f Gyr'%timeunit)
+			v_unit = l_unit/t_unit
+
+			f = open('%s.AHF.input'%fname,'w')
+			f.write('[AHF]\n')
+			f.write('ic_filename = %s\n'%fname)
+			f.write('ic_filetype = 90\n')
+			f.write('outfile_prefix = %s\n'%fname)
+			f.write('LgridDomain = 256\n')
+			f.write('LgridMax = 2097152\n')
+			f.write('NperDomCell = 5\n')
+			f.write('NperRefCell = 5\n')
+			f.write('VescTune = 1.0\n')
+			f.write('NminPerHalo = %d\n'%nmin_per_halo)
+			f.write('RhoVir = 0\n')
+			f.write('Dvir = 200\n')
+			f.write('MaxGatherRad = 1.0\n')
+			f.write('[TIPSY]\n')
+			f.write('TIPSY_BOXSIZE = %e\n'%(s.properties['boxsize'].in_units('Mpc')*s.properties['h']/s.properties['a']))
+			f.write('TIPSY_MUNIT   = %e\n'%(massunit*s.properties['h']))#/s.properties['omegaM0']))
+			f.write('TIPSY_OMEGA0  = %f\n'%s.properties['omegaM0'])
+			f.write('TIPSY_LAMBDA0 = %f\n'%s.properties['omegaL0'])
+			
+		 #   velunit = Unit('%f cm'%s._info['unit_l'])/Unit('%f s'%s._info['unit_t'])
+			
+			f.write('TIPSY_VUNIT   = %e\n'%v_unit.ratio('km s^-1 a', **s.conversion_context()))			
+		 
+			# the thermal energy in K -> km^2/s^2
+		 
+			f.write('TIPSY_EUNIT   = %e\n'%((pynbody.units.k/pynbody.units.m_p).in_units('km^2 s^-2 K^-1')*5./3.))
+			f.close()			
+
+			os.environ['OMP_NUM_THREADS'] = str(num_threads)
+			os.system("~/apps/bin/AHF-v1.0-075 %s.AHF.input"%fname)
+
+		if isTipsy is False:
+			s = self.tipsy().raw_snapshot()
+		return s.halos()
 
 class Species:
 	GAS = 1
