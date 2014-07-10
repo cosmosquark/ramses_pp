@@ -11,8 +11,8 @@ pynbody_enabled = True
 
 default_module='pynbody'
 
-ramses_f90_dir='/home/ben/phd/software/ramses_pp/ramses_pp/ramses_f90'
-json_dir = '/home/ben/phd/software/ramses_pp/ramses_pp/data'
+ramses_f90_dir='/gpfs/home/bthompson1/ramses_pp/ramses_pp/ramses_f90'
+json_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/data'
 override = True
 verbose = True
 

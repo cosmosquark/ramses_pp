@@ -40,7 +40,7 @@ INST_ZLIB=1     # On some systems (Kraken) matplotlib has issues with
                 # If need be, you can turn this off.
 INST_BZLIB=1    # On some systems, libbzip2 is missing.  This can
                 # lead to broken mercurial installations.
-INST_PNG=1      # Install a local libpng?  Same things apply as with zlib.
+INST_PNG=0      # Install a local libpng?  Same things apply as with zlib.
 INST_FTYPE=1    # Install FreeType2 locally?
 INST_ENZO=0     # Clone a copy of Enzo?
 INST_SQLITE3=1  # Install a local version of SQLite3?
