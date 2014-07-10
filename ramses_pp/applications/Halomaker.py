@@ -1,7 +1,7 @@
 import loader
 #from ramses_pp.modules import Simulation, Snapshot
 from ramses_pp import config
-import halomaker_utils
+import Halomaker_Utils
 import os
 
 class Halomaker():
@@ -94,6 +94,49 @@ class Halomaker():
 		}
 		return sim_info
 
+	def run_halomaker_snap(self,ioutput):
+		direct = self._data_dir + '/' + str(ioutput)
+		# check if run is not already done
+		# first by checking if there is any out files
+		props = "%03d" % ioutput
+		fileprops = direct + "/" + "haloProps." + props
+		if os.path.exists(fileprops):
+			print "halomaker already run on " + str(ioutput)
+			return
+		# then by checking the log file
+		logfile = direct + "/log.out"
+		if os.path.exists(logfile):
+			run = False
+			lines = [line.strip() for line in open(logfile)]
+			for i in range(0,len(lines)):
+				print lines[i]
+				if lines[i] == "End of HaloMaker":
+					run = True		
+			if run == True:
+				print "halomaker already run on " + str(ioutput)
+				return
+		# make the directory
+						
+		print "working with " + direct
+		if not os.path.exists(direct):
+			os.makedirs(direct)
+		# make input files
+		Halomaker_Utils.make_input(direct, self.sim_info(), self._halomaker_stats, self._nsteps)
+		snapno = "%05d" % ioutput
+		snaploc = self.Simulation._path + "/" + "output_" + snapno + '/'
+		nsteps = self._nsteps
+		Halomaker_Utils.make_inputfiles(direct, nsteps, snapno, snaploc, simtype="Ra3")
+
+		os.chdir(direct)
+		command = "ln -s " + self._halomaker_exe + " ."
+		os.system(command)
+		command = "chmod u+x HaloFinder"
+		os.system(command)
+		command = "./HaloFinder > log.out"
+		os.system(command)
+		command = "rm HaloFinder"
+		os.system(command)
+
 	def run_halomaker(self,parallel=False,ncpu=1):
 		'''
 		executes halomaker across all snapshots
@@ -105,18 +148,8 @@ class Halomaker():
 		if parallel==False:
 			print "running HaloMaker in serial"
 			for ioutput in range(1,num+1):
-				# make the directory
-				direct = self._data_dir + '/' + str(ioutput)
-				print "working with " + direct
-				if not os.path.exists(direct):
-					os.makedirs(direct)
-				# make input files
-				halomaker_utils.make_input(direct, self.sim_info(), self._halomaker_stats, self._nsteps)
-				snapno = "%05d" % ioutput
-				snaploc = self.Simulation._path + "/" + "output_" + snapno + '/'
-				nsteps = self._nsteps
-				halomaker_utils.make_inputfiles(direct, nsteps, snapno, snaploc, simtype="Ra3")
-				
+				self.run_halomaker_snap(self,ioutput)
+		
 		return
 							
 		
