@@ -75,4 +75,4 @@ if __name__ == "__main__":
 	for ioutput in range(start, num_snapshots+1):
 		projection(sim.snapshot(ioutput, module='pymses'), Pymses.Type.AMR, field)
 
-	make_movie(fps, outname)
+#	make_movie(fps, outname)

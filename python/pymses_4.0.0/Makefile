@@ -1,3 +1,7 @@
+LD = gcc
+CC = gcc
+CFLAGS = -pthread -fno-strict-aliasing -DNDEBUG -g -O2 -fPIC
+
 PYSETUP_FLAGS=
 PYMSES_BASE=pymses
 
