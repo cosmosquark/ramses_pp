@@ -264,13 +264,17 @@ class PynbodySnapshot(Snapshot.Snapshot):
 
 			os.environ['OMP_NUM_THREADS'] = str(num_threads)
 
-			if configloc:
+			if not configloc:
 				print "running AHF from your applications dir"
 				os.system("~/apps/bin/AHF-v1.0-075 %s.AHF.input"%fname)
 			else:
 				print "running AHF from your compiled location"
-				appstring = config.applications_dir + "/AHF-v1.0-075"
-				os.system("%s %s.AHF.input" %appstring %fname)	
+				appstring = config.applications_dir + "/AHF-v1.0-084"
+				filename = "%s.AHF.input" %fname
+				print filename
+				print appstring
+				exe_string = appstring + " " + filename
+				os.system(exe_string)	
 
 		if isTipsy is False:
 			s = self.tipsy().raw_snapshot()
