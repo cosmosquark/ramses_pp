@@ -13,6 +13,13 @@ default_module='pynbody'
 
 ramses_f90_dir='/gpfs/home/bthompson1/ramses_pp/ramses_pp/ramses_f90'
 json_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/data'
+simulation_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/simulations'
+applications_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/applications'
+root_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp'
+ramses_pp_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/ramses_pp'
+ramses_pp_apps_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/ramses_pp/applications'
+
+
 override = True
 verbose = True
 
