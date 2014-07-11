@@ -8,7 +8,9 @@ TODO: Add features similar to Hamu i.e Automatic generation of axis labels for p
 
 @author: dsullivan, bthompson
 '''
+from __future__ import division
 from ramses_pp import config
+
 
 pymses_loaded = config.pymses_enabled
 pynbody_loaded = config.pynbody_enabled
@@ -52,6 +54,8 @@ else:
 import numpy as np
 import json, os, glob, uuid
 
+from ramses_pp.applications import Halomaker
+
 def load(name):
 	'''
 	Load the simulation with this name from the json dump
@@ -61,7 +65,7 @@ def load(name):
 	if os.path.isfile(filename):
 		with open(filename, 'rb') as fp:
 			data = json.load(fp)
-		return Simulation(str(data['_name']), str(data['_path']), str(data['_boxsize']), data['_halomaker'], data['_periodic'], data['_oid'])
+		return Simulation(str(data['_name']), str(data['_path']), str(data['_boxsize']), data['_halomaker_info'], data['_periodic'], data['_oid'])
 	else:
 		raise Exception("No simulation with the name: %s"%name)
 
@@ -126,16 +130,17 @@ class Simulation():
 		self._name = name
 		self._path = path
 		self._boxsize = self.box_size() #100   #100 #in Mpc h^-1
-		self._halomaker = {  # store input parameters for HaloMaker
-				'_method': 'MSM',  
-				'_b': 0.2,
-				'_cdm' : ".false.",
+		self._halomaker_info = {  # store input parameters for HaloMaker
+				'method': 'MSM',  
+				'b': 0.2,
+				'cdm' : ".false.",
+				'npart' : '20',
 				'adaptahop' : {
 					'nvoisins' : 32,
 					'nhop' : 16,
 					'rhot' : 80,
 					'fudge' : 4.0,
-					'fudgeepsilon' : 0.0,
+					'fudgepsilon' : 0.0,
 					'alphap' : 3.0,
 					'megaverbose' : ".false.",	
 					} ,
@@ -180,6 +185,9 @@ class Simulation():
 		else:
 			print "Invalid input, True or False"
 			return
+
+	def is_periodic(self):
+		return self._periodic
 		
 
 	def jdefault(self, o):
@@ -297,7 +305,7 @@ class Simulation():
 		while nline <= 18:
 			line = f.readline()
 			if(nline == 10): faexp = np.float32(line.split("=")[1])
-			if(nline == 11): h0 = np.float32(line.split("=")[1]) / 100
+			if(nline == 11): h0 = np.float32(line.split("=")[1])
 			if(nline == 12): omega_m_0 = np.float32(line.split("=")[1])
 			if(nline == 13): omega_l_0 = np.float32(line.split("=")[1])
 			if(nline == 14): omega_k_0 = np.float32(line.split("=")[1])
@@ -307,7 +315,7 @@ class Simulation():
 			if(nline == 18): tunit = np.float32(line.split("=")[1])
 			nline += 1
 
-		h = h0 / 100.0
+		h = h0 / 100
 
 		first_snap = 1
 		info = ("%s/output_%05d/info_%05d.txt" % (self._path, first_snap, first_snap))
@@ -333,6 +341,7 @@ class Simulation():
 			'omega_k_0':omega_k_0,
 			'omega_b_0':omega_b_0,
 			'h':h,
+			'H0':h0,
 			'lunit':lunit,
 			'dunit':dunit,
 			'tunit':tunit,
@@ -397,6 +406,17 @@ class Simulation():
 
 		return np.array(redshifts)
 
+### halomaker stuff
+
+	def halomaker_info(self):
+		return self._halomaker_info
+
+	def halomaker(self, subvol=False, ncpu=1):
+		return Halomaker.Halomaker(self, subvol=False, ncpu=1)
+		
+
+
+#### end halomaker stuff
 
 	def info(self):
 		'''
