@@ -12,8 +12,8 @@ _*
 *.out
 python/yt/yt*
 simulations/*
-applications/*
 data/*
+applications/AHF*
 ramses_pp/config.py
 python/pynbody/*
 python/pymses_4.0.0/*

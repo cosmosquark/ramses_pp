@@ -1,0 +1,84 @@
+#
+# Makefile for HaloMaker
+#
+######
+# 1/ Enzo related OPTIONS:
+#    -------------------
+# --- If you need to read Enzo files use the compilation option -DHDF and uncomment library LIBS below 
+# checking that the path to these libs on your machine is correct 
+# --- Use the -Dr8 flag if Enzo outputs were done in double precision 
+######
+# 2/ RAMSES related OPTIONS:
+#    ---------------------
+# Use the -DMETALS flag if RAMSES has computed metallicity from stellar feedback and you are reading version 3.0 i/o format
+######
+# 3/ GADGET related OPTION:
+#    ---------------------
+# Use the -DTest_Gd flag for testing Gadget reading routines only, especially a resimulation or hydro. That's a debugging option use to use if HaloMaker cannot read a gadget snapshot.
+######
+# 4/ Other simulation related OPTIONS:
+#    --------------------------------
+# --- Use the -DBIG_RUN option for a normal (as opposed to resimulation) simulation whatever the i/o format.
+# --- Use the -DRENORM option if you are analyzing the DM part of a hydro simulation and want to renormalize 
+# the mass of your dark matter particle so as to include the baryons (by pretending they are distributed like the DM):
+# this might be useful when one wants to compare a pure DM simulation to its DM + hydro counterpart
+# --- Use the -DANG_MOM_OF_R option if you want the code to output the angular momentum of concentric shells for your DM halos
+#
+# --- RECOMPUTE_PROPS : use this (together with ANG_MOM_OF_R) to read a tree_brick(s) file 
+#                       and recompute angular momentum
+#
+#
+# --- SIMPLE_OUTPUTS : output simple stuff for debugging and checks.
+#
+# --- STARS : if set, read star particles instead of DM particles -> DO NOT SET IN OPTIONS
+# 
+######
+
+COMPILE = "ifort"
+# options for HaloFinder 
+HOPTIONS = -DSIMPLE_OUTPUTS #-DBIG_RUN
+# options for GalFinder  -> Does not actually work ... 
+GOPTIONS = -DMETALS -DSIMPLE_OUTPUTS -DSTARS
+
+
+ifeq ($(COMPILE),"ifort")
+# option when compiling with ifort (crozes, orac, octopus)
+ F90C    = ifort
+ DEBUG   = -g -fpe0 -traceback -C -ftrapuv #-warn all -stand f90 
+ OPTIM   = -O2 -fp-model precise #-fast 
+ FFLAGS  = ${OPTIM} -free -cpp #-convert big_endian 
+endif
+
+# need these libs to read enzo HDF4 format
+LIBS    = # -L/sw/lib -ljpeg -lz -lsz -lmfhdf -ldf 
+
+.SUFFIXES: .s .o .f90 
+
+#
+# Rules:
+#
+
+%.o: %.f90
+	$(F90C) $(FFLAGS) $(HOPTIONS) -c $*.f90
+
+%.s: %.f90
+	$(F90C) $(FFLAGS) $(GOPTIONS) -c $*.f90
+
+default: clean HaloFinder clean # GalFinder clean
+
+clean:	
+	rm -f *.o
+	rm -f *.mod
+
+HaloFinder: halo_defs.o utils.o subbox.o num_rec.o input_output.o fof_mod.o compute_neiKDtree_mod.o compute_halo_props.o  HaloMaker.o
+	${F90C} ${FFLAGS} ${HOPTIONS} ${LIBS}  halo_defs.o utils.o subbox.o num_rec.o input_output.o fof_mod.o compute_neiKDtree_mod.o compute_halo_props.o HaloMaker.o -o HaloFinder
+
+GalFinder: halo_defs.s utils.s subbox.s num_rec.s input_output.s fof_mod.s compute_neiKDtree_mod.s compute_halo_props.s  HaloMaker.s
+	${F90C} ${FFLAGS} ${GOPTIONS} ${LIBS}  halo_defs.o utils.o subbox.o num_rec.o input_output.o fof_mod.o compute_neiKDtree_mod.o compute_halo_props.o HaloMaker.o -o GalFinder
+
+
+merge_subboxes:	halo_defs.o utils.o subbox.o num_rec.o input_output.o merge_subboxes.o
+	${F90C} ${FFLAGS} ${LIBS} halo_defs.o utils.o subbox.o num_rec.o input_output.o merge_subboxes.o -o merge_subboxes
+
+snap2mass: halo_defs.o utils.o subbox.o num_rec.o input_output.o fof_mod.o compute_neiKDtree_mod.o compute_halo_props.o snap2mass.o
+	${F90C} ${FFLAGS} ${LIBS} halo_defs.o utils.o subbox.o num_rec.o input_output.o fof_mod.o compute_neiKDtree_mod.o compute_halo_props.o snap2mass.o -o snap2mass
