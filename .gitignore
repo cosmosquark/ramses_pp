@@ -22,3 +22,4 @@ python/scipy/*
 python/Cython/*
 python/mpi4py/*
 movie/*
+ramses_pp/config.py

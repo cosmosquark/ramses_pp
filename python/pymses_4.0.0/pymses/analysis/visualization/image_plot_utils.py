@@ -71,7 +71,8 @@ def save_map_HDF5(map, camera, unit=None, scale_unit=None, hdf5_path="./",
 	try:
 		h5f = tables.openFile(fname, mode='w')
 	except:
-		os.mkdir(hdf5_path)
+		print hdf5_path
+		#os.mkdir(hdf5_path)
 		h5f = tables.openFile(fname, mode='w')
 	h5f.createArray("/", "name", map_name)
 	camera.save_HDF5(h5f)
