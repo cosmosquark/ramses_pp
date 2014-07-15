@@ -142,7 +142,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 
 		return lenunit, massunit, timeunit
 
-	def tipsy(self, convert=True):
+	def tipsy(self, gas=True, convert=True):
 		#Grab the tipsy output for this snapshot, if it exists
 		ftipsy = self.tipsy_fname()
 
@@ -186,14 +186,16 @@ class PynbodySnapshot(Snapshot.Snapshot):
 				print 'Writing file %s'%newfile
 				#s['mass'].convert_units('%f Msol'%massunit)
 				s['mass'].convert_units('%f Msol'%massunit)
-				s.g['rho'].convert_units(m_unit/l_unit**3)
-				s.g['temp']
-				s.g['metals'] = s.g['metal']
+				if gas == True:
+					s.g['rho'].convert_units(m_unit/l_unit**3)
+					s.g['temp']
+					s.g['metals'] = s.g['metal']
 				s['pos'].convert_units(l_unit)
 				s['vel'].convert_units(v_unit)
-				s['eps'] = s.g['smooth'].min()
-				s['eps'].units = s['pos'].units
-				del(s.g['metal'])
+				if gas == True:
+					s['eps'] = s.g['smooth'].min()
+					s['eps'].units = s['pos'].units
+					del(s.g['metal'])
 				del(s['smooth'])
 				
 				s.write(filename='%s'%newfile, fmt=pynbody.tipsy.TipsySnap, binary_aux_arrays = True)
@@ -207,7 +209,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 
 # see here for more doccumentation http://pynbody.github.io/pynbody/tutorials/halos.html
 
-	def halos(self, nmin_per_halo = 150, num_threads=16, configloc = True):
+	def halos(self, gas = True, nmin_per_halo = 150, num_threads=16, configloc = True):
 		import glob
 		s = self.raw_snapshot()
 		snap = self
