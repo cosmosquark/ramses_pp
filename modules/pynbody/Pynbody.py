@@ -66,6 +66,13 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		Return an object with cosmological parameters
 		'''
 		s = self.raw_snapshot()
+
+		#We need the ramses snapshot for this
+		if (type(s) == pynbody.tipsy.TipsySnap):
+			ramses_path = os.path.abspath(os.path.join(self.path(), '../../../'))
+			snap = load(ramses_path, self.output_number())
+			s = snap.raw_snapshot()
+		
 		info = s.properties
 		omega_m_0 = info['omegaM0']
 		omega_l_0 = info['omegaL0']
@@ -107,6 +114,12 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		import numpy as np
 		from ..utils import constants
 		s = self.raw_snapshot()
+
+		#We need the ramses snapshot for this
+		if (type(s) == pynbody.tipsy.TipsySnap):
+			ramses_path = os.path.abspath(os.path.join(self.path(), '../../../'))
+			snap = load(ramses_path, self.output_number())
+			s = snap.raw_snapshot()
 
 		# figure out the units			 
 		cmtokpc = constants.cmtokpc
@@ -179,7 +192,77 @@ class PynbodySnapshot(Snapshot.Snapshot):
 			else:
 				raise Exception("Tipsy file not found: %s"%ftipsy)
 
-	def halos(self, nmin_per_halo = 150, num_threads=16):
+	def halos(self, nmin_per_halo = 50, num_threads=16, run_ahf=False):
+		import glob
+		s = self.raw_snapshot()
+		isRamses = (type(s) == pynbody.ramses.RamsesSnap)
+
+		fname = self.tipsy_fname() if isRamses else self.path()
+		ahf_files = glob.glob('%s.*.AHF_*'%fname)
+
+		if run_ahf:
+			#Remove the AHF files
+			for fname in ahf_files:
+				os.remove(fname)
+			ahf_files = glob.glob('%s.*.AHF_*'%fname)
+
+		if len(ahf_files) == 0:
+			#We need to run AHF
+			from ..utils import cosmo
+			z = self.current_redshift()
+			omega_m_z = cosmo.omega_z(s.properties['omegaM0'], z)
+			#First, convert to tipsy
+			if os.path.exists(fname) is False and isRamses: self.tipsy()
+			
+			lenunit, massunit, timeunit = self.tipsy_units()
+
+			l_unit = Unit('%f kpc'%lenunit)
+			t_unit = Unit('%f Gyr'%timeunit)
+			v_unit = l_unit/t_unit
+
+			f = open('%s.AHF.input'%fname,'w')
+			f.write('[AHF]\n')
+			f.write('ic_filename = %s\n'%fname)
+			f.write('ic_filetype = 90\n')
+			f.write('outfile_prefix = %s\n'%fname)
+			f.write('LgridDomain = 256\n')
+			f.write('LgridMax = 2097152\n')
+			f.write('NperDomCell = 5\n')
+			f.write('NperRefCell = 5\n')
+			f.write('VescTune = 1.0\n')
+			f.write('NminPerHalo = %d\n'%nmin_per_halo)
+			f.write('RhoVir = 0\n')
+			f.write('Dvir = 200\n')
+			f.write('MaxGatherRad = 1.0\n')
+			f.write('[TIPSY]\n')
+			f.write('TIPSY_BOXSIZE = %e\n'%(s.properties['boxsize'].in_units('Mpc')*s.properties['h']/s.properties['a']))
+			f.write('TIPSY_MUNIT   = %e\n'%(massunit*s.properties['h']*(1/omega_m_z)))
+			f.write('TIPSY_OMEGA0  = %f\n'%s.properties['omegaM0'])
+			f.write('TIPSY_LAMBDA0 = %f\n'%s.properties['omegaL0'])
+			
+		 #   velunit = Unit('%f cm'%s._info['unit_l'])/Unit('%f s'%s._info['unit_t'])
+			
+			f.write('TIPSY_VUNIT   = %e\n'%v_unit.ratio('km s^-1 a', **s.conversion_context()))			
+		 
+			# the thermal energy in K -> km^2/s^2
+		 
+			f.write('TIPSY_EUNIT   = %e\n'%((pynbody.units.k/pynbody.units.m_p).in_units('km^2 s^-2 K^-1')*5./3.))
+			f.close()			
+
+			os.environ['OMP_NUM_THREADS'] = str(num_threads)
+			os.system("~/apps/bin/AHF-v1.0-075 %s.AHF.input"%fname)
+
+		#Return the halos. We need the tipsy snap now to load them
+		if isRamses:
+			#print 'Warning: Analysis of RAMSES output with tipsy halos can result in unexpected results...'
+			s = self.tipsy().raw_snapshot()
+
+		halos = s.halos()
+		print 'Loaded %d halos'%len(halos)
+
+		return halos
+
+	def halos_deprec(self, nmin_per_halo = 150, num_threads=16):
 		import glob
 		s = self.raw_snapshot()
 		snap = self

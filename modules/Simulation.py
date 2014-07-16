@@ -9,44 +9,10 @@ TODO: Add features similar to Hamu i.e Automatic generation of axis labels for p
 @author: dsullivan
 '''
 from .. import config
-from .utils import string_utils
 
 pymses_loaded = config.pymses_enabled
 pynbody_loaded = config.pynbody_enabled
 yt_loaded = config.yt_enabled
-
-if config.quick_import:
-	from .pymses import Pymses
-	from .pynbody import Pynbody
-	from .yt import YT
-else:
-
-	config.list_modules()
-
-	if pymses_loaded:
-		try:
-			from .pymses import Pymses
-		except ImportError as e:
-			print 'Unable to import pymses'
-			pymses_loaded = False
-			print e
-	if pynbody_loaded:
-		try:
-			from .pynbody import Pynbody
-		except ImportError as e:
-			print 'Unable to import pynbody'
-			pynbody_loaded = False
-			print e
-	if yt_loaded:
-		try:
-			from .yt import YT
-		except ImportError as e:
-			print 'Unable to import yt'
-			yt_loaded = False
-			print e
-		if (pymses_loaded or pynbody_loaded or yt_loaded) is False:
-			raise RuntimeError("Could not import any modules!")
-			
 import numpy as np
 import json, os, glob, uuid
 
@@ -205,10 +171,13 @@ class Simulation():
 		Return a snapshot from the simulation
 		'''
 		if (module == 'yt') and yt_loaded:
+			from .yt import YT
 			return YT.load(self._path, ioutput)
 		elif (module == 'pymses') and pymses_loaded:
+			from .pymses import Pymses
 			return Pymses.load(self._path, ioutput)
 		elif (module == 'pynbody') and pynbody_loaded:
+			from .pynbody import Pynbody
 			return Pynbody.load(self._path, ioutput)
 		else:
 			print 'yt loaded: ', yt_loaded
@@ -220,12 +189,21 @@ class Simulation():
 		'''
 		Locate the snapshot closest to the given redshift
 		'''
-		redshifts = self.avail_redshifts()		
+		from .utils import array_utils
 
-		idx = np.argmin(np.abs(redshifts - z))
+		redshifts = self.avail_redshifts()
+		idx = array_utils.argmin(redshifts, z)
 		if config.verbose: print 'ioutput %05d closest to redshift %f'%(idx+1, z)
 
 		return idx+1
+
+	def avail_redshift(self, z):
+		'''
+		Return the closest available redshift
+		'''
+		redshifts = self.avail_redshifts()
+		idx = self.redshift(z)
+		return redshifts[idx]
 
 	def redshift_deprecated(self, z):
 		'''
@@ -253,7 +231,7 @@ class Simulation():
 
 		return idx+1
 
-	def avail_redshifts(self, zmin=0, zmax=1000):
+	def avail_redshifts(self, zmin=None, zmax=1000):
 		'''
 		Return a list of the available redshifts between some range
 		'''
@@ -277,6 +255,7 @@ class Simulation():
 		'''
 		Return an ordered list of outputs
 		'''
+		from .utils import string_utils
 		outputs = glob.glob('%s/output_00*'%self.path())
 		outputs.sort(key=string_utils.natural_keys)
 		return outputs
