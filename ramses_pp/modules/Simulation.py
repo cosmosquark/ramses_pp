@@ -282,10 +282,13 @@ class Simulation():
 		Return a snapshot from the simulation
 		'''
 		if (module == 'yt') and yt_loaded:
+			from .yt import YT
 			return YT.load(self._path, ioutput)
 		elif (module == 'pymses') and pymses_loaded:
+			from .pymses import Pymses
 			return Pymses.load(self._path, ioutput)
 		elif (module == 'pynbody') and pynbody_loaded:
+			from .pynbody import Pynbody
 			return Pynbody.load(self._path, ioutput)
 		else:
 			print 'yt loaded: ', yt_loaded
@@ -353,12 +356,23 @@ class Simulation():
 		'''
 		Locate the snapshot closest to the given redshift
 		'''
-		redshifts = self.avail_redshifts()		
-
-		idx = np.argmin(np.abs(redshifts - z))
+		from .utils import array_utils
+		redshifts = self.avail_redshifts()
+		idx = array_utils.argmin(redshifts, z)	
 		if config.verbose: print 'ioutput %05d closest to redshift %f'%(idx+1, z)
 
 		return idx+1
+
+	def avail_redshift(self, z):
+		'''
+		Return the closest available redshift
+		'''
+		redshifts = self.avail_redshifts()
+		idx = self.redshift(z)
+		return redshifts[idx]
+
+		
+
 
 	def redshift_deprecated(self, z):
 		'''
@@ -386,7 +400,7 @@ class Simulation():
 
 		return idx+1
 
-	def avail_redshifts(self, zmin=0, zmax=1000):
+	def avail_redshifts(self, zmin=None, zmax=1000):
 		'''
 		Return a list of the available redshifts between some range
 		'''
@@ -405,6 +419,18 @@ class Simulation():
 				redshifts.append(float(redshift))
 
 		return np.array(redshifts)
+
+ 	def ordered_outputs(self):
+ 		'''
+ 		Return an ordered list of outputs
+ 		'''
+
+		from .utils import string_utils
+ 		outputs = glob.glob('%s/output_00*'%self.path())
+ 		outputs.sort(key=string_utils.natural_keys)
+ 		return outputs
+
+
 
 ### halomaker stuff
 
