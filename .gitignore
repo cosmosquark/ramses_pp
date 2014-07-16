@@ -12,7 +12,6 @@ _*
 *.out
 python/yt/yt*
 simulations/*
-applications/*
 data/*
 ramses_pp/config.py
 python/pynbody/*

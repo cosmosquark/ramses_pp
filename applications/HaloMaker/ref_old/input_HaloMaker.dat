@@ -1,0 +1,36 @@
+# general parameters : 
+# --------------------
+
+af             =  1.0        	! Today expansion factor == 1+zi
+lbox           =  136.9863    	! Size of the box at z=0 (NB: in Mpc! ==> 479 Mpc/h=684.286 Mpc)
+H_f            =  73.000      	! Hubble constant (in Km/s/Mpc) at z=0
+omega_f        =  0.24        	! Omega matter at z=0 (ex: 0.3)
+omega_b        =  0.045        	! Omega baryon at z=0 (ex: 0.044)
+lambda_f       =  0.76        	! Omega lambda at z=0 (ex: 0.7)
+FlagPeriod     =  1           	! pericidicity flag choose 1 for periodic boundary conditions 0 else
+npart          =  20            ! Minimum number of particles per halo (ex:10)
+method         =  FOF        	! choose between FOF, HOP, DPM, MHM (view ReadMe for details).
+cdm            =  .true.    	! use center of mass instead of densest particle.
+b              =  0.2        	! fof parameter "b" (usually b=0.2)
+nsteps         =  1         	! Number of time steps to analyse
+PadFile        = pad_file.1
+xmin           = -0.5
+xmax           = 0.5
+ymin           = -0.5
+ymax           = 0.5
+zmin           = -0.5
+zmax           = 0.5
+
+
+# adaptahop parameters : 
+# ----------------------
+
+nvoisins       =  20        	! parameter for adaptahop (usually 20)
+nhop           =  20         	! parameter for adaptahop (usually 20)
+rhot           =  80.       	! parameter for adaptahop (80 coreespond to b = 0.2)
+fudge          = 4.          	! parameter for adaptahop (usually 4.) 
+fudgepsilon    = 0.05        	! parameter for adaptahop (usually 0.05)
+alphap         = 1.          	! parameter for adaptahop (usually 1.)
+verbose        = .true.     	! verbose parameter for both halo finder
+megaverbose    = .false.     	! parameter for adaptahop
+
