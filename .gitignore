@@ -13,6 +13,7 @@ _*
 python/yt/yt*
 simulations/*
 data/*
+applications/AHF*
 ramses_pp/config.py
 python/pynbody/*
 python/pymses_4.0.0/*
@@ -21,3 +22,4 @@ python/scipy/*
 python/Cython/*
 python/mpi4py/*
 movie/*
+ramses_pp/config.py

@@ -155,7 +155,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 
 		return lenunit, massunit, timeunit
 
-	def tipsy(self, convert=True):
+	def tipsy(self, gas=True, convert=True):
 		#Grab the tipsy output for this snapshot, if it exists
 		ftipsy = self.tipsy_fname()
 
@@ -199,14 +199,16 @@ class PynbodySnapshot(Snapshot.Snapshot):
 				print 'Writing file %s'%newfile
 				#s['mass'].convert_units('%f Msol'%massunit)
 				s['mass'].convert_units('%f Msol'%massunit)
-				s.g['rho'].convert_units(m_unit/l_unit**3)
-				s.g['temp']
-				s.g['metals'] = s.g['metal']
+				if gas == True:
+					s.g['rho'].convert_units(m_unit/l_unit**3)
+					s.g['temp']
+					s.g['metals'] = s.g['metal']
 				s['pos'].convert_units(l_unit)
 				s['vel'].convert_units(v_unit)
-				s['eps'] = s.g['smooth'].min()
-				s['eps'].units = s['pos'].units
-				del(s.g['metal'])
+				if gas == True:
+					s['eps'] = s.g['smooth'].min()
+					s['eps'].units = s['pos'].units
+					del(s.g['metal'])
 				del(s['smooth'])
 				
 				s.write(filename='%s'%newfile, fmt=pynbody.tipsy.TipsySnap, binary_aux_arrays = True)
@@ -220,6 +222,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 
 # see here for more doccumentation http://pynbody.github.io/pynbody/tutorials/halos.html
 
+<<<<<<< HEAD
 	def halos(self, nmin_per_halo = 50, num_threads=16, run_ahf=False):
 		import glob
 		s = self.raw_snapshot()
@@ -291,6 +294,9 @@ class PynbodySnapshot(Snapshot.Snapshot):
 
 
 	def halos_deprec(self, nmin_per_halo = 150, num_threads=16, configloc = True):
+=======
+	def halos(self, gas = True, nmin_per_halo = 150, num_threads=16, configloc = True):
+>>>>>>> 5ef5aa5018f149f9103a2a740ef0b6a26b7fdfca
 		import glob
 		s = self.raw_snapshot()
 		snap = self
@@ -347,13 +353,17 @@ class PynbodySnapshot(Snapshot.Snapshot):
 
 			os.environ['OMP_NUM_THREADS'] = str(num_threads)
 
-			if configloc:
+			if not configloc:
 				print "running AHF from your applications dir"
 				os.system("~/apps/bin/AHF-v1.0-075 %s.AHF.input"%fname)
 			else:
 				print "running AHF from your compiled location"
-				appstring = config.applications_dir + "/AHF-v1.0-075"
-				os.system("%s %s.AHF.input" %appstring %fname)	
+				appstring = config.applications_dir + "/AHF-v1.0-084"
+				filename = "%s.AHF.input" %fname
+				print filename
+				print appstring
+				exe_string = appstring + " " + filename
+				os.system(exe_string)	
 
 		if isTipsy is False:
 			s = self.tipsy().raw_snapshot()

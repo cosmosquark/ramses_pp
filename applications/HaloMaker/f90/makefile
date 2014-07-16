@@ -34,7 +34,8 @@
 # 
 ######
 
-COMPILE = "ifort"
+#COMPILE = "ifort"
+COMPILE = "gfortran"
 # options for HaloFinder 
 HOPTIONS = -DSIMPLE_OUTPUTS #-DBIG_RUN
 # options for GalFinder  -> Does not actually work ... 
@@ -47,6 +48,14 @@ ifeq ($(COMPILE),"ifort")
  DEBUG   = -g -fpe0 -traceback -C -ftrapuv #-warn all -stand f90 
  OPTIM   = -O2 -fp-model precise #-fast 
  FFLAGS  = ${OPTIM} -free -cpp #-convert big_endian 
+endif
+
+
+ifeq ($(COMPILO), "gfortran")
+F90C    = gfortran
+DEBUG   = -g
+OPTIM   = -O2
+FFLAGS  =  -cpp ${OPTIM}
 endif
 
 # need these libs to read enzo HDF4 format

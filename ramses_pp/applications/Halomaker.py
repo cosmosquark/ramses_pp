@@ -29,8 +29,14 @@ class Halomaker():
 		application_dir = config.applications_dir
 		data_dir = config.json_dir + '/' + str(self.Simulation.name()) + '/' + 'HaloMaker'
 		halomaker_dir = application_dir + "/HaloMaker/f90"
+		post_analysis_dir = application_dir + "/HaloMaker/post_analysis"
+		TreeMaker_dir = application_dir + "/HaloMaker/TreeMaker"
+		GalaxyMaker_dir = application_dir + "/HaloMaker/GalaxyMaker"
 		self._halomaker_exe = halomaker_dir + "/HaloFinder"
 		self._halomaker_dir = halomaker_dir
+		self._post_analysis_dir = post_analysis_dir
+		self._TreeMaker_dir = TreeMaker_dir
+		self._GalaxyMaker_dir = GalaxyMaker_dir
 		self._data_dir = data_dir
 		print "loading initial variables"
 
@@ -94,48 +100,78 @@ class Halomaker():
 		}
 		return sim_info
 
-	def run_halomaker_snap(self,ioutput):
+## part 1, halomaker
+
+	def check_halofinder_snap(self,ioutput):
 		direct = self._data_dir + '/' + str(ioutput)
+		# does the directory exist? if not run it
+		if not os.path.exists(direct):
+			os.makedirs(direct)
 		# check if run is not already done
 		# first by checking if there is any out files
 		props = "%03d" % ioutput
 		fileprops = direct + "/" + "haloProps." + props
 		if os.path.exists(fileprops):
 			print "halomaker already run on " + str(ioutput)
-			return
+			return True
 		# then by checking the log file
 		logfile = direct + "/log.out"
 		if os.path.exists(logfile):
 			run = False
 			lines = [line.strip() for line in open(logfile)]
 			for i in range(0,len(lines)):
-				print lines[i]
 				if lines[i] == "End of HaloMaker":
 					run = True		
 			if run == True:
 				print "halomaker already run on " + str(ioutput)
-				return
-		# make the directory
-						
-		print "working with " + direct
-		if not os.path.exists(direct):
-			os.makedirs(direct)
-		# make input files
-		Halomaker_Utils.make_input(direct, self.sim_info(), self._halomaker_stats, self._nsteps)
+				return True
+		return False
+		
+
+
+	def run_halomaker_snap(self,ioutput):
+		'''
+		runs halomaker and treemaker preperations on a snapshot
+		'''
 		snapno = "%05d" % ioutput
 		snaploc = self.Simulation._path + "/" + "output_" + snapno + '/'
 		nsteps = self._nsteps
-		Halomaker_Utils.make_inputfiles(direct, nsteps, snapno, snaploc, simtype="Ra3")
+		direct = self._data_dir + '/' + str(ioutput)
 
-		os.chdir(direct)
-		command = "ln -s " + self._halomaker_exe + " ."
-		os.system(command)
-		command = "chmod u+x HaloFinder"
-		os.system(command)
-		command = "./HaloFinder > log.out"
-		os.system(command)
-		command = "rm HaloFinder"
-		os.system(command)
+		check = self.check_halofinder_snap(ioutput)
+		if check == False: # if false, run halomaker
+		# make the directory
+						
+			print "working with " + direct
+
+		# make input files
+			Halomaker_Utils.make_input(direct, self.sim_info(), self._halomaker_stats, self._nsteps)
+			Halomaker_Utils.make_inputfiles(direct, nsteps, snapno, snaploc, simtype="Ra3")
+			os.chdir(direct)
+			command = "ln -s " + self._halomaker_exe + " ."
+			os.system(command)
+			command = "chmod u+x HaloFinder"
+			os.system(command)
+			command = "./HaloFinder > log.out"
+			os.system(command)
+			command = "rm HaloFinder"
+			os.system(command)
+		else:
+			"halomaker already run, skipping"
+
+		print "preparing " + str(ioutput) + " for treemaker"
+		
+		os.chdir(direct)  # this directory must exist to get past halomaker check
+		treeprepexe = self._post_analysis_dir + "/treebrick2ascii"
+		naploc = self.Simulation._path + "/" + "output_" + snapno
+		outnod = "halomaker_" + str(snapno) + ".nod"
+		outnei = "halomaker_" + str(snapno) + ".nei"
+		outbricks = "tree_bricks" + str("%03d" % ioutput)
+		treecommand = treeprepexe + " -inp " + naploc + " " + outnod + " " + outnei + " " + outbricks
+		print treecommand
+		os.system(treecommand)
+		print "treemaker done, assuming there are halos"
+
 
 	def run_halomaker(self,parallel=False,ncpu=1):
 		'''
@@ -148,12 +184,10 @@ class Halomaker():
 		if parallel==False:
 			print "running HaloMaker in serial"
 			for ioutput in range(1,num+1):
-				self.run_halomaker_snap(self,ioutput)
+				self.run_halomaker_snap(ioutput)
 		
 		return
-							
-		
-		
+
 
 	def executable_loc(self):
 		'''

@@ -45,9 +45,9 @@ def projection(snapshot, source_type, field, method='RayTracer', cmap='jet'):
 		h5fname = save_map_HDF5(map, cam, map_name=fname)
 
 		# Save into PNG image file
-		fig = save_HDF5_to_plot(h5fname, map_unit=("H/cc",factor), axis_unit=("Mpc", scale), img_path="./", cmap=cmap)#, cmap_range=crange)
+		fig = save_HDF5_to_plot(h5fname, map_unit=("H/cc",factor), axis_unit=("Mpc", scale), img_path="./movie", cmap=cmap)#, cmap_range=crange)
 		#plt.savefig('%s_mpl.png'%fname)
-		save_HDF5_to_img(h5fname, img_path='./', cmap=cmap)#, cmap_range=crange)
+		save_HDF5_to_img(h5fname, img_path='./movie', cmap=cmap)#, cmap_range=crange)
 
 	else:
 		raise Exception("Method %s not found"%method)
