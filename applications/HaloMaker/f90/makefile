@@ -34,8 +34,8 @@
 # 
 ######
 
-#COMPILE = "ifort"
-COMPILE = "gfortran"
+COMPILE = "ifort"
+#COMPILE = "gfortran"
 # options for HaloFinder 
 HOPTIONS = -DSIMPLE_OUTPUTS #-DBIG_RUN
 # options for GalFinder  -> Does not actually work ... 

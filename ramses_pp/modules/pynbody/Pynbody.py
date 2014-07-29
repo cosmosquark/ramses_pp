@@ -222,8 +222,8 @@ class PynbodySnapshot(Snapshot.Snapshot):
 
 # see here for more doccumentation http://pynbody.github.io/pynbody/tutorials/halos.html
 
-<<<<<<< HEAD
-	def halos(self, nmin_per_halo = 50, num_threads=16, run_ahf=False):
+
+	def halos(self, nmin_per_halo = 50, num_threads=16, run_ahf=False, configloc=True):
 		import glob
 		s = self.raw_snapshot()
 		isRamses = (type(s) == pynbody.ramses.RamsesSnap)
@@ -275,13 +275,18 @@ class PynbodySnapshot(Snapshot.Snapshot):
 			f.write('TIPSY_EUNIT   = %e\n'%((pynbody.units.k/pynbody.units.m_p).in_units('km^2 s^-2 K^-1')*5./3.))
 			f.close()			
 			os.environ['OMP_NUM_THREADS'] = str(num_threads)
-			if configloc:
+			if not configloc:
 				print "running AHF from your applications dir"
-				os.system("~/apps/bin/AHF-v1.0-075 %s.AHF.input"%fname)
+				os.system("~/apps/bin/AHF-v1.0-084 %s.AHF.input"%fname)
 			else:
 				print "running AHF from your compiled location"
-				appstring = config.applications_dir + "/AHF-v1.0-075"
-				os.system("%s %s.AHF.input" %appstring %fname)	
+				appstring = config.applications_dir + "/AHF-v1.0-084"
+				filename = "%s.AHF.input" %fname
+				print filename
+				print appstring
+				exe_string = appstring + " " + filename
+				os.system(exe_string)
+	
 
 
 		#Return the halos. We need the tipsy snap now to load them
@@ -294,9 +299,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 
 
 	def halos_deprec(self, nmin_per_halo = 150, num_threads=16, configloc = True):
-=======
-	def halos(self, gas = True, nmin_per_halo = 150, num_threads=16, configloc = True):
->>>>>>> 5ef5aa5018f149f9103a2a740ef0b6a26b7fdfca
+
 		import glob
 		s = self.raw_snapshot()
 		snap = self

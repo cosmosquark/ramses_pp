@@ -40,7 +40,7 @@ def okamoto_Mc(z, Vc, H0, omega_m=0.27):
 	return ((Vc_3 * A * B) / (C.G * H0)) / C.Msun # Msun
 
 
-+#Okamoto 2008 Virial Temperature
+#Okamoto 2008 Virial Temperature
 
 def T_vir(M, z, omega_m, H0, mu=0.59):
 	import constants as C
