@@ -23,3 +23,9 @@ python/Cython/*
 python/mpi4py/*
 movie/*
 ramses_pp/config.py
+tipsy.info
+AHF.in
+ahf_mtree_infile
+ahf_track_halos
+ahf_track_infile
+zfile
