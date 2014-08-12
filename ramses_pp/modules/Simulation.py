@@ -148,6 +148,24 @@ class Simulation():
 			} ,
 		self._periodic = True,
 
+	# add new methods based on "what modules (pymses, pynbody) are working
+
+		if pynbody_loaded:
+			from ..applications.ahf import AHF
+			for f in dir(AHF):
+				if f[0] != "_": # ignore hidden functions
+					self.func = self.call(getattr(AHF,f))  # loads any arbitary function
+			self.run_ahf = self.call(getattr(AHF,dir(AHF)[2]))
+			self.run_ahf_merger = self.call(getattr(AHF,dir(AHF)[3]))
+			self.run_ahf_tracker = self.call(getattr(AHF,dir(AHF)[4]))
+
+					
+
+	def func(self,a):
+		print("Not Defined")
+
+	def call(self,func,*args,**kwargs):
+		return lambda *args, **kwargs : func(self, *args, **kwargs)
 
 	def set_name(self, name):
 		self._name = name

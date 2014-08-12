@@ -12,6 +12,9 @@ import json, glob, uuid
 class AHF():
 	@staticmethod
 	def run_ahf(self,gas=True):
+		"""
+		run AHF on all pynbody snapshots
+		"""
 		for i in range(1,self.num_snapshots()):
 			shot = self.snapshot(i)
 			shot.tipsy(gas)
@@ -20,6 +23,9 @@ class AHF():
 
 	@staticmethod
 	def run_ahf_merger(self):
+		"""
+		Generate the Halo merger tree from AHF outputs
+		"""
 		snapno = self.num_snapshots()
 		ahf_files = []
 		red = []
@@ -46,12 +52,28 @@ class AHF():
 		execommand = "." + config.root_dir + "/applications/ahf-v1.0-084/bin/MergerTree < " + config.root_dir + "applications/ahf_mtree_infile"
 		os.system(execommand)
 
-	
-	def run_ahf_tracker(self)
-		snapno = self.num_snapshots()
+	@staticmethod
+	def run_ahf_tracker(self,snaptime=None,halos=None):
+		"""
+		take in a halo object from a snapshot of your choice  and track all or specific (halos_sel numpy array) individual halos backwards in time
+		"""
+
+		if snaptime==None:
+			snaptime = self.num_snapshots()
+
+		if snaptime > self.num_snapshots():
+			print "too many snapshots, returning"
+			return
+
+		if halos == None:
+			snap = self.snapshot(snaptime)
+			halo_arr = snap.halos()
+			count = len(halo_arr)
+			halos = np.arange(1,count+1)
+		
 		ahf_files = []
 		mfiles = []
-		mtree_files = np.zeros(snapno-1, dtype=str)
+		mtree_files = np.zeros(snaptime-1, dtype=str)
 		for isnap in range(snapno,0,-1):
 			tipsy_dir = str("%s/output_%05d/output_%05d_tipsy/" % (sim.path(), isnap, isnap))
 			ahf_files.append(glob.glob('%s*.AHF_halos'%tipsy_dir))
@@ -61,10 +83,16 @@ class AHF():
 			word[0] = word[0][:-6]
 			ahf_files[i] = word # trims the text "halos" from the main word... to give a suitable prefix
 
+		# write the halo id file
+		f = open((config.root_dir + "applications/ahf_track_halos"),'w')
+		for i in range(0,len(halos)):
+			f.write(str(halos[i]) + "\n")
+		f.close()
+
 		f = open((config.root_dir + "applications/ahf_track_infile"), 'w')
 
 		## write the track infile
-		for i in range(0,snapno):
+		for i in range(0,snaptime):
 			f.write(str(ahf_files[i][0]) + "\n")
 		f.close()
 
@@ -75,9 +103,9 @@ class AHF():
 			red[(sim.num_snapshots()-1)] = 0
 
 		z = open((config.root_dir + "applications/zfile"),'w')
-		for i in range(snapno-1,-1,-1):
+		for i in range(snaptime-1,-1,-1):
 			z.write(str(red[i]) + "\n")
-		z.close
+		z.close()
 
-		execommand = "." + config.root_dir + "/applications/ahf-v1.0-084/bin/ahfHaloHistory " + config.root_dir + "/applications/ahf_track_infile " + config.root_dir + "/applications/zfile"
+		execommand = "." + config.root_dir + "/applications/ahf-v1.0-084/bin/ahfHaloHistory " + config.root_dir + "/applications/ahf_track_halos " + config.root_dir + "/applications/ahf_track_infile " + config.root_dir + "/applications/zfile"
 		os.system(execommand)
