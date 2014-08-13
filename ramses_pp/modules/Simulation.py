@@ -462,6 +462,44 @@ class Simulation():
 
 #### end halomaker stuff
 
+	def info_snap(self,ioutput):
+		'''
+		return the basic infomation of an individual snapshot without loading it
+		'''
+		num = self.num_snapshots()
+		if ioutput > num or ioutput < 1:
+			print "Snapshot needs to be in range of 1 and " + str(self.num_snapshots())
+			raise e
+			return
+
+		infopath = ("%s/output_%05d" % (self._path, ioutput))
+		if not os.path.isdir(infopath):
+			print "Snapshot does not exist"
+			raise e
+			return
+		
+		info = infopath + ("/info_%05d.txt" % (ioutput))
+		f = open(info,'r')
+		nline = 1
+		while nline <= 18:
+			line = f.readline()
+			if(nline == 10): aexp = np.float32(line.split("=")[1])
+			if(nline == 16): lunit = np.float32(line.split("=")[1])
+			if(nline == 17): dunit = np.float32(line.split("=")[1])
+			if(nline == 18): tunit = np.float32(line.split("=")[1])
+			nline += 1
+		z = (1.0/aexp) - 1.0
+
+		infodata = {
+			'aexp': aexp,
+			'lunit': lunit,
+			'dunit': dunit,
+			'z':z,
+			}
+		return infodata
+	
+
+
 	def info(self):
 		'''
 		List all snapshots with some basic info

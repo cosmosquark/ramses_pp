@@ -6,7 +6,8 @@ from ramses_pp import config
 ########################
 import sys, os
 import json, glob, uuid
-
+import numpy as np
+import re
 
 
 class AHF():
@@ -29,9 +30,15 @@ class AHF():
 		snapno = self.num_snapshots()
 		ahf_files = []
 		red = []
-		mtree_files = np.zeros(snapno-1, dtype=str)
+		mfiles = []
 		for isnap in range(snapno,0,-1):
 			tipsy_dir = str("%s/output_%05d/output_%05d_tipsy/" % (self.path(), isnap, isnap))
+			if not os.path.isdir(tipsy_dir):
+				print "AHF not run on this snapshot.. aborting"
+				return
+			if len(glob.glob('%s*.AHF_particles'%tipsy_dir)) == 0:
+				print "AHF not run on this snapshot.. aborting"
+				return
 			ahf_files.append(glob.glob('%s*.AHF_particles'%tipsy_dir)[0])
 			red.append( re.split(r'\.(?!\d)', glob.glob('%s*.AHF_particles'%tipsy_dir)[0])[2] )
 			
@@ -49,13 +56,16 @@ class AHF():
 			f.write("\n")
 		f.close()
 
-		execommand = "." + config.root_dir + "/applications/ahf-v1.0-084/bin/MergerTree < " + config.root_dir + "applications/ahf_mtree_infile"
+		execommand = config.root_dir + "/applications/ahf-v1.0-084/bin/MergerTree < " + config.root_dir + "/applications/ahf_mtree_infile"
+		os.system(execommand)
+		print "cleaning up"
+		execommand = "rm " + config.root_dir + "/applications/ahf_mtree_infile"
 		os.system(execommand)
 
 	@staticmethod
 	def run_ahf_tracker(self,snaptime=None,halos=None):
 		"""
-		take in a halo object from a snapshot of your choice  and track all or specific (halos_sel numpy array) individual halos backwards in time
+		take in a halo object from a snapshot of your choice  and track all or specific (halos_sel numpy array) individual halos backwards in time !!! WARNING, DO NOT RUN IN PARALLEL WITH ANOTHER AHF HALO TRACKER PROCESS"
 		"""
 
 		if snaptime==None:
@@ -74,9 +84,16 @@ class AHF():
 		ahf_files = []
 		mfiles = []
 		mtree_files = np.zeros(snaptime-1, dtype=str)
-		for isnap in range(snapno,0,-1):
-			tipsy_dir = str("%s/output_%05d/output_%05d_tipsy/" % (sim.path(), isnap, isnap))
+		for isnap in range(snaptime,0,-1):
+			tipsy_dir = str("%s/output_%05d/output_%05d_tipsy/" % (self.path(), isnap, isnap))
 			ahf_files.append(glob.glob('%s*.AHF_halos'%tipsy_dir))
+			if not os.path.isdir(tipsy_dir):
+				print "AHF not run on this snapshot.. aborting"
+				return
+			if len(glob.glob('%s*.AHF_halos'%tipsy_dir)) == 0:
+				print "AHF not run on this snapshot.. aborting"
+				return
+
 
 		for i in range (0, len(ahf_files)):
 			word = ahf_files[i]
@@ -84,12 +101,12 @@ class AHF():
 			ahf_files[i] = word # trims the text "halos" from the main word... to give a suitable prefix
 
 		# write the halo id file
-		f = open((config.root_dir + "applications/ahf_track_halos"),'w')
+		f = open((config.root_dir + "/applications/ahf_track_halos"),'w')
 		for i in range(0,len(halos)):
 			f.write(str(halos[i]) + "\n")
 		f.close()
 
-		f = open((config.root_dir + "applications/ahf_track_infile"), 'w')
+		f = open((config.root_dir + "/applications/ahf_track_infile"), 'w')
 
 		## write the track infile
 		for i in range(0,snaptime):
@@ -98,14 +115,30 @@ class AHF():
 
 		# write the redshift file
 
-		red = sim.avail_redshifts() # redshifts based on RAMSES simulation redshifts here
-		if red[(sim.num_snapshots()-1)] < 0.00:
-			red[(sim.num_snapshots()-1)] = 0
+		red = self.avail_redshifts(zmin=self.info_snap(snaptime)['z']) # redshifts based on RAMSES simulation redshifts here
+		if red[(snaptime-1)] < 0.0000000000: # sometimes, the final snapshot can be less than 0
+			red[(snaptime-1)] = 0
 
-		z = open((config.root_dir + "applications/zfile"),'w')
-		for i in range(snaptime-1,-1,-1):
+		z = open((config.root_dir + "/applications/zfile"),'w')
+		for i in range(snaptime-1,-1,-1): # technically since we're going back in time.. this actually works index wise
 			z.write(str(red[i]) + "\n")
 		z.close()
 
-		execommand = "." + config.root_dir + "/applications/ahf-v1.0-084/bin/ahfHaloHistory " + config.root_dir + "/applications/ahf_track_halos " + config.root_dir + "/applications/ahf_track_infile " + config.root_dir + "/applications/zfile"
+		execommand =  config.root_dir + "/applications/ahf-v1.0-084/bin/ahfHaloHistory " + config.root_dir + "/applications/ahf_track_halos " + config.root_dir + "/applications/ahf_track_infile " + config.root_dir + "/applications/zfile"
 		os.system(execommand)
+		
+		# finally storing the halo tracker data from this timestep into the timestep directory
+		print "cleaning up"
+		execommand = "rm " + config.root_dir + "/applications/ahf_track_halos" 
+		os.system(execommand)
+		execommand = "rm " + config.root_dir + "/applications/ahf_track_infile"
+		os.system(execommand)
+		execommand = "rm " + config.root_dir + "/applications/zfile"
+		os.system(execommand)
+		
+		for h in range(0,len(halos)):
+			path = ("%s/output_%05d/output_%05d_tipsy/ahf_halo_track/" %  (self.path(), snaptime, snaptime))
+			if not os.path.isdir(path): os.mkdir(path)
+			fname = ("%s/halo_%07d.dat" % (config.root_dir, halos[h]))
+			execommand = "mv " + fname + " " + path
+			os.system(execommand)
