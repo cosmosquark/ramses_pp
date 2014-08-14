@@ -156,3 +156,13 @@ class Snapshot():
 			self._friedman = friedman
 
 		return friedman
+
+	def halos(self, finder='rockstar'):
+		'''
+		Load a generic halo catalogue - default to rockstar if not overridden
+		'''
+		from ..analysis.halo_analysis import halos
+		if finder=='rockstar':
+			return halos.RockstarCatalogue(self)
+		else:
+			raise Exception("Unimplemented finder: %s"%finder)
