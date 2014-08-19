@@ -2,14 +2,16 @@
 Module config object to store app wide settings
 '''
 
-#Enable/disable modules
-quick_import = True
+# TODO - Rewrite this entirely (nice to have a system like pynbody where you can
+#	do config_parser.getboolean('Rockstar', "some_prop"))
 
-yt_enabled = False
+#enable/disable modules
+yt_enabled = True
 pymses_enabled = True
 pynbody_enabled = True
+quick_import = True
 
-default_module='pynbody'
+default_module='yt'
 
 ramses_f90_dir='..ramses_f90'
 json_dir = '..data'
@@ -18,6 +20,9 @@ applications_dir = '..applications'
 root_dir = '..topdog'
 ramses_pp_dir = '..thing'
 ramses_pp_apps_dir = '..really'
+rockstar_base=""
+rockstar_autogrp=False
+
 
 
 override = True

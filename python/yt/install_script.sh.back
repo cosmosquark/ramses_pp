@@ -35,20 +35,20 @@ fi
 
 INST_HG=1       # Install Mercurial or not?  If hg is not already
                 # installed, yt cannot be installed.
-INST_ZLIB=1     # On some systems (Kraken) matplotlib has issues with
+INST_ZLIB=0     # On some systems (Kraken) matplotlib has issues with
                 # the system zlib, which is compiled statically.
                 # If need be, you can turn this off.
 INST_BZLIB=1    # On some systems, libbzip2 is missing.  This can
                 # lead to broken mercurial installations.
-INST_PNG=1      # Install a local libpng?  Same things apply as with zlib.
+INST_PNG=0      # Install a local libpng?  Same things apply as with zlib.
 INST_FTYPE=1    # Install FreeType2 locally?
 INST_ENZO=0     # Clone a copy of Enzo?
 INST_SQLITE3=1  # Install a local version of SQLite3?
-INST_PYX=1      # Install PyX?  Sometimes PyX can be problematic without a
+INST_PYX=0      # Install PyX?  Sometimes PyX can be problematic without a
                 # working TeX installation.
-INST_0MQ=1      # Install 0mq (for IPython) and affiliated bindings?
+INST_0MQ=0      # Install 0mq (for IPython) and affiliated bindings?
 INST_ROCKSTAR=1 # Install the Rockstar halo finder?
-INST_SCIPY=1    # Install scipy?
+INST_SCIPY=0    # Install scipy?
 
 # If you've got yt some other place, set this to point to it.
 YT_DIR=""

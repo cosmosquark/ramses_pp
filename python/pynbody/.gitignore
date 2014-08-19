@@ -1,8 +1,0 @@
-*~
-build
-_build
-*.pyc
-direct_omp.c
-testdata
-docs/_static/*png
-docs/*png

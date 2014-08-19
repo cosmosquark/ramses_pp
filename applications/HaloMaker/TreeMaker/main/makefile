@@ -35,7 +35,7 @@ OPTIM   = -O2 -fp-model precise
 FFLAGS  =  -cpp ${OPTIM}
 endif	
 
-<<<<<<< HEAD
+
 ifeq ($(COMPILO), "gfortran")
 F90C    = gfortran
 DEBUG   = -g
@@ -44,8 +44,6 @@ FFLAGS  =  -cpp ${OPTIM}
 endif
 
 
-=======
->>>>>>> 5ef5aa5018f149f9103a2a740ef0b6a26b7fdfca
 .SUFFIXES: .o .f90 
 # Rules:
 %.o: %.f90
