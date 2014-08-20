@@ -62,17 +62,11 @@ if __name__ == "__main__":
 	field = sys.argv[2]
 	fps = int(sys.argv[3])
 	outname = sys.argv[4]
-	start = (sys.argv[5])
-
-	if start == None:
-		start = 1
-	else:
-		start = int(start)
 
 	sim = Simulation.load(sim_name)
 	num_snapshots = sim.num_snapshots()
 
-	for ioutput in range(start, num_snapshots+1):
+	for ioutput in range(1, num_snapshots+1):
 		projection(sim.snapshot(ioutput, module='pymses'), Pymses.Type.AMR, field)
 
 	make_movie(fps, outname)

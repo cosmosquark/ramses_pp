@@ -17,7 +17,7 @@ class Snapshot():
 	'''
 	__metaclass__ = abc.ABCMeta
 
-	def __init__(self, sim_type):
+	def __init__(self, sim_type, **kwargs):
 		'''
 		Constructor
 		'''

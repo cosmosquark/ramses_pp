@@ -17,6 +17,8 @@ from yt.utilities.physical_constants import \
 	mass_sun_cgs, \
 	mh
 
+from yt.data_objects.particle_filters import add_particle_filter
+
 verbose = True
 
 def rho_crit_now(data, units='cgs'):
@@ -24,7 +26,7 @@ def rho_crit_now(data, units='cgs'):
 		G = 6.6743E-11
 	else:
 		G = 6.6743E-8 # cgs
-	H0 = (data.pf['H0'] * 1000) / 3.08567758E22 # s^-1
+	H0 = (data.ds['H0'] * 1000) / 3.08567758E22 # s^-1
 	rho_crit_0 = (3 * H0**2) / (8 * np.pi * G)
 	return rho_crit_0
 
@@ -39,26 +41,48 @@ def _NumDens(field, data):
 	return rv
 
 def _OverDensity(field, data):
-	omega_baryon_now = data.pf['omega_b']	
+	omega_baryon_now = data.ds.parameters['omega_b']
 	#return data['Density'] / (omega_baryon_now * rho_crit_now * (data.pf.hubble_constant**2) * ((1+data.pf.current_redshift)**3))
-	return data['Density'] / (omega_baryon_now * rho_crit_now(data) * ((1+data.pf.current_redshift)**3))
+	return data['Density'] / (omega_baryon_now * rho_crit_now(data) * ((1+data.ds.current_redshift)**3))
 
-def load(folder, ioutput):
+def load(folder, ioutput, **kwargs):
 	add_field(("gas", "Temperature"), function=_Temperature, units=r"\rm{K}")
 	add_field(("gas", "Number Density"), function=_NumDens, units=r"\rm{cm}^{-3}")
 	add_field(("gas", "Baryon Overdensity"), function=_OverDensity,
           units=r"")
-	return YTSnapshot(folder, ioutput)
+	return YTSnapshot(folder, ioutput, **kwargs)
 
-class YTSnapshot(Snapshot.Snapshot):
-	def __init__(self, folder, ioutput):
+def star_filter(pfilter,data):
+	filter = np.logical_and(data.particles.source["particle_age"] != 0, data.particles.source["particle_age"] != None)
+	return filter
+
+stclass YTSnapshot(Snapshot.Snapshot):
+	def __init__(self, folder, ioutput, **kwargs):
 		Snapshot.Snapshot.__init__(self, "yt")
 		'''
 		Load the snapshot
 		'''
+		
 		self._path = folder
 		self._ioutput = ioutput
+
+		
+		try:
+			stars = kwargs.get("stars",True)
+		except KeyError:
+			stars = False
+
 		self._snapshot = yt.mods.load(os.path.join('%s/output_%05d/info_%05d.txt'%(folder, ioutput, ioutput)))
+
+## snapshot filter methods ... for example, filtering out DM particles (creation time != 0)
+		if stars == True:
+			print "stars"
+			add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
+			self._snapshot.add_particle_filter("stars")
+	#		add_particle_filter("stars", function=Stars, filtered_type='all', requires=["particle_type"])
+			
+
+		
 
 		#Implement abstract methods from Snapshot.py
 
@@ -78,22 +102,23 @@ class YTSnapshot(Snapshot.Snapshot):
 		'''
 		Return the number of CPUs used
 		'''
-		pf = self.raw_snapshot()
-		return pf.parameters['ncpu']
+		ds = self.raw_snapshot()
+		return ds.parameters['ncpu']
 
 	def current_redshift(self):
 		'''
 		Return the current redshift
 		'''
-		pf = self.raw_snapshot()
-		return pf.current_redshift
+		ds = self.raw_snapshot()
+		return ds.current_redshift
+		
 
 	def cosmology(self):
 		'''
 		Return an object with cosmological parameters
 		'''
-		pf = self.raw_snapshot()
-		info = pf.parameters
+		ds = self.raw_snapshot()
+		info = ds.parameters
 		omega_m_0 = info['omega_m']
 		omega_l_0 = info['omega_l']
 		omega_k_0 = info['omega_k']
@@ -127,9 +152,23 @@ class YTSnapshot(Snapshot.Snapshot):
 		'''
 		return self._snapshot
 
+	def raw_snapshot_all(self):
+		'''
+		Return all the raw snapshot object data
+		'''
+		raw_snap = self.raw_snapshot()
+		raw_snap_all = raw_snap.all_data()
+		raw_snap_all.ds    # patch to get the pf functionality working nicely... bit of a hack
+		return raw_snap_all
+
+	def field_list(self):
+		ds = self.raw_snapshot_all()
+		for field in ds.derived_field_list:
+			print field
+
 	#Return the HOP halo catalogue. Can override run_hop to force re-running
 	def halos(self, run_hop=False):
-		pf = self._snapshot
+		ds = self._snapshot
 
 		#Check if HOP file exists (note we will adopt a naming convention here)
 		hop_dir = self.hop_path()
@@ -153,13 +192,16 @@ class YTSnapshot(Snapshot.Snapshot):
 			dump_fname = '%s/%s'%(hop_dir, prefix)
 			print 'No hop catalogue found, running hop...'
 			print 'Will dump halos in: %s'%dump_fname
-			halos = HaloFinder(pf, threshold=200)
+			halos = HaloFinder(ds, threshold=200)
 			#Dump the halos for next time
 			halos.dump(dump_fname)
 		else:
 			halo_file = '%s/%s'%(hop_dir, prefix)
 			if (verbose): print 'Loading halo file: %s'%halo_file
-			halos = LoadHaloes(pf, halo_file)
+			halos = LoadHaloes(ds, halo_file)
 			if (verbose): print 'Loaded %d halos'%len(halos)
 
 		return halos
+
+# YT with RAMSES has no way of determining whether particles are stars or dark matter.. for that, we need to make ammends.. for example, stars have a birth time, dark matter particles do not.
+

@@ -295,13 +295,13 @@ class Simulation():
 		'''
 		return self._path
 
-	def snapshot(self, ioutput, module=config.default_module):
+	def snapshot(self, ioutput, module=config.default_module, **kwargs):
 		'''
 		Return a snapshot from the simulation
 		'''
 		if (module == 'yt') and yt_loaded:
 			from .yt import YT
-			return YT.load(self._path, ioutput)
+			return YT.load(self._path, ioutput, **kwargs)
 		elif (module == 'pymses') and pymses_loaded:
 			from .pymses import Pymses
 			return Pymses.load(self._path, ioutput)
