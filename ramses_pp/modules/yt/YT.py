@@ -68,7 +68,7 @@ class YTSnapshot(Snapshot.Snapshot):
 
 		
 		try:
-			stars = kwargs.get("stars",True)
+			stars = kwargs.get("stars",False)
 		except KeyError:
 			stars = False
 
@@ -81,8 +81,6 @@ class YTSnapshot(Snapshot.Snapshot):
 			self._snapshot.add_particle_filter("stars")
 	#		add_particle_filter("stars", function=Stars, filtered_type='all', requires=["particle_type"])
 			
-
-		
 
 		#Implement abstract methods from Snapshot.py
 
@@ -165,6 +163,18 @@ class YTSnapshot(Snapshot.Snapshot):
 		ds = self.raw_snapshot_all()
 		for field in ds.derived_field_list:
 			print field
+
+	def trim_snapshot(self,size=1,units='Mpc',shape="sphere", region=[0.5,0.5,0.5]):
+		''' by default, trim your simulation down to a 1 MPc sphere situated at the center '''
+		raw_snap = self._snapshot
+		if shape=="sphere":
+			sp = raw_snap.sphere(region,(size,units))
+			return sp
+		else:
+			print "invalid shape"
+			return None
+
+
 
 	#Return the HOP halo catalogue. Can override run_hop to force re-running
 	def halos(self, run_hop=False):

@@ -449,6 +449,18 @@ class Simulation():
  		return outputs
 
 
+	def pos_to_codepos(self,val):
+		''' simple dirty code to convert a position in Mpc/h into code units'''
+		if val > self.box_size():
+			print "value is larger than the box size"
+			print "the boxsize is " + str(self.box_size())
+			return
+		else:
+			new_val = val / self.box_size()
+			print str(val) + " Mpc/h in code units is " + str(new_val)
+			return new_val
+
+
 
 ### halomaker stuff
 
