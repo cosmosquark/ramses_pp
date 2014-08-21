@@ -56,7 +56,7 @@ def star_filter(pfilter,data):
 	filter = np.logical_and(data.particles.source["particle_age"] != 0, data.particles.source["particle_age"] != None)
 	return filter
 
-stclass YTSnapshot(Snapshot.Snapshot):
+class YTSnapshot(Snapshot.Snapshot):
 	def __init__(self, folder, ioutput, **kwargs):
 		Snapshot.Snapshot.__init__(self, "yt")
 		'''
