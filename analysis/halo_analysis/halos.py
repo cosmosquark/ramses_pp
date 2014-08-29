@@ -8,7 +8,8 @@ dependency out sometime in the future if needed.
 @author dsullivan
 '''
 
-super_verbose=True
+super_verbose=False
+OFFSET=30 # This is to match rockstar outputs to snapshot numbers (in the event that cayalogue does not start at 1) - manual at the moment (I cba to fix it)
 
 import numpy as np
 import sys, os.path, glob
@@ -39,9 +40,12 @@ class Halo():
 		self._descriptor = "halo_" + str(halo_id)
 
 	def __getitem__(self, item):
+		snap = self._halo_catalogue._base()
+		ds = snap.raw_snapshot()
 		unit = self._halo_catalogue.units[item]
 		#return np.array([{item:self.properties[item]}, {'unit':unit}])
-		return YTArray(self.properties[item], unit)
+		#return YTArray(self.properties[item], unit)
+		return ds.arr(self.properties[item], unit)
 
 	def field_list(self):
 		return self._halo_catalogue.halo_type
@@ -54,7 +58,7 @@ class Halo():
 
 		return self._halo_catalogue.is_subhalo(self._halo_id, otherhalo._halo_id)
 
-	def sphere(self):
+	def get_sphere(self):
 		'''
 		YT only function. Currently, there is a bug with ds.sphere which ignores / h units.
 		So for the time being this function will take care of that
@@ -66,12 +70,53 @@ class Halo():
 			raise NotImplementedError("sphere only implemented for YT")
 		ds = snapshot.raw_snapshot()
 
-		if(centre.uq == YTArray(1.0, 'Mpc/h') or (Rvir.uq == YTArray(1.0, 'kpc/h'))):
-			if super_verbose:
-				print "Warning: YT ds.sphere() but does not recognise /h units. Correcting, but double check!"
-			return ds.sphere(centre/ds.hubble_constant, Rvir/ds.hubble_constant)
+		#if(centre.uq == YTArray(1.0, 'Mpc/h') or (Rvir.uq == YTArray(1.0, 'kpc/h'))):
+		#	if super_verbose:
+		#		print "Warning: YT ds.sphere() but does not recognise /h units. Correcting, but double check!"
+		#	return ds.sphere(centre/ds.hubble_constant, Rvir/ds.hubble_constant)
 
 		return ds.sphere(centre, Rvir)
+
+	def dbscan(self, eps=0.2, min_samples=10):
+		'''
+		Define a sphere centred on the halo, and identify groups of stars using DBSCAN (i.e to find galaxies)
+		eps defines the linking length to use, min_samples defines the minimum number of stars to define a galaxy
+		'''
+		#First, we will need a sphere
+		sphere = self.get_sphere()
+
+		#Now, identify only star particles
+		stars = sphere.particles.source['particle_age'] != 0
+		#Make sure there are some stars to analyze
+		if not True in stars:
+			raise Exception("No star particles found in sphere")
+
+		#Get the positions in code units
+		x, y, z = sphere['particle_position_x'][stars].value, \
+						sphere['particle_position_y'][stars].value, \
+						sphere['particle_position_z'][stars].value
+		X = np.dstack([x, y, z])[0]
+
+		#We have the data to run dbscan
+		from scipy.spatial import distance
+		from sklearn.cluster import DBSCAN
+		#from sklearn import metrics
+
+		# Compute similarities
+		D = distance.squareform(distance.pdist(X))
+		S = 1 - (D / np.max(D))
+
+		db = DBSCAN(eps=eps, min_samples=min_samples).fit(S)
+		del(D)
+		del(S)
+		#core_samples = db.core_sample_indices_
+		labels = db.labels_
+
+		# Number of clusters in labels, ignoring noise if present.
+		n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
+		print 'Found %d groups in halo %d'%(n_clusters_, self._halo_id)
+
+		return db, X
 
 class HaloCatalogue(object):
 
@@ -153,16 +198,48 @@ class RockstarCatalogue(HaloCatalogue):
 					  ('bullock_spin','f'),('b_to_a','f'),('c_to_a','f'),
 					  ('A','f',3),('T/|U|','f')])
 
-	units = {'id':'dimensionless','hostHalo':'dimensionless','Mvir':'Msun / h',
-					  'v_max':'km / s','v_rms':'km / s','Rvir':'kpc / h',
-					  'Rs':'kpc / h','num_p':'dimensionless',
-					  'pos':'Mpc / h','vel':'km / s',
-					  'J':'(Msun/h)**2 / (km/s)','spin':'dimensionless','klypin_rs':'dimensionless',
-					  'Mvir_all':'Msun / h',
-					  'M200b':'Msun / h','M200c':'Msun / h','M500c':'Msun / h',
-					  'Xoff':'kpc / h','Voff':'km / s',
-					  'bullock_spin':'dimensionless','b_to_a':'kpc / h','c_to_a':'kpc / h',
-					  'A':'?','T/|U|':'K(?)'}
+	mtree_type = np.dtype([('scale','f'),('id',np.int64),('desc_scale','f'),('desc_id',np.int64),
+					('num_prog',np.int64),('pid',np.int64),('upid',np.int64),
+					('desc_pid',np.int64),('phantom','f'),('sam_mvir','f'),
+					('Mvir','f'),('Rvir','f'),('Rs','f'),('v_rms','f'),
+					('mmp',np.int64),('scale_of_last_MM','f'),('v_max','f'),
+					('pos','f',3),('vel','f',3),('J','f',3),
+					('spin','f'),('breadth_first_id',np.int64),('depth_first_id',np.int64),
+					('tree_root_id',np.int64),('orig_halo_id',np.int64),
+					('snap_num',np.int64),('next_prog_depth_first_id',np.int64),
+					('last_prog_depth_first_id',np.int64),('klypin_rs','f'),
+					('Mvir_all','f'),('M200b','f'),('M200c','f'),('M500c','f'),
+					('M2500c','f'),('Xoff','f'),('Voff','f'),('bullock_spin','f'),
+					('b_to_a','f'),('c_to_a','f'),('A','f',3),('T/|U|','f'),
+					('M_pe_Behroozi','f'),('M_pe_Diemer','f')
+					])
+
+	#cm = comoving
+	#nocm = physical
+	units = {'id':'dimensionless',
+			'hostHalo':'dimensionless',
+			'Mvir':'Msun / h',
+			'v_max':'km / s',
+			'v_rms':'km / s',
+			'Rvir':'kpccm / h',
+			'Rs':'kpccm / h',
+			'num_p':'dimensionless',
+			'pos':'Mpccm / h',
+			'vel':'km / s',
+			'J':'(Msun/h)**2 / (km/s)',
+			'spin':'dimensionless',
+			'klypin_rs':'dimensionless',
+			'Mvir_all':'Msun / h',
+			'M200b':'Msun / h',
+			'M200c':'Msun / h',
+			'M500c':'Msun / h',
+			'Xoff':'kpccm / h',
+			'Voff':'km / s',
+			'bullock_spin':'dimensionless',
+			'b_to_a':'kpccm / h',
+			'c_to_a':'kpccm / h',
+			'A':'?',
+			'T/|U|':'dimensionless'}
 
 	def __init__(self, snap, filename=None, make_grp=None):
 		# TODO - Read/store header
@@ -170,11 +247,12 @@ class RockstarCatalogue(HaloCatalogue):
 			raise Exception("Cannot locate/load rockstar catalogue")
 
 		self._base = weakref.ref(snap)
+		#self._base = snap
 		HaloCatalogue.__init__(self)
 		
 		if filename is not None: self._rsFilename = filename
 		else:
-			fname = '%s/%s/out_%d.list'%(snap.path(), pp_cfg.rockstar_base, snap.output_number()-1)
+			fname = '%s/%s/out_%d.list'%(snap.path(), pp_cfg.rockstar_base, snap.output_number()-OFFSET)
 			self._rsFilename = cutgz(glob.glob(fname)[0])
 			if True == pp_cfg.verbose:
 				print 'Loading from %s'%fname
@@ -205,6 +283,9 @@ class RockstarCatalogue(HaloCatalogue):
 
 		if make_grp:
 			self.make_grp()
+
+	def __str__(self):
+		return 'HaloCatalogue - Snapshot %s'%self._base()
 
 	def make_grp(self):
 		'''
@@ -285,7 +366,7 @@ class RockstarCatalogue(HaloCatalogue):
 
 	@staticmethod
 	def _can_load(snap, **kwargs):
-		fname = '%s/%s/out_%d.list'%(snap.path(), pp_cfg.rockstar_base, snap.output_number()-1)
+		fname = '%s/%s/out_%d.list'%(snap.path(), pp_cfg.rockstar_base, snap.output_number()-OFFSET)
 		print fname
 		for file in glob.glob(fname):
 			if os.path.exists(file):
