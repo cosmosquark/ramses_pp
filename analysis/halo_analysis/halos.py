@@ -8,7 +8,7 @@ dependency out sometime in the future if needed.
 @author dsullivan
 '''
 
-super_verbose=False
+super_verbose=True
 OFFSET=30 # This is to match rockstar outputs to snapshot numbers (in the event that cayalogue does not start at 1) - manual at the moment (I cba to fix it)
 
 import numpy as np
@@ -77,10 +77,10 @@ class Halo():
 
 		return ds.sphere(centre, Rvir)
 
-	def dbscan(self, eps=0.2, min_samples=10):
+	def dbscan(self, eps=0.4, min_samples=20):
 		'''
 		Define a sphere centred on the halo, and identify groups of stars using DBSCAN (i.e to find galaxies)
-		eps defines the linking length to use, min_samples defines the minimum number of stars to define a galaxy
+		eps defines the linking length to use, min_samples defines the minimum number of stars to define a galaxyTODO - normalise positions AND eps by the virial radius of the halo
 		'''
 		#First, we will need a sphere
 		sphere = self.get_sphere()
@@ -92,21 +92,62 @@ class Halo():
 			raise Exception("No star particles found in sphere")
 
 		#Get the positions in code units
+		if super_verbose:
+			import time
+			t0 = time.time()
+			print 'Loading positions...'
 		x, y, z = sphere['particle_position_x'][stars].value, \
 						sphere['particle_position_y'][stars].value, \
 						sphere['particle_position_z'][stars].value
-		X = np.dstack([x, y, z])[0]
+
+		#Normalise these based on the virial radius
+		pos = self['pos'].convert_to_units('code_length').value
+		Rvir = self['Rvir'].convert_to_units('code_length').value
+
+		min_x, max_x = pos[0] - Rvir, pos[0] + Rvir
+		min_y, max_y = pos[1] - Rvir, pos[1] + Rvir
+		min_z, max_z = pos[2] - Rvir, pos[2] + Rvir
+
+		x_norm = (x - min_x)/(max_x - min_x)
+		y_norm = (y - min_y)/(max_y - min_y)
+		z_norm = (z - min_z)/(max_z - min_z)
+		#x_norm = x
+		#y_norm = y
+		#z_norm = z
+
+		print min(x_norm), max(x_norm)
+		print min(y_norm), max(y_norm)
+		print min(z_norm), max(z_norm)
+
+		X = np.dstack([x_norm, y_norm, z_norm])[0]
+		if super_verbose:
+			print 'Got positions'
+			t1 = time.time()
+			print 'Took %f s'%(t1 - t0)
 
 		#We have the data to run dbscan
 		from scipy.spatial import distance
 		from sklearn.cluster import DBSCAN
 		#from sklearn import metrics
-
 		# Compute similarities
+		if super_verbose:
+			print 'Computing similarities'
+			t0 = time.time()
 		D = distance.squareform(distance.pdist(X))
 		S = 1 - (D / np.max(D))
+		if super_verbose:
+			print 'Got similarities'
+			t1 = time.time()
+			print 'Took %f s'%(t1 - t0)
 
+		if super_verbose:
+			print 'Starting DBSCAN'
+			t0 = time.time()
 		db = DBSCAN(eps=eps, min_samples=min_samples).fit(S)
+		if super_verbose:
+			print 'Finished DBSCAN'
+			t1 = time.time()
+			print 'Took %f s'%(t1 - t0)
 		del(D)
 		del(S)
 		#core_samples = db.core_sample_indices_
