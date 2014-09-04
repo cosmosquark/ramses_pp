@@ -6,6 +6,7 @@ Based on Pymses.py from the Hamu project https://github.com/samgeen/Hamu
 
 from .. import Snapshot
 import sys, os
+#from ramses_pp import config
 
 #from yt.config import ytcfg; ytcfg["yt","loglevel"] = "20"
 import yt
@@ -20,6 +21,7 @@ from yt.utilities.physical_constants import \
 from yt.data_objects.particle_filters import add_particle_filter
 
 verbose = True
+#simulation_dir = config.simulation_dir
 
 def rho_crit_now(data, units='cgs'):
 	if units == 'SI':
@@ -62,17 +64,17 @@ class YTSnapshot(Snapshot.Snapshot):
 		'''
 		Load the snapshot
 		'''
-		
-		self._path = folder
+		print folder
+		self._path = folder #simulation_dir + "/" + folder
 		self._ioutput = ioutput
-
+		self._snappath = os.path.join('%s/output_%05d/'%(self._path, ioutput))
 		
 		try:
 			stars = kwargs.get("stars",False)
 		except KeyError:
 			stars = False
 
-		self._snapshot = yt.mods.load(os.path.join('%s/output_%05d/info_%05d.txt'%(folder, ioutput, ioutput)))
+		self._snapshot = yt.mods.load(os.path.join('%s/output_%05d/info_%05d.txt'%(self._path, ioutput, ioutput)))
 
 ## snapshot filter methods ... for example, filtering out DM particles (creation time != 0)
 		if stars == True:
@@ -90,11 +92,14 @@ class YTSnapshot(Snapshot.Snapshot):
 		'''
 		return self._ioutput
 
+	def folder(self):
+		return self._folder
+
 	def path(self):
 		'''
 		Return the path to this snapshot
 		'''
-		return os.path.join(os.path.dirname(self._path), 'output_%05d/'%ioutput)
+		return self._snappath
 
 	def ncpu(self):
 		'''
@@ -177,41 +182,52 @@ class YTSnapshot(Snapshot.Snapshot):
 
 
 	#Return the HOP halo catalogue. Can override run_hop to force re-running
-	def halos(self, run_hop=False):
+	def halos(self, finder="AHF", run_finder=False):
 		ds = self._snapshot
-
+		from ...analysis.halo_analysis import halos
 		#Check if HOP file exists (note we will adopt a naming convention here)
-		hop_dir = self.hop_path()
+		if finder == "hop":
+			hop_dir = self.hop_path()
+	
+			#if not os.path.isdir(hop_dir): os.mkdir(hop_dir)
+	
+			if (verbose): print 'Loading halos from directory: %s'%hop_dir
+	
+			#Check if out_%05d_hop.h5, .out and .txt exist
+			prefix = 'out_%05d_hop'%self._ioutput
+			extensions = ['h5', 'txt', 'out']
+	
+			if run_finder == False:
+				for ext in extensions:
+					if not os.path.isfile('%s/%s.%s'%(hop_dir, prefix, ext)):
+						run_finder = True
+						break
 
-		#if not os.path.isdir(hop_dir): os.mkdir(hop_dir)
+			#Return the halos
+			if run_finder:
+				dump_fname = '%s/%s'%(hop_dir, prefix)
+				print 'No hop catalogue found, running hop...'
+				print 'Will dump halos in: %s'%dump_fname
+				halos = HaloFinder(ds, threshold=200)
+				#Dump the halos for next time
+				halos.dump(dump_fname)
+			else:
+				halo_file = '%s/%s'%(hop_dir, prefix)
+				if (verbose): print 'Loading halo file: %s'%halo_file
+				halos = LoadHaloes(ds, halo_file)
+				if (verbose): print 'Loaded %d halos'%len(halos)
 
-		if (verbose): print 'Loading halos from directory: %s'%hop_dir
+			return halos
 
-		#Check if out_%05d_hop.h5, .out and .txt exist
-		prefix = 'out_%05d_hop'%self._ioutput
-		extensions = ['h5', 'txt', 'out']
 
-		if run_hop == False:
-			for ext in extensions:
-				if not os.path.isfile('%s/%s.%s'%(hop_dir, prefix, ext)):
-					run_hop = True
-					break
+		elif finder == "AHF":
+			return halos.AHFCatalogue(self)
 
-		#Return the halos
-		if run_hop:
-			dump_fname = '%s/%s'%(hop_dir, prefix)
-			print 'No hop catalogue found, running hop...'
-			print 'Will dump halos in: %s'%dump_fname
-			halos = HaloFinder(ds, threshold=200)
-			#Dump the halos for next time
-			halos.dump(dump_fname)
+		elif finder == "rockstar":
+			return halos.RockstarCatalogue(self)
+
 		else:
-			halo_file = '%s/%s'%(hop_dir, prefix)
-			if (verbose): print 'Loading halo file: %s'%halo_file
-			halos = LoadHaloes(ds, halo_file)
-			if (verbose): print 'Loaded %d halos'%len(halos)
-
-		return halos
+			raise Exception("Unimplemented finder: %s" %finder)
 
 # YT with RAMSES has no way of determining whether particles are stars or dark matter.. for that, we need to make ammends.. for example, stars have a birth time, dark matter particles do not.
 

@@ -301,13 +301,13 @@ class Simulation():
 		'''
 		if (module == 'yt') and yt_loaded:
 			from .yt import YT
-			return YT.load(self._path, ioutput, **kwargs)
+			return YT.load(folder=self.path(), ioutput=ioutput, **kwargs)
 		elif (module == 'pymses') and pymses_loaded:
 			from .pymses import Pymses
-			return Pymses.load(self._path, ioutput)
+			return Pymses.load(self.path(), ioutput)
 		elif (module == 'pynbody') and pynbody_loaded:
 			from .pynbody import Pynbody
-			return Pynbody.load(self._path, ioutput)
+			return Pynbody.load(self.path(), ioutput)
 		else:
 			print 'yt loaded: ', yt_loaded
 			print 'pymses loaded: ', pymses_loaded
