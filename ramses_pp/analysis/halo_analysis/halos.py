@@ -507,7 +507,7 @@ class AHFCatalogue(HaloCatalogue):
 		if filename is not None: self._AHFFilename = filename
 		else:
 			# get the file name
-			tipsy_dir = str("%s/output_%05d_tipsy/" % (snap.path(), snap.output_number()))
+			tipsy_dir = str("%soutput_%05d_tipsy/" % (snap.path(), snap.output_number()))
 			if not os.path.isdir(tipsy_dir):
 				print "AHF not run on this snapshot.. aborting"
 				raise Exception("AHF not run, run AHF plz")
@@ -536,7 +536,7 @@ class AHFCatalogue(HaloCatalogue):
 			print "AHFCatalogue: loading halos...",
 			sys.stdout.flush()
 
-		self._load_ahf_halos(f, snap)
+		self._load_ahf_halos(self._AHFFilename, snap)
 		f.close()
 
 		self._setup_children()
@@ -601,17 +601,9 @@ class AHFCatalogue(HaloCatalogue):
 	def base(self):
 		return self._base()
 
-### now we get complicated
+
 	def _load_ahf_halos(self, f, snap):
-		print f
-		haloprops = np.loadtxt(f,comments='#', skiprows=1)
-		print haloprops
-		print haloprops[1]
-		print len(haloprops[1])
-		print len(self.halo_type)
-		print len(self.units)
-		haloprops = np.loadtxt(f, dtype=self.halo_type, comments='#', skiprows=1)
-	#	haloprops = np.loadtxt(f, dtype=self.halo_type, comments='#')
+		haloprops = np.loadtxt(f, dtype=self.halo_type, comments='#')
 		self._nhalos = len(haloprops)
 		self._haloprops = np.array(haloprops)
 		# sort by number of particles to make compatible with AHF
@@ -649,6 +641,7 @@ class AHFCatalogue(HaloCatalogue):
 		print "3"		
 		fname = glob.glob('%s*.AHF_halos'%tipsy_dir)[0]
 		if os.path.exists(fname):
+			print fname, "test"
 			return True
 		return False
 
