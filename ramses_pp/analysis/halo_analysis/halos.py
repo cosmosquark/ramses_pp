@@ -41,9 +41,12 @@ class Halo():
 		self._descriptor = "halo_" + str(halo_id)
 
 	def __getitem__(self, item):
+		snap = self._halo_catalogue._base()
+		ds = snap.raw_snapshot()
 		unit = self._halo_catalogue.units[item]
 		#return np.array([{item:self.properties[item]}, {'unit':unit}])
-		return YTArray(self.properties[item], unit)
+		#return YTArray(self.properties[item], unit)
+		return ds.arr(self.properties[item], unit)
 
 	def field_list(self):
 		return self._halo_catalogue.halo_type
@@ -56,7 +59,7 @@ class Halo():
 
 		return self._halo_catalogue.is_subhalo(self._halo_id, otherhalo._halo_id)
 
-	def sphere(self):
+	def get_sphere(self):
 		'''
 		YT only function. Currently, there is a bug with ds.sphere which ignores / h units.
 		So for the time being this function will take care of that
@@ -183,13 +186,13 @@ class HaloCatalogue(object):
 	def __getitem__(self, item):
 		if isinstance(item, slice):
 			indices = item.indices(len(self._halos))
-			[self.calc_item(i + 1) for i in range(*indices)]
+			[self.calc_item(i) for i in range(*indices)]
 			return self._halos[item]
 		else:
 			return self.calc_item(item)
 
 	def _halo_generator(self):
-		i = 1
+		i = 0
 		while True:
 			try:
 				yield self[i]
@@ -331,13 +334,13 @@ class RockstarCatalogue(HaloCatalogue):
 		fails for some reason.
 		'''
 		for i in xrange(self._nhalos):
-			self._halos[i+1]._children = []
+			self._halos[i]._children = []
 
 		for i in xrange(self._nhalos):
-			host = self._halos[i+1].properties['hostHalo']
+			host = self._halos[i].properties['hostHalo']
 			if host > -1:
 				try:
-					self._halos[host+1]._children.append(i+1)
+					self._halos[host]._children.append(i)
 				except KeyError:
 					pass
 
@@ -367,7 +370,7 @@ class RockstarCatalogue(HaloCatalogue):
 		self._num_p_rank = np.flipud(self._haloprops[:]['num_p'].argsort(axis=0))
 
 		for h in xrange(self._nhalos): # self._nhalos + 1?
-			hn = np.where(self._num_p_rank==h)[0][0]+1
+			hn = np.where(self._num_p_rank==h)[0][0]
 
 			#Is this really memory inefficient?
 			self._halos[hn] = Halo(self._haloprops[h]['id'], self)
@@ -573,13 +576,13 @@ class AHFCatalogue(HaloCatalogue):
 		fails for some reason.
 		'''
 		for i in xrange(self._nhalos):
-			self._halos[i+1]._children = []
+			self._halos[i]._children = []
 
 		for i in xrange(self._nhalos):
-			host = self._halos[i+1].properties['hostHalo']
+			host = self._halos[i].properties['hostHalo']
 			if host > -1:
 				try:
-					self._halos[host+1]._children.append(i+1)
+					self._halos[host]._children.append(i)
 				except KeyError:
 					pass
 
@@ -592,7 +595,7 @@ class AHFCatalogue(HaloCatalogue):
 	def _get_by_id(self, halo_id):
 		#Nasty! But, allows lookup by id only (do we need this?)
 		idx = np.where(self._haloprops[:]['id'] == halo_id)[0][0]
-		hn = np.where(self._num_p_rank==idx)[0][0]+1
+		hn = np.where(self._num_p_rank==idx)[0][0]
 		#print 'hn=', hn
 		halo = self._halos[hn]
 		return halo
@@ -610,7 +613,8 @@ class AHFCatalogue(HaloCatalogue):
 		self._num_p_rank = np.flipud(self._haloprops[:]['num_p'].argsort(axis=0))
 
 		for h in xrange(self._nhalos): # self._nhalos + 1?
-			hn = np.where(self._num_p_rank==h)[0][0]+1
+			# AHF halos index start from 0... python start from 0.. lets be consitant :P
+			hn = np.where(self._num_p_rank==h)[0][0]
 
 			#Is this really memory inefficient?
 			self._halos[hn] = Halo(self._haloprops[h]['id'], self)
@@ -623,25 +627,20 @@ class AHFCatalogue(HaloCatalogue):
 		'''
 		raise NotImplementedError("Requires pynbody functionality")
 
-	def _load_rs_particles(self, f, snap):
+	def _load_ahf_particles(self, f, snap):
 		NotImplementedError("Only halo loading implemented")
 
 	@staticmethod
 	def _can_load(snap, **kwargs):
-		print snap.path()
-		print snap.output_number()
 		tipsy_dir = str("%soutput_%05d_tipsy/" % (snap.path(), snap.output_number()))
-		print "1"
-		print tipsy_dir
 		if not os.path.isdir(tipsy_dir):
 			return False
-		print "2"
+
 		if len(glob.glob('%s*.AHF_particles'%tipsy_dir)) == 0:
 			return False
-		print "3"		
+		
 		fname = glob.glob('%s*.AHF_halos'%tipsy_dir)[0]
 		if os.path.exists(fname):
-			print fname, "test"
 			return True
 		return False
 
