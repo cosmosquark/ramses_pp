@@ -29,7 +29,7 @@ fi
 
 # If you need to supply arguments to the NumPy or SciPy build, supply them here
 # This one turns on gfortran manually:
-#NUMPY_ARGS="--fcompiler=gnu95"
+#NUMPY_ARGS="--fcompiler=mpif77"
 # If you absolutely can't get the fortran to work, try this:
 #NUMPY_ARGS="--fcompiler=fake"
 
@@ -41,12 +41,12 @@ INST_ZLIB=1     # On some systems (Kraken) matplotlib has issues with
 INST_BZLIB=1    # On some systems, libbzip2 is missing.  This can
                 # lead to broken mercurial installations.
 INST_PNG=1      # Install a local libpng?  Same things apply as with zlib.
-INST_FTYPE=1    # Install FreeType2 locally?
+INST_FTYPE=0    # Install FreeType2 locally?
 INST_ENZO=0     # Clone a copy of Enzo?
 INST_SQLITE3=1  # Install a local version of SQLite3?
 INST_PYX=1      # Install PyX?  Sometimes PyX can be problematic without a
                 # working TeX installation.
-INST_0MQ=1      # Install 0mq (for IPython) and affiliated bindings?
+INST_0MQ=0      # Install 0mq (for IPython) and affiliated bindings?
 INST_ROCKSTAR=1 # Install the Rockstar halo finder?
 INST_SCIPY=1    # Install scipy?
 

@@ -576,13 +576,13 @@ class AHFCatalogue(HaloCatalogue):
 		fails for some reason.
 		'''
 		for i in xrange(self._nhalos):
-			self._halos[i]._children = []
+			self._halos[i+1]._children = []
 
 		for i in xrange(self._nhalos):
-			host = self._halos[i].properties['hostHalo']
+			host = self._halos[i+1].properties['hostHalo']
 			if host > -1:
 				try:
-					self._halos[host]._children.append(i)
+					self._halos[host+1]._children.append(i+1)
 				except KeyError:
 					pass
 

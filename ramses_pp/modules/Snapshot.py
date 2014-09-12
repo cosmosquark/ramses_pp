@@ -159,11 +159,11 @@ class Snapshot():
 
 		return friedman
 
-	def halos(self, finder='rockstar'):
+	def halos(self, finder='AHF'):
 
 		'''
 
-		Load a generic halo catalogue - default to rockstar if not overridden
+		Load a generic halo catalogue - default to AHF if not overridden
 
 		'''
 
@@ -172,6 +172,10 @@ class Snapshot():
 		if finder=='rockstar':
 
 			return halos.RockstarCatalogue(self)
+
+		elif finder=="AHF":
+			print "things are happening"
+			return halos.AHFCatalogue(self)
 
 		else:
 
