@@ -56,6 +56,10 @@ def star_filter(pfilter,data):
 	filter = np.logical_and(data.particles.source["particle_age"] != 0, data.particles.source["particle_age"] != None)
 	return filter
 
+def dark_filter(pfilter,data):
+	filter = np.logical_and(data.particles.source["particle_age"] == 0, data.particles.source["particle_age"] != None)
+	return filter
+
 class YTSnapshot(Snapshot.Snapshot):
 	def __init__(self, folder, ioutput, **kwargs):
 		Snapshot.Snapshot.__init__(self, "yt")
@@ -72,6 +76,11 @@ class YTSnapshot(Snapshot.Snapshot):
 		except KeyError:
 			stars = False
 
+		try:
+			dark = kwargs.get("dark",False)
+		except KeyError:
+			dark = False
+
 		self._snapshot = yt.mods.load(os.path.join('%s/output_%05d/info_%05d.txt'%(folder, ioutput, ioutput)))
 
 ## snapshot filter methods ... for example, filtering out DM particles (creation time != 0)
@@ -79,6 +88,11 @@ class YTSnapshot(Snapshot.Snapshot):
 			print "stars"
 			add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
 			self._snapshot.add_particle_filter("stars")
+
+		if dark == True:
+			print "dark"
+			add_particle_filter("dark", function=dark_filter, filtered_type="all", requires=["particle_age"])
+			self._snapshot.add_particle_filter("dark")
 	#		add_particle_filter("stars", function=Stars, filtered_type='all', requires=["particle_type"])
 			
 
