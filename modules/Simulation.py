@@ -54,7 +54,7 @@ else:
 import numpy as np
 import json, os, glob, uuid
 
-from ramses_pp.applications import Halomaker
+#from ramses_pp.analysis.halo_analysis import Halomaker
 
 def load(name):
 	'''
@@ -151,7 +151,7 @@ class Simulation():
 	# add new methods based on "what modules (pymses, pynbody) are working
 
 		if pynbody_loaded:
-			from ..applications.ahf import AHF
+			from ramses_pp.analysis.halo_analysis.ahf import AHF
 			for f in dir(AHF):
 				if f[0] != "_": # ignore hidden functions
 					self.func = self.call(getattr(AHF,f))  # loads any arbitary function
