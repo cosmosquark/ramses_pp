@@ -3,6 +3,7 @@ from ramses_pp import config
 ##########################
 ## Author, Ben Thompson
 ## just some simple routines to get AHF running it's built in analysis routines
+## these get loaded into the Simulation Snapshot Object if the pynbody module is available
 ########################
 import sys, os
 import json, glob, uuid
@@ -12,7 +13,7 @@ import re
 
 class AHF():
 	@staticmethod
-	def run_ahf(self,gas=True):
+	def run_ahf(self,gas=False):
 		"""
 		run AHF on all pynbody snapshots
 		"""
@@ -63,7 +64,7 @@ class AHF():
 		os.system(execommand)
 
 	@staticmethod
-	def run_ahf_tracker(self,snaptime=None,halos=None):
+	def run_ahf_tracker(self,snaptime=None,halos=None,forward=True):
 		"""
 		take in a halo object from a snapshot of your choice  and track all or specific (halos_sel numpy array) individual halos backwards in time !!! WARNING, DO NOT RUN IN PARALLEL WITH ANOTHER AHF HALO TRACKER PROCESS"
 		"""
@@ -79,7 +80,7 @@ class AHF():
 			snap = self.snapshot(snaptime)
 			halo_arr = snap.halos()
 			count = len(halo_arr)
-			halos = np.arange(1,count+1)
+			halos = np.arange(0,count)
 		
 		ahf_files = []
 		mfiles = []
@@ -139,6 +140,6 @@ class AHF():
 		for h in range(0,len(halos)):
 			path = ("%s/output_%05d/output_%05d_tipsy/ahf_halo_track/" %  (self.path(), snaptime, snaptime))
 			if not os.path.isdir(path): os.mkdir(path)
-			fname = ("%s/halo_%07d.dat" % (config.root_dir, halos[h]))
+			fname = ("%s/halo_%07d.dat" % (os.getcwd(), halos[h]))
 			execommand = "mv " + fname + " " + path
 			os.system(execommand)

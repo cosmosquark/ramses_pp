@@ -469,7 +469,7 @@ class Simulation():
 
 	def halomaker(self, subvol=False, ncpu=1):
 		return Halomaker.Halomaker(self, subvol=False, ncpu=1)
-		
+
 
 
 #### end halomaker stuff
