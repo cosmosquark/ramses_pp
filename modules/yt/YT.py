@@ -245,3 +245,11 @@ class YTSnapshot(Snapshot.Snapshot):
 
 # YT with RAMSES has no way of determining whether particles are stars or dark matter.. for that, we need to make ammends.. for example, stars have a birth time, dark matter particles do not.
 
+
+		
+# standard cosmology
+
+	def _a_dot():
+		cos = self.cosmology()
+		a_dot = (cos["h"]*100) * cos["aexp"] * np.sqrt(cos["omega_m_0"] * (cos["aexp"] ** -3) + cos["omega_k_0"]* (cos["aexp"] ** -2) + cos["omega_l_0"])
+		return a_dot

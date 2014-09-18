@@ -98,9 +98,10 @@ class Halo():
 			import time
 			t0 = time.time()
 			print 'Loading positions...'
-		x, y, z = sphere['particle_position_x'][stars].value, \
+		x, y, z, i = sphere['particle_position_x'][stars].value, \
 						sphere['particle_position_y'][stars].value, \
-						sphere['particle_position_z'][stars].value
+						sphere['particle_position_z'][stars].value, \
+						sphere['particle_index'][stars].value
 
 		#Normalise these based on the virial radius
 		pos = self['pos'].convert_to_units('code_length').value
@@ -155,11 +156,13 @@ class Halo():
 		#core_samples = db.core_sample_indices_
 		labels = db.labels_
 
+		# add the particle indices to the origional array
+		Y = np.insert(X,3,d,axis=1)
+
 		# Number of clusters in labels, ignoring noise if present.
 		n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
 		print 'Found %d groups in halo %d'%(n_clusters_, self._halo_id)
-
-		return db, X
+		return db, Y
 
 class HaloCatalogue(object):
 
