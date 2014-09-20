@@ -213,7 +213,7 @@ class Halo():
 		print "baryon_centre found at ", centre
 		return centre
 
-	def galaxy_disk(self,n_disks=5,disk_h=(10,"kpc/h"),center=None):
+	def galaxy_disk(self,n_disks=5,disk_h=(10,"kpc/h"),disk_w=(50,"kpc/h"),center=None):
 		# n_disks need to be odd... you have 1 disk.. or 1 disk sandwiched inbetween 2 others (n_disk=3) etc
 		if center == None:
 			center = self.baryon_center_quick(gas=True)
@@ -240,7 +240,7 @@ class Halo():
 			L = sphere.quantities.angular_momentum_vector(use_gas=True,use_particles=False)
 			print L
 		# simple galaxy disk for height and width work
-		cylinder = ds.disk(center,L,Rvir,Rvir)
+	
 
 		L_mag = np.sqrt(L[0].value**2 + L[1].value**2 + L[2].value**2)
 		print L_mag
@@ -279,7 +279,8 @@ class Halo():
 				disks.append([h_bin_down,cent_down,d_obj_down])
 
 		print disks
-		return disks
+		cylinder = ds.disk(center,L,disk_w,Rvir)
+		return disks, cylinder
 
 		
 		
