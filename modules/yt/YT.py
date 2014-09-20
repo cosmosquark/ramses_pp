@@ -249,7 +249,7 @@ class YTSnapshot(Snapshot.Snapshot):
 		
 # standard cosmology
 
-	def _a_dot():
+	def _a_dot(self):
 		cos = self.cosmology()
 		a_dot = (cos["h"]*100) * cos["aexp"] * np.sqrt(cos["omega_m_0"] * (cos["aexp"] ** -3) + cos["omega_k_0"]* (cos["aexp"] ** -2) + cos["omega_l_0"])
 		return a_dot

@@ -11,12 +11,14 @@ dependency out sometime in the future if needed.
 super_verbose=True
 OFFSET=30 # This is to match rockstar outputs to snapshot numbers (in the event that cayalogue does not start at 1) - manual at the moment (I cba to fix it)
 
+import yt
 import numpy as np
 import sys, os.path, glob
 import weakref, copy
 import re, uuid
 from ramses_pp import config as pp_cfg
 from yt.units.yt_array import YTArray
+#from ..analysis import center_finder
 #import logging
 
 #Should adopt this throughout
@@ -98,7 +100,7 @@ class Halo():
 			import time
 			t0 = time.time()
 			print 'Loading positions...'
-		x, y, z, i = sphere['particle_position_x'][stars].value, \
+		x, y, z, ind = sphere['particle_position_x'][stars].value, \
 						sphere['particle_position_y'][stars].value, \
 						sphere['particle_position_z'][stars].value, \
 						sphere['particle_index'][stars].value
@@ -157,12 +159,137 @@ class Halo():
 		labels = db.labels_
 
 		# add the particle indices to the origional array
-		Y = np.insert(X,3,d,axis=1)
+		Y = np.insert(X,3,ind,axis=1)
 
 		# Number of clusters in labels, ignoring noise if present.
 		n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
 		print 'Found %d groups in halo %d'%(n_clusters_, self._halo_id)
 		return db, Y
+
+	def baryon_center_quick(self, gas=False):
+		"""
+		find the center of the galaxy in the halo in a quick and dirty method (credit Gareth Few for the idea)
+		1) put a sphere around the halo at Rvir = 1 centered on centre of halo
+		2) find stellar CoM
+		3) put a sphere around 0.9 Rvir of the halo on the stellar center
+		4) find stellar CoM
+		5) repeat until 0.1Rvir
+		"""
+
+		centre = self['pos']
+		Rvir = self['Rvir']
+		snapshot = self._halo_catalogue._base()
+		if not (str(type(snapshot)) == "<class 'ramses_pp.modules.yt.YT.YTSnapshot'>"):
+			raise NotImplementedError("sphere only implemented for YT")
+		ds = snapshot.raw_snapshot()
+
+		for i in range(0,5):
+			print i
+			Rvir_fact = 1.0 - (i * 0.2) # shrink virial radius by 0.2 upon each run.. center on the new CoM
+			try:
+				sphere = ds.sphere(centre, (Rvir*Rvir_fact))
+			except yt.utilities.exceptions.YTSphereTooSmall:
+				break
+#			stars = None # potentially fixes a bug in YT
+			stars = sphere.particles.source['particle_age'] != 0
+			print "stars ", len(stars)
+#			center = sphere[stars].quantities.center_of_mass(use_gas = gas) ## find the CoM of the stars
+#			print center
+			if gas:
+				com_x = (  (sphere["particle_position_x"][stars] * sphere["particle_mass"][stars]).sum(dtype=np.float64) + \
+					(sphere["index","x"] * sphere["gas","cell_mass"]).sum(dtype=np.float64) )  / ((sphere["particle_mass"][stars]).sum(dtype=np.float64) + (sphere["gas","cell_mass"]).sum(dtype=np.float64) )
+				com_y = ( ( (sphere["particle_position_y"][stars] * sphere["particle_mass"][stars]).sum(dtype=np.float64) + \
+					(sphere["index","y"] * sphere["gas","cell_mass"]).sum(dtype=np.float64) ) )  / ((sphere["particle_mass"][stars]).sum(dtype=np.float64) + (sphere["gas","cell_mass"]).sum(dtype=np.float64) )
+				com_z = ( (sphere["particle_position_z"][stars] * sphere["particle_mass"][stars]).sum(dtype=np.float64) +  \
+					(sphere["index","z"] * sphere["gas","cell_mass"]).sum(dtype=np.float64) )   / ( (sphere["particle_mass"][stars]).sum(dtype=np.float64) + (sphere["gas","cell_mass"]).sum(dtype=np.float64) )
+			else:
+				com_x = (sphere["particle_position_x"][stars] * sphere["particle_mass"][stars]).sum(dtype=np.float64) / (sphere["particle_mass"][stars]).sum(dtype=np.float64)
+				com_y = (sphere["particle_position_y"][stars] * sphere["particle_mass"][stars]).sum(dtype=np.float64) / (sphere["particle_mass"])[stars].sum(dtype=np.float64)
+				com_z = (sphere["particle_position_z"][stars]* sphere["particle_mass"][stars]).sum(dtype=np.float64) / (sphere["particle_mass"][stars]).sum(dtype=np.float64)
+			centre = [com_x,com_y,com_z]
+			print centre
+			
+
+		print "baryon_centre found at ", centre
+		return centre
+
+	def galaxy_disk(self,n_disks=5,disk_h=(10,"kpc/h"),center=None):
+		# n_disks need to be odd... you have 1 disk.. or 1 disk sandwiched inbetween 2 others (n_disk=3) etc
+		if center == None:
+			center = self.baryon_center_quick(gas=True)
+		if n_disks % 2 == 0: # check for even number
+			print "n_disks must be odd"
+			return
+
+		print disk_h[0], disk_h[1]
+		disk_h = YTArray(disk_h[0],disk_h[1])
+		print disk_h
+		# get angular momentum
+		Rvir = self['Rvir']
+		snapshot = self._halo_catalogue._base()
+		if not (str(type(snapshot)) == "<class 'ramses_pp.modules.yt.YT.YTSnapshot'>"):
+			raise NotImplementedError("sphere only implemented for YT")
+		ds = snapshot.raw_snapshot()
+
+		for i in range(0,10):
+			Rvir_fact = 1.0 - (i * 0.1) # shrink virial radius by 0.1 upon each run.. center on the new CoM
+			try:
+				sphere = ds.sphere(center, (Rvir*Rvir_fact))
+			except yt.utilities.exceptions.YTSphereTooSmall:
+				break
+			L = sphere.quantities.angular_momentum_vector(use_gas=True,use_particles=False)
+			print L
+		# simple galaxy disk for height and width work
+		cylinder = ds.disk(center,L,Rvir,Rvir)
+
+		L_mag = np.sqrt(L[0].value**2 + L[1].value**2 + L[2].value**2)
+		print L_mag
+		L_norm = np.zeros(3)
+		L_norm[0] = L[0].value/L_mag
+		L_norm[1] = L[1].value/L_mag
+		L_norm[2] = L[2].value/L_mag
+		print L_norm
+
+		# bin of data disks
+
+		# how small can we get the height
+                disks = []
+
+		stacks = (n_disks + 1)/2
+
+	#	print center[0].convert_to_units("kpc/h")
+		center = [center[0].convert_to_units("kpc/h"),center[1].convert_to_units("kpc/h"),center[2].convert_to_units("kpc/h")]
+
+		print center	
+		print disk_h	
+		for i in range(0,stacks):
+			if i == 0: # central region first
+				cent = center
+				h_bin = YTArray(0,"kpc/h")
+				d_obj = ds.disk(center,L,Rvir,disk_h)
+				disks.insert(0,[h_bin,cent,d_obj])
+			else:
+				cent_up = [center[0] + ((L_norm[0] * i * disk_h)), center[1] + ((L_norm[1]* i * disk_h)) , center[2] + ((L_norm[2] * i * disk_h))]
+				cent_down = [center[0] - ((L_norm[0] * i * disk_h)), center[1] - ((L_norm[1]* i * disk_h)) , center[2] - ((L_norm[2] * i * disk_h))]
+				h_bin_up = i * disk_h
+				h_bin_down = i *(-disk_h)
+				d_obj_up = ds.disk(cent_up,L,Rvir,disk_h)
+				d_obj_down = ds.disk(cent_down,L,Rvir,disk_h)
+				disks.insert(0,[h_bin_up,cent_up,d_obj_up])
+				disks.append([h_bin_down,cent_down,d_obj_down])
+
+		print disks
+		return disks
+
+		
+		
+		
+
+
+
+	def stellar_center(self):
+		print "not functioning yet, will do something with dbscan results"
+		return 
 
 class HaloCatalogue(object):
 
