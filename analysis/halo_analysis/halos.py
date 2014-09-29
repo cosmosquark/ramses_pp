@@ -79,7 +79,24 @@ class Halo():
 #				print "Warning: YT ds.sphere() but does not recognise /h units. Correcting, but double check!"
 #			return ds.sphere(centre/ds.hubble_constant, Rvir/ds.hubble_constant)
 
-		return ds.sphere(centre, Rvir)
+		return ds.sphere(centre, (Rvir* Rvir_fact))
+
+	def projection_plot(self, Rvir_fact=1.0,fixed_length=None,stars=False,axis="x",units="kpc/h",quantity="density"):
+		'''
+		YT only function, produce and save a gas projection plot of the Halo of interest
+		Rvir_fact = multiply Rvir or fixed_length by a factor of something
+		fixed_length: if None, then use Rvir... otherwise whatever custom length (with units) which you choose
+		axis = projection axis
+		units = projection axis units
+		quantity = whatever you feel like plotting
+		'''
+		halo_sphere = self.get_sphere(Rvir_fact=Rvir_fact)
+		if fixed_length == None:
+			fixed_length = self["Rvir"]
+		region = halo_sphere.ds.region(center=self["pos"],left_edge=[(i.in_units('code_length').value - (self["Rvir"].in_units('code_length').value * Rvir_fact ) ) for i in self["pos"] ], right_edge=[(i.in_units('code_length').value + (self["Rvir"].in_units('code_length').value * Rvir_fact ) ) for i in self["pos"] ])
+		
+		plt = yt.ProjectionPlot(halo_sphere.ds,axis,quantity,center=self["pos"].in_units(units), width=(fixed_length.in_units('code_length').value*Rvir_fact), axes_unit=units, data_source=region )
+		plt.save(("Halo_" + str(self["id"].value)) )
 
 	def dbscan(self, eps=0.4, min_samples=20):
 		'''
@@ -166,7 +183,7 @@ class Halo():
 		print 'Found %d groups in halo %d'%(n_clusters_, self._halo_id)
 		return db, Y
 
-	def baryon_center_quick(self, gas=False):
+	def iterative_com(self, stars=True, dark=False, gas=False):
 		"""
 		find the center of the galaxy in the halo in a quick and dirty method (credit Gareth Few for the idea)
 		1) put a sphere around the halo at Rvir = 1 centered on centre of halo
@@ -176,47 +193,104 @@ class Halo():
 		5) repeat until 0.1Rvir
 		"""
 
-		centre = self['pos']
+		center = self['pos']
 		Rvir = self['Rvir']
 		snapshot = self._halo_catalogue._base()
 		if not (str(type(snapshot)) == "<class 'ramses_pp.modules.yt.YT.YTSnapshot'>"):
 			raise NotImplementedError("sphere only implemented for YT")
 		ds = snapshot.raw_snapshot()
 
+		## from stars, dark, gas .. what are we trying to find the centre of?
+		## cases
+		## if gas = True, stars = False, Dark = False ... case = 1 = gas CoM
+		## if gas = False, stars = True, Dark = False ... case = 2 = star CoM
+		## if gas = False, stars = False, Dark = True ... case = 3 = Dark CoM
+		## if gas = True, stars = True, Dark = False ... case = 4 = Baryon CoM
+		## if gas = False, stars = True, Dark = True ... case = 5 = Dark Star CoM
+		## if gas = True, stars = False, Dark = True ... case = 6 = Dark Gas
+		## if gas = True, stars = True, Dark = True ... case = 7 = All CoM
+		## if gas = False, stars = False, Dark = False .. case = 8... nothing... return
+
+		if stars == False and dark == False and gas == False:
+			print "Finding the centre of nothing is boring.. returning nothing"
+			return None
+		
+
 		for i in range(0,5):
 			print i
 			Rvir_fact = 1.0 - (i * 0.2) # shrink virial radius by 0.2 upon each run.. center on the new CoM
 			try:
-				sphere = ds.sphere(centre, (Rvir*Rvir_fact))
+				sphere = ds.sphere(center, (Rvir*Rvir_fact))
 			except yt.utilities.exceptions.YTSphereTooSmall:
 				break
 #			stars = None # potentially fixes a bug in YT
-			stars = sphere.particles.source['particle_age'] != 0
-			print "stars ", len(stars)
+			stars_part = sphere.particles.source['particle_age'] != 0
+			dark_part = sphere.particles.source['particle_age'] == 0
+			print "stars ", len(stars_part)
 #			center = sphere[stars].quantities.center_of_mass(use_gas = gas) ## find the CoM of the stars
 #			print center
-			if gas:
-				com_x = (  (sphere["particle_position_x"][stars] * sphere["particle_mass"][stars]).sum(dtype=np.float64) + \
-					(sphere["index","x"] * sphere["gas","cell_mass"]).sum(dtype=np.float64) )  / ((sphere["particle_mass"][stars]).sum(dtype=np.float64) + (sphere["gas","cell_mass"]).sum(dtype=np.float64) )
-				com_y = ( ( (sphere["particle_position_y"][stars] * sphere["particle_mass"][stars]).sum(dtype=np.float64) + \
-					(sphere["index","y"] * sphere["gas","cell_mass"]).sum(dtype=np.float64) ) )  / ((sphere["particle_mass"][stars]).sum(dtype=np.float64) + (sphere["gas","cell_mass"]).sum(dtype=np.float64) )
-				com_z = ( (sphere["particle_position_z"][stars] * sphere["particle_mass"][stars]).sum(dtype=np.float64) +  \
-					(sphere["index","z"] * sphere["gas","cell_mass"]).sum(dtype=np.float64) )   / ( (sphere["particle_mass"][stars]).sum(dtype=np.float64) + (sphere["gas","cell_mass"]).sum(dtype=np.float64) )
-			else:
-				com_x = (sphere["particle_position_x"][stars] * sphere["particle_mass"][stars]).sum(dtype=np.float64) / (sphere["particle_mass"][stars]).sum(dtype=np.float64)
-				com_y = (sphere["particle_position_y"][stars] * sphere["particle_mass"][stars]).sum(dtype=np.float64) / (sphere["particle_mass"])[stars].sum(dtype=np.float64)
-				com_z = (sphere["particle_position_z"][stars]* sphere["particle_mass"][stars]).sum(dtype=np.float64) / (sphere["particle_mass"][stars]).sum(dtype=np.float64)
-			centre = [com_x,com_y,com_z]
-			print centre
+
+			# case 1
+
+			if stars == False and gas == True and dark == False:
+				center = sphere.quantities.center_of_mass(use_gas=True, use_particles=False)
+
+			# case 2
+
+			elif stars == True and gas == False and dark == False:
+				com_x = (sphere["particle_position_x"][stars_part] * sphere["particle_mass"][stars_part]).sum(dtype=np.float64) / (sphere["particle_mass"][stars_part]).sum(dtype=np.float64)
+				com_y = (sphere["particle_position_y"][stars_part] * sphere["particle_mass"][stars_part]).sum(dtype=np.float64) / (sphere["particle_mass"])[stars_part].sum(dtype=np.float64)
+				com_z = (sphere["particle_position_z"][stars_part]* sphere["particle_mass"][stars_part]).sum(dtype=np.float64) / (sphere["particle_mass"][stars_part]).sum(dtype=np.float64)
+				center = [com_x,com_y,com_z]
+	
+			# case 3
+			elif stars == False and gas == False and dark == True:
+				com_x = (sphere["particle_position_x"][dark_part] * sphere["particle_mass"][dark_part]).sum(dtype=np.float64) / (sphere["particle_mass"][dark_part]).sum(dtype=np.float64)
+				com_y = (sphere["particle_position_y"][dark_part] * sphere["particle_mass"][dark_part]).sum(dtype=np.float64) / (sphere["particle_mass"])[dark_part].sum(dtype=np.float64)
+				com_z = (sphere["particle_position_z"][dark_part]* sphere["particle_mass"][dark_part]).sum(dtype=np.float64) / (sphere["particle_mass"][dark_part]).sum(dtype=np.float64)
+				center = [com_x,com_y,com_z]
+			# case 4 baryon COM
+
+			elif stars == True and gas == True and dark == False:
+				com_x = (  (sphere["particle_position_x"][stars_part] * sphere["particle_mass"][stars_part]).sum(dtype=np.float64) + \
+					(sphere["index","x"] * sphere["gas","cell_mass"]).sum(dtype=np.float64) )  / ((sphere["particle_mass"][stars_part]).sum(dtype=np.float64) + (sphere["gas","cell_mass"]).sum(dtype=np.float64) )
+				com_y = ( ( (sphere["particle_position_y"][stars_part] * sphere["particle_mass"][stars_part]).sum(dtype=np.float64) + \
+					(sphere["index","y"] * sphere["gas","cell_mass"]).sum(dtype=np.float64) ) )  / ((sphere["particle_mass"][stars_part]).sum(dtype=np.float64) + (sphere["gas","cell_mass"]).sum(dtype=np.float64) )
+				com_z = ( (sphere["particle_position_z"][stars_part] * sphere["particle_mass"][stars_part]).sum(dtype=np.float64) +  \
+					(sphere["index","z"] * sphere["gas","cell_mass"]).sum(dtype=np.float64) )   / ( (sphere["particle_mass"][stars_part]).sum(dtype=np.float64) + (sphere["gas","cell_mass"]).sum(dtype=np.float64) )
+				center = [com_x,com_y,com_z]
+
+			# case 5 dark star COM
+			elif stars == True and gas == False and dark == True:
+				center = sphere.quantities.center_of_mass(use_gas=False, use_particles=True) 
+
+			# case 6
+
+			elif stars == False and gas == True and dark == True:
+				com_x = (  (sphere["particle_position_x"][dark_part] * sphere["particle_mass"][dark_part]).sum(dtype=np.float64) + \
+					(sphere["index","x"] * sphere["gas","cell_mass"]).sum(dtype=np.float64) )  / ((sphere["particle_mass"][dark_part]).sum(dtype=np.float64) + (sphere["gas","cell_mass"]).sum(dtype=np.float64) )
+				com_y = ( ( (sphere["particle_position_y"][dark_part] * sphere["particle_mass"][dark_part]).sum(dtype=np.float64) + \
+					(sphere["index","y"] * sphere["gas","cell_mass"]).sum(dtype=np.float64) ) )  / ((sphere["particle_mass"][dark_part]).sum(dtype=np.float64) + (sphere["gas","cell_mass"]).sum(dtype=np.float64) )
+				com_z = ( (sphere["particle_position_z"][dark_part] * sphere["particle_mass"][dark_part]).sum(dtype=np.float64) +  \
+					(sphere["index","z"] * sphere["gas","cell_mass"]).sum(dtype=np.float64) )   / ( (sphere["particle_mass"][dark_part]).sum(dtype=np.float64) + (sphere["gas","cell_mass"]).sum(dtype=np.float64) )
+				center = [com_x,com_y,com_z]
+
 			
 
-		print "baryon_centre found at ", centre
-		return centre
+			# case 7 All COM
+			else:
+				center = sphere.quantities.center_of_mass(use_gas=True, use_particles=True)
+
+			print center
+			
+
+		print "centre found at ", center, " with stars " + str(stars) + " dark " + str(dark) + " gas " + str(gas)
+		return center
 
 	def galaxy_disk(self,n_disks=5,disk_h=(10,"kpc/h"),disk_w=(50,"kpc/h"),center=None):
 		# n_disks need to be odd... you have 1 disk.. or 1 disk sandwiched inbetween 2 others (n_disk=3) etc
 		if center == None:
-			center = self.baryon_center_quick(gas=True)
+			center = self.iterative_com(stars=True, dark=False, gas=True)
 		if n_disks % 2 == 0: # check for even number
 			print "n_disks must be odd"
 			return

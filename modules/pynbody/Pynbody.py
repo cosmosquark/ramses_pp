@@ -15,7 +15,8 @@ def load(folder, ioutput=None):
 	return PynbodySnapshot(folder, ioutput)
 
 class PynbodySnapshot(Snapshot.Snapshot):
-	def __init__(self, folder, ioutput=None):
+	def __init__(self, folder, ioutput=None, gas=False):
+		# gas is default to FALSE since pynbody does weird things with gas conversion to tipsy (pymses/yt is better for the gas data)
 		Snapshot.Snapshot.__init__(self, "Pynbody")
 		'''
 		Load the snapshot using pymses.RamsesOutput
@@ -24,9 +25,9 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		self._path = folder
 		self._ioutput = ioutput
 		if ioutput is not None:
-			self._snapshot = pynbody.load('%s/output_%05d'%(folder, ioutput))
+			self._snapshot = pynbody.load('%s/output_%05d'%(folder, ioutput),force_gas=False)
 		else:
-			self._snapshot = pynbody.load(folder)
+			self._snapshot = pynbody.load(folder,force_gas=False)
 
 	#Implement abstract methods from Snapshot.py
 
@@ -155,8 +156,10 @@ class PynbodySnapshot(Snapshot.Snapshot):
 
 		return lenunit, massunit, timeunit
 
-	def tipsy(self, gas=True, convert=True):
+	def tipsy(self, gas=False, convert=True):
+		# note RAMSES-CH does not handle very well with the pynbody conversion... tbh gas converted to particles is bad news anyway
 		#Grab the tipsy output for this snapshot, if it exists
+		print "if you are using RAMSES-CH, this will probably break, unless you set has_gas = False in RamsesSnap__init__ within pynbody"
 		ftipsy = self.tipsy_fname()
 
 		if os.path.exists(ftipsy):
@@ -200,16 +203,16 @@ class PynbodySnapshot(Snapshot.Snapshot):
 				#s['mass'].convert_units('%f Msol'%massunit)
 				s['mass'].convert_units('%f Msol'%massunit)
 				if gas == True:
-					s.g['rho'].convert_units(m_unit/l_unit**3)
+					s.g['rho'].convert_units(m_unit/l_unit**3) # get gas variables
 					s.g['temp']
 					s.g['metals'] = s.g['metal']
 				s['pos'].convert_units(l_unit)
 				s['vel'].convert_units(v_unit)
 				if gas == True:
-					s['eps'] = s.g['smooth'].min()
+					s['eps'] = s.g['smooth'].min()   # smooth the gas
 					s['eps'].units = s['pos'].units
 					del(s.g['metal'])
-				del(s['smooth'])
+					del(s['smooth'])
 				
 				s.write(filename='%s'%newfile, fmt=pynbody.tipsy.TipsySnap, binary_aux_arrays = True)
 				t = load(newfile)
@@ -243,7 +246,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 			omega_m_z = cosmo.omega_z(s.properties['omegaM0'], z)
 
 			#First, convert to tipsy
-			if os.path.exists(fname) is False and isRamses: self.tipsy()
+			if os.path.exists(fname) is False and isRamses: self.tipsy(gas=False)
 			lenunit, massunit, timeunit = self.tipsy_units()
 
 			l_unit = Unit('%f kpc'%lenunit)
