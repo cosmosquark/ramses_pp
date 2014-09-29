@@ -227,7 +227,7 @@ class HaloCatalogue(object):
 		'''
 		return sorted(self, key = lambda x: x[field], reverse=reverse)
 
-	def mass_function(self, units='Msun/h', nbins=50):
+	def mass_function(self, units='Msun/h', nbins=100):
 		'''
 		Compute the halo mass function for the given catalogue
 		'''
