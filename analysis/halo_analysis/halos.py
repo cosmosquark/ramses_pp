@@ -9,13 +9,12 @@ dependency out sometime in the future if needed.
 '''
 
 super_verbose=True
-OFFSET=30 # This is to match rockstar outputs to snapshot numbers (in the event that cayalogue does not start at 1) - manual at the moment (I cba to fix it)
 
 import numpy as np
 import sys, os.path, glob
 import weakref, copy
 from ramses_pp import config as pp_cfg
-from yt.units.yt_array import YTArray
+#from yt.units.yt_array import YTArray
 #import logging
 
 #Should adopt this throughout
@@ -185,18 +184,18 @@ class HaloCatalogue(object):
 	def __getitem__(self, item):
 		if isinstance(item, slice):
 			indices = item.indices(len(self._halos))
-			[self.calc_item(i + 1) for i in range(*indices)]
+			[self.calc_item(i) for i in range(*indices)]
 			return self._halos[item]
 		else:
 			return self.calc_item(item)
 
 	def _halo_generator(self):
-		i = 1
+		i = 0
 		while True:
 			try:
 				yield self[i]
 				i += 1
-				if i > len(self._halos):
+				if i > len(self._halos)-1:
 					break
 			except RuntimeError:
 				break
@@ -221,6 +220,31 @@ class HaloCatalogue(object):
 	@staticmethod
 	def can_run(self):
 		return False
+
+	def sort(self, field, reverse=True):
+		'''
+		Sort halos by a given field
+		'''
+		return sorted(self, key = lambda x: x[field], reverse=reverse)
+
+	def mass_function(self, units='Msun/h', nbins=50):
+		'''
+		Compute the halo mass function for the given catalogue
+		'''
+		masses = []
+		for halo in self:
+			Mvir = halo['Mvir'].in_units(units)
+			masses.append(Mvir)
+
+		mhist, mbin_edges = np.histogram(np.log10(masses),bins=nbins)
+		mbinmps = np.zeros(len(mhist))
+		mbinsize = np.zeros(len(mhist))
+		for i in np.arange(len(mhist)):
+			mbinmps[i] = np.mean([mbin_edges[i],mbin_edges[i+1]])
+			mbinsize[i] = mbin_edges[i+1] - mbin_edges[i]
+
+		return mbinmps, mhist, mbinsize
+
 
 #Rockstar
 class RockstarCatalogue(HaloCatalogue):
@@ -293,7 +317,7 @@ class RockstarCatalogue(HaloCatalogue):
 		
 		if filename is not None: self._rsFilename = filename
 		else:
-			fname = '%s/%s/out_%d.list'%(snap.path(), pp_cfg.rockstar_base, snap.output_number()-OFFSET)
+			fname = '%s/%s/out_%d.list'%(snap.path(), pp_cfg.rockstar_base, snap.output_number()-1)
 			self._rsFilename = cutgz(glob.glob(fname)[0])
 			if True == pp_cfg.verbose:
 				print 'Loading from %s'%fname
@@ -353,13 +377,13 @@ class RockstarCatalogue(HaloCatalogue):
 		fails for some reason.
 		'''
 		for i in xrange(self._nhalos):
-			self._halos[i+1]._children = []
+			self._halos[i]._children = []
 
 		for i in xrange(self._nhalos):
-			host = self._halos[i+1].properties['hostHalo']
+			host = self._halos[i].properties['hostHalo']
 			if host > -1:
 				try:
-					self._halos[host+1]._children.append(i+1)
+					self._halos[host]._children.append(i)
 				except KeyError:
 					pass
 
@@ -372,7 +396,7 @@ class RockstarCatalogue(HaloCatalogue):
 	def _get_by_id(self, halo_id):
 		#Nasty! But, allows lookup by id only (do we need this?)
 		idx = np.where(self._haloprops[:]['id'] == halo_id)[0][0]
-		hn = np.where(self._num_p_rank==idx)[0][0]+1
+		hn = np.where(self._num_p_rank==idx)[0][0]
 		#print 'hn=', hn
 		halo = self._halos[hn]
 		return halo
@@ -389,7 +413,7 @@ class RockstarCatalogue(HaloCatalogue):
 		self._num_p_rank = np.flipud(self._haloprops[:]['num_p'].argsort(axis=0))
 
 		for h in xrange(self._nhalos): # self._nhalos + 1?
-			hn = np.where(self._num_p_rank==h)[0][0]+1
+			hn = np.where(self._num_p_rank==h)[0][0]
 
 			#Is this really memory inefficient?
 			self._halos[hn] = Halo(self._haloprops[h]['id'], self)
@@ -407,7 +431,7 @@ class RockstarCatalogue(HaloCatalogue):
 
 	@staticmethod
 	def _can_load(snap, **kwargs):
-		fname = '%s/%s/out_%d.list'%(snap.path(), pp_cfg.rockstar_base, snap.output_number()-OFFSET)
+		fname = '%s/%s/out_%d.list'%(snap.path(), pp_cfg.rockstar_base, snap.output_number()-1)
 		print fname
 		for file in glob.glob(fname):
 			if os.path.exists(file):
