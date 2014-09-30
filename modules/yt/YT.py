@@ -115,7 +115,7 @@ class YTSnapshot(Snapshot.Snapshot):
 		'''
 		return self._path
 
-	def snappath(self)
+	def snappath(self):
 		'''
 		Return the path to this snapshot
 		'''

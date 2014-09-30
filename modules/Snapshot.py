@@ -7,7 +7,7 @@ Based on Snapshot.py from the Hamu project https://github.com/samgeen/Hamu
 import abc
 from ramses_pp import config
 import numpy as np
-
+import os
 
 #Abstract snapshot class for loading a ramses output
 
@@ -97,8 +97,9 @@ class Snapshot():
 		return boxsize
 
 	def particles(self):
+		ioutput = self.output_number()
 		header = ("%s/output_%05d/header_%05d.txt" % (self._path, ioutput, ioutput))
-		f = open(info, 'r')
+		f = open(header, 'r')
 		nline = 1
 		while nline <= 8:
 			line = f.readline()
@@ -106,6 +107,8 @@ class Snapshot():
 			if (nline == 4): ndark = int(line)
 			if (nline == 6): nstar = int(line)
 			if (nline == 8): nsink = int(line)
+			nline += 1
+
 		f.close()
 		particles = {
 			"total":npart,
@@ -125,6 +128,7 @@ class Snapshot():
 			line = f.readline()
 			if(nline == 3): min = np.float32(line.split("=")[1])
 			if(nline == 4): max = np.float32(line.split("=")[1])
+			nline += 1
 
 		grid = {
 			"min":min,
@@ -256,7 +260,7 @@ class Snapshot():
 			raise Exception("Unimplemented finder: %s"%finder)
 
 
-	def vide_inputs(self,lightcone=False, pecval = False, threads=4, divisions=1, slices=1, subvolumes = 1, partciles=True, subsamples = [1.0], halo_min_masses = ["none"], finder=None):
+	def vide_inputs(self,lightcone=False, pecval = False, threads=4, divisions=1, slices=1, subvolumes = 1, particles=True, subsamples = [1.0], halo_min_masses = ["none"], finder=None):
 		'''
 		Because VIDE is OpenMP and not MPI parallalised, I would not recommend running VIDE on a cluster.
 		to get around this, run vide on a computer with a high amount of RAM.
@@ -300,37 +304,41 @@ class Snapshot():
 		sim_path = self.path()
 		ioutput = self.output_number()
 
+		if not os.path.isdir('%s/vide'%(sim_path)):
+			os.mkdir('%s/vide'%(sim_path))
+
+
 		if particles:
-			filename = os.path.join('%s/vide_input_particles_%05d.py'%(sim_path,ioutput))
+			filename = os.path.join('%s/vide/vide_input_particles_%05d.py'%(sim_path,ioutput))
 		else:
 
 			# does the halo file exist? stored in simulation/vide_halos/output_NNNNN.txt
-			if not os.path.isdir(os.path.join('%s/vide_halos'%(sim_path))):
+			if not os.path.isdir(os.path.join('%s/vide/halos'%(sim_path))):
 				print "vide_halos directory does not exist"
 				return None
 			if finder == None:
-				if not os.path.isfile(str(os.path.join('%s/vide_halos'%(sim_path)) + ("/output_%05d.txt" % ioutput)))
+				if not os.path.isfile('%s/vide/halos/output_%05d.txt' % (sim_path, ioutput)):
 					print "vide halos input file does not exist"
 					return None
-				vide_halos_location = str('%s/vide_halos'%(sim_path)) + ("/output_%05d.txt" % ioutput)
+				vide_halos_location = str('%s/vide/halos'%(sim_path)) + ("/output_%05d.txt" % ioutput)
 				f.open(vide_halos,'r')
 				line = f.readline()
 				finder = str(line.split("=")[1])
 				f.close()
-				copy_file = os.path.join('%s/vide_input_halos_%05d.py'%(sim_path,ioutput))
-				copy_destination = os.path.join('%s/vide_input_halos_%s_%05d.py'%(sim_path,finder,ioutput))
+				copy_file = os.path.join('%s/vide/vide_input_halos_%05d.py'%(sim_path,ioutput))
+				copy_destination = os.path.join('%s/vide/vide_input_halos_%s_%05d.py'%(sim_path,finder,ioutput))
 				os.system(("cp %s %s" % (copy_file, copy_destination)))
 			else: # in most cases, we will have a finder
-				if not os.path.isfile(str(os.path.join('%s/vide_halos'%(sim_path)) + ("/output_%s_%05d.txt" % finder, ioutput)
+				if not os.path.isfile('%s/vide/halos/output_%s_%05d.txt' % (sim_path, finder, ioutput)):
 					print "vide halos input file for " + str(finder) + " does not exist"
 					return None
 
-			vide_halos = "vide_halos/output_%s_NNNNN.txt" % str(finder)
-			filename = os.path.join('%s/vide_input_halos_%s_%05d.py'%(sim_path,str(finder),ioutput))
+			vide_halos = "vide/halos/output_%s_NNNNN.txt" % str(finder)
+			filename = os.path.join('%s/vide/vide_input_halos_%s_%05d.py'%(sim_path,str(finder),ioutput))
 
 
 		sim_name = os.path.split(sim_path)[1] 
-		vide_catalogDir = os.path.join('%s/%s'%(config.vide_catalogue_root ,sim_name))
+		vide_catalogDir = os.path.join('%s/%s/'%(config.vide_catalogue_root ,sim_name))
 
 		# calculate redshift
 		redshift = self.current_redshift()
@@ -340,7 +348,7 @@ class Snapshot():
 		cosmology = self.cosmology()
 
 		dark_part = self.particles()['dark']
-		part_1d = str(int(np.power(dark,(1.0/3.0))))
+		part_1d = str(int(np.rint(np.power(dark_part,(1.0/3.0)))))  # that rint is crucial otherwise int(256.0) = 255!
 
 
 		f = open(filename,'w')
@@ -355,10 +363,10 @@ class Snapshot():
 		f.write('startCatalogStage = 1 \n')
 		f.write('endCatalogStage = 3 \n')
 		f.write('catalogDir = \"%s\" \n' % vide_catalogDir)
-		f.write('voidOutputDir = \"%s/vide_voids/voids/\" \n' % vide_catalogDir)
-		f.write('logDir = \"%s/vide_voids/logs/\" \n' % vide_catalogDir)
-		f.write('figDir = \"%s/vide_voids/figs/\" \n' % vide_catalogDir)
-		f.write('scriptDir = \"%s/vide_voids/scripts/\" \n' % vide_catalogDir)
+		f.write('voidOutputDir = \"%s/vide/voids/\" \n' % vide_catalogDir)
+		f.write('logDir = \"%s/vide/logs/\" \n' % vide_catalogDir)
+		f.write('figDir = \"%s/vide/figs/\" \n' % vide_catalogDir)
+		f.write('scriptDir = \"%s/vide/scripts/\" \n' % vide_catalogDir)
 		f.write('dataType = \"simulation\" \n')
 		f.write('dataFormat = \"ramses\" \n')
 		f.write('dataUnit = 1\n') ## assuming you are using your data units between 0.0 and 1.0.. care
@@ -385,10 +393,10 @@ class Snapshot():
 			f.write('#PARTICLES \n')
 			f.write('particleFileBase = \"output_NNNNN\" \n')
 			f.write('particleFileDummy = \"NNNNN\" \n')
-			f.write('fileNums = [\"%05d\"] \n' % ioutput)				
+			f.write('fileNums = [\"%05d\"] \n' % ioutput)	
 			f.write('redshifts = [\"%s\"] \n' % str(redshift))
-			f.write('subSamples = %s \n' % str(subsamples)
-			f.write('doSubSampling = False \n'
+			f.write('subSamples = %s \n' % str(subsamples))
+			f.write('doSubSampling = False \n')
 			f.write('doSubSamplingInPrep = False \n')
 			f.write('subSampleMode = \'relative\'\n')
 			f.write('shiftSimZ = False \n')
@@ -414,9 +422,10 @@ class Snapshot():
 
 		f.write('numPart = %s*%s*%s \n' % (part_1d,part_1d,part_1d) )
 		f.write('lbox = %f \n' % self.box_size())
-		f.write('omegaM = %s \n ' % cosmology['omega_m_0'])
-		f.write('hubble = %s \n ' % cosmology['h'])
+		f.write('omegaM = %s \n' % cosmology['omega_m_0'])
+		f.write('hubble = %s \n' % cosmology['h'])
 		f.close()
+		print "VIDE input file saved as ", filename
 		return
 
 	def voids(self, finder="VIDE"):

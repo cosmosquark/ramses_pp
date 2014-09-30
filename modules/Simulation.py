@@ -99,8 +99,8 @@ def create(name, path):
 		simulation = Simulation(name, path)
 		simulation.save()
 
-		data_dir = '%s/%s'%(json_dir, simulation._name)
-		if not os.path.isdir(data_dir): os.mkdir(data_dir)
+#		data_dir = '%s/%s'%(json_dir, simulation._name)
+#		if not os.path.isdir(data_dir): os.mkdir(data_dir)
 		return simulation
 	else:
 		raise Exception("Path does not exist: %s"%path)
