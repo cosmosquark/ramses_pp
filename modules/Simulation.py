@@ -335,7 +335,7 @@ class Simulation():
 			if(nline == 17): dunit = np.float32(line.split("=")[1])
 			if(nline == 18): tunit = np.float32(line.split("=")[1])
 			nline += 1
-
+		f.close()
 		h = h0 / 100
 
 		first_snap = 1
@@ -346,7 +346,7 @@ class Simulation():
 			line = f.readline()
 			if(nline == 10): iaexp = np.float32(line.split("=")[1])
 			nline += 1
-
+		f.close()
 		# store variables into a dictionary
 
 		iz = 1.0/iaexp -1.0
@@ -502,6 +502,7 @@ class Simulation():
 			nline += 1
 		z = (1.0/aexp) - 1.0
 
+		f.close()
 		infodata = {
 			'aexp': aexp,
 			'lunit': lunit,
@@ -532,3 +533,4 @@ class Simulation():
 				nline += 1
 			z = (1.0/aexp) - 1.0
 			print "    %5d  %10.5f  %10.5f  %12.5e  %12.5e  %12.5e" % (ioutput, aexp, z, lunit, dunit, tunit)
+		f.close()

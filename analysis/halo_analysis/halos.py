@@ -373,8 +373,9 @@ class HaloCatalogue(object):
 	Generic halo catalogue bases on pynbody, but with non-essential functionality
 	stripped out
 	'''
-	def __init__(self):
+	def __init__(self,finder):
 		self._halos = {}
+		self._finder = finder
 
 	def calc_item(self, i):
 		if i in self._halos:
@@ -454,7 +455,26 @@ class HaloCatalogue(object):
 		
 		return mbinmps, mhist, mbinsize
 
+	def vide_input(self):
+		'''
+		generates an input for VIDE ... don't do this with a sub catalogue or weird things may happen
+		'''
+		# initial array
+		vide_array = np.zeros([len(self),7])
+		for i in range(0,len(self)):
+			haloobj = self._get_halo[i]
+			vide_array[i,0] = haloobj["pos"][0].in_units("code_length").value
+			vide_array[i,1] = haloobj["pos"][1].in_units("code_length").value
+			vide_array[i,2] = haloobj["pos"][2].in_units("code_length").value
+			vide_array[i,3] = haloobj["vel"][0].in_units("code_length/code_time").value # need to check the velocity stuff
+			vide_array[i,4] = haloobj["vel"][1].in_units("code_length/code_time").value
+			vide_array[i,5] = haloobj["vel"][2].in_units("code_length/code_time").value
+			vide_array[i,4] = haloobj["vel"][1].in_units("code_length/code_time").value
+			vide_array[i,6] = haloobj["Mvir"].in_units("Msun/h").value
 
+		file_location = snap.path() + str("/vide_halos/output_%05d.txt" % str(snap.output_number()))
+		header_txt = "# finder = " + str(self._finder)
+		np.savetxt(file_location,vide_array,delimiter=",",header=header_txt)
 
 #Rockstar
 class RockstarCatalogue(HaloCatalogue):
@@ -506,7 +526,7 @@ class RockstarCatalogue(HaloCatalogue):
 			raise Exception("Cannot locate/load rockstar catalogue")
 
 		self._base = weakref.ref(snap)
-		HaloCatalogue.__init__(self)
+		HaloCatalogue.__init__(self,"rockstar")
 		
 		if filename is not None: self._rsFilename = filename
 		else:
@@ -632,7 +652,7 @@ class RockstarCatalogue(HaloCatalogue):
 
 class AHFCatalogue(HaloCatalogue):
 	'''
-	Class to handle catalogues produced by Rockstar (by Peter Behroozi).
+	Class to handle catalogues produced by AHF (by Peter Behroozi).
 	'''	
 ## assume file structure like this
 
@@ -739,11 +759,11 @@ class AHFCatalogue(HaloCatalogue):
 			raise Exception("Cannot locate/load AHF catalogue")
 
 		self._base = weakref.ref(snap)
-		HaloCatalogue.__init__(self)
+		HaloCatalogue.__init__(self,"AHF")
 		if filename is not None: self._AHFFilename = filename
 		else:
 			# get the file name
-			tipsy_dir = str("%soutput_%05d_tipsy/" % (snap.path(), snap.output_number()))
+			tipsy_dir = str("%soutput_%05d_tipsy/" % (snap.snappath(), snap.output_number()))
 			if not os.path.isdir(tipsy_dir):
 				print "AHF not run on this snapshot.. aborting"
 				raise Exception("AHF not run, run AHF plz")
@@ -865,7 +885,7 @@ class AHFCatalogue(HaloCatalogue):
 
 	@staticmethod
 	def _can_load(snap, **kwargs):
-		tipsy_dir = str("%soutput_%05d_tipsy/" % (snap.path(), snap.output_number()))
+		tipsy_dir = str("%soutput_%05d_tipsy/" % (snap.snappath(), snap.output_number()))
 		if not os.path.isdir(tipsy_dir):
 			return False
 
@@ -990,7 +1010,7 @@ class AHFHaloTracker(HaloCatalogue):
 		if filename is not None: self._AHFFilename = filename
 		else:
 			# get the file name
-			tipsy_dir = str("%soutput_%05d_tipsy/" % (snap.path(), snap.output_number()))
+			tipsy_dir = str("%soutput_%05d_tipsy/" % (snap.snappath(), snap.output_number()))
 			if not os.path.isdir(tipsy_dir):
 				print "AHF not run on this snapshot.. aborting"
 				raise Exception("AHF not run, run AHF plz")
@@ -1112,7 +1132,7 @@ class AHFHaloTracker(HaloCatalogue):
 
 	@staticmethod
 	def _can_load(snap, **kwargs):
-		tipsy_dir = str("%soutput_%05d_tipsy/" % (snap.path(), snap.output_number()))
+		tipsy_dir = str("%soutput_%05d_tipsy/" % (snap.snappath(), snap.output_number()))
 		if not os.path.isdir(tipsy_dir):
 			return False
 

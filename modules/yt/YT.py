@@ -111,6 +111,12 @@ class YTSnapshot(Snapshot.Snapshot):
 
 	def path(self):
 		'''
+		Return the path to this simulation directory
+		'''
+		return self._path
+
+	def snappath(self)
+		'''
 		Return the path to this snapshot
 		'''
 		return self._snappath
