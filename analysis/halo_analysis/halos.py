@@ -17,8 +17,7 @@ import sys, os.path, glob
 import weakref, copy
 import re, uuid
 from ramses_pp import config as pp_cfg
-from yt.units.yt_array import YTArray
-#from ..analysis import center_finder
+#from yt.units.yt_array import YTArray
 #import logging
 
 #Should adopt this throughout
@@ -295,6 +294,8 @@ class Halo():
 			print "n_disks must be odd"
 			return
 
+		from yt.units.yt_array import YTArray
+
 		print disk_h[0], disk_h[1]
 		disk_h = YTArray(disk_h[0],disk_h[1])
 		print disk_h
@@ -429,6 +430,32 @@ class HaloCatalogue(object):
 	def can_run(self):
 		return False
 
+	def sort(self, field, reverse=True):
+		'''
+		Sort halos by a given field
+		'''
+		return sorted(self, key = lambda x: x[field], reverse=reverse)
+
+	def mass_function(self, units='Msun/h', nbins=100):
+		'''
+		Compute the halo mass function for the given catalogue
+		'''
+		masses =[]
+		for halo in self:
+			Mvir = halo['Mvir'].in_units(units)
+			masses.append(Mvir)
+
+		mhist, mbin_edges = np.histogram(np.log10(masses),bins=nbins)
+		mbinmps = np.zeros(len(mhist))
+		mbinsize = np.zeros(len(mhist))
+		for i in np.arange(len(mhist)):
+			mbinmps[i] = np.mean([mbin_edges[i],mbin_edges[i+1]])
+			mbinsize[i] = mbin_edges[i+1] - mbin_edges[i]
+		
+		return mbinmps, mhist, mbinsize
+
+
+
 #Rockstar
 class RockstarCatalogue(HaloCatalogue):
 	'''
@@ -559,7 +586,7 @@ class RockstarCatalogue(HaloCatalogue):
 	def _get_by_id(self, halo_id):
 		#Nasty! But, allows lookup by id only (do we need this?)
 		idx = np.where(self._haloprops[:]['id'] == halo_id)[0][0]
-		hn = np.where(self._num_p_rank==idx)[0][0]+1
+		hn = np.where(self._num_p_rank==idx)[0][0]
 		#print 'hn=', hn
 		halo = self._halos[hn]
 		return halo

@@ -11,13 +11,19 @@ import sys, os
 import numpy as np
 from ramses_pp import config
 
+
+# multithreading
+pynbody.ramses.multiprocess_num = 16
+pynbody.config['number_of_threads'] = 16
+
 def load(folder, ioutput=None):
 	return PynbodySnapshot(folder, ioutput)
 
+
 class PynbodySnapshot(Snapshot.Snapshot):
-	def __init__(self, folder, ioutput=None, gas=False):
+	def __init__(self, folder, ioutput=None, gas=False, **kwargs):
 		# gas is default to FALSE since pynbody does weird things with gas conversion to tipsy (pymses/yt is better for the gas data)
-		Snapshot.Snapshot.__init__(self, "Pynbody")
+		Snapshot.Snapshot.__init__(self, "Pynbody", **kwargs)
 		'''
 		Load the snapshot using pymses.RamsesOutput
 		TODO Verify snapshot exists
@@ -104,11 +110,6 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		}
 		return cosmology
 
-	def info(self):
-		'''
-		Return info object
-		'''
-		return self.raw_snapshot()._info
 
 	def info(self):
 		'''
@@ -116,6 +117,18 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		'''
 		#return self.raw_snapshot().properties
 		return self.raw_snapshot()._info
+
+	def analytical_mass_function(self):
+		'''
+		Return the Sheth-Tormen mass function (can edit this method to include more)
+		'''
+		s = self._snapshot
+		M, sigma, N = pynbody.analysis.halo_mass_function(s)
+		return M, sigma, N
+
+
+
+
 
 ### tipsy conversion utlitlies
 
@@ -226,7 +239,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 # see here for more doccumentation http://pynbody.github.io/pynbody/tutorials/halos.html
 
 
-	def halos(self, nmin_per_halo = 50, num_threads=16, run_ahf=False, configloc=True):
+	def halos(self, LgridDomain=256, LgridMax=2097152, VescTune=1.0, Dvir=200, nmin_per_halo = 50, MaxGatherRad=1.0, num_threads=16, run_ahf=False, rewrite_tipsy=False, configloc=True):
 		import glob
 		s = self.raw_snapshot()
 		isRamses = (type(s) == pynbody.ramses.RamsesSnap)
@@ -235,17 +248,22 @@ class PynbodySnapshot(Snapshot.Snapshot):
 
 		if run_ahf:
 			#Remove the AHF files
-			for fname in ahf_files:
-				os.remove(fname)
 			ahf_files = glob.glob('%s.*.AHF_*'%fname)
+			for f in ahf_files:
+				os.remove(f)
 
-		if len(ahf_files) == 0:
+		if self.halo_cat_exists() is False:
 			#We need to run AHF
 			from ..utils import cosmo
 			z = self.current_redshift()
 			omega_m_z = cosmo.omega_z(s.properties['omegaM0'], z)
 
 			#First, convert to tipsy
+			if rewrite_tipsy:
+				rmdir = self.tipsy_dir()
+				print 'Would remove &s'%rmdir
+				#os.system('rm -rf %s'%(rmdir))
+
 			if os.path.exists(fname) is False and isRamses: self.tipsy(gas=False)
 			lenunit, massunit, timeunit = self.tipsy_units()
 
@@ -258,15 +276,15 @@ class PynbodySnapshot(Snapshot.Snapshot):
 			f.write('ic_filename = %s\n'%fname)
 			f.write('ic_filetype = 90\n')
 			f.write('outfile_prefix = %s\n'%fname)
-			f.write('LgridDomain = 256\n')
-			f.write('LgridMax = 2097152\n')
+			f.write('LgridDomain = %d\n'%LgridDomain)
+			f.write('LgridMax = %d\n'%LgridMax)
 			f.write('NperDomCell = 5\n')
 			f.write('NperRefCell = 5\n')
-			f.write('VescTune = 1.0\n')
+			f.write('VescTune = %1.1f\n'%VescTune)
 			f.write('NminPerHalo = %d\n'%nmin_per_halo)
 			f.write('RhoVir = 0\n')
-			f.write('Dvir = 200\n')
-			f.write('MaxGatherRad = 1.0\n')
+			f.write('Dvir = %f\n'%Dvir)
+			f.write('MaxGatherRad = 1.1f\n'%MaxGatherRad)
 			f.write('[TIPSY]\n')
 			f.write('TIPSY_BOXSIZE = %e\n'%(s.properties['boxsize'].in_units('Mpc')*s.properties['h']/s.properties['a']))
 			f.write('TIPSY_MUNIT   = %e\n'%(massunit*s.properties['h']*(1/omega_m_z)))
@@ -300,6 +318,15 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		print 'Loaded %d halos'%len(halos)
 		return halos
 
+	def halo_cat_exists(self):
+		import glob
+
+		s = self.raw_snapshot()
+		isRamses = (type(s) == pynbody.ramses.RamsesSnap)
+		fname = self.tipsy_fname() if isRamses else self.path()
+		ahf_files = glob.glob('%s.*.AHF_*'%fname)
+
+		return (len(ahf_files) != 0)
 
 	def halos_deprec(self, nmin_per_halo = 150, num_threads=16, configloc = True):
 
