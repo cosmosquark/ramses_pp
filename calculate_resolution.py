@@ -89,8 +89,7 @@ if __name__ == "__main__":
 	print 'levelmin = %s, levelmax = %s'%(lgridmin, lgridmax)
 	print 'ngrid_min = %s, ngrid_max = %s'%(ngrid_min**(1./3.), ngrid_max**(1./3.))
 	print 'omega_m0 = %s, omega_b = %s, h=%s kms**-1 Mpc**-1, boxsize = %e Mpc h**-1'%(omega_m0, omega_b, h, boxsize)
-	print 'coarse resolution = ', cell_size_coarse.in_units(unit_coarse), '%s, fine resolution = '%unit_coarse, cell_size_fine.in_units(unit_fine), 
-unit_fine
+	print 'coarse resolution = ', cell_size_coarse.in_units(unit_coarse), '%s, fine resolution = '%unit_coarse, cell_size_fine.in_units(unit_fine), unit_fine
 
 	print '---------------------------------------------'
 	n_J = n_jeans(cell_size_fine.in_units(unit_fine))

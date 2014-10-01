@@ -31,7 +31,6 @@ class SimpleField():
 	def __str__(self):
 		return str(np.array([self.value, self.unit]))
 
-
 class MergerHalo(Halo):
 	"""
 	Generic class representing a halo.
@@ -140,8 +139,7 @@ class RockstarMergerTree(MergerTree):
 					('Mvir','f'),('Rvir','f'),('Rs','f'),('v_rms','f'),
 					('mmp',np.int64),('scale_of_last_MM','f'),('v_max','f'),
 					('pos','f',3),('vel','f',3),('J','f',3),
-					
-('spin','f'),('breadth_first_id',np.int64),('depth_first_id',np.int64),
+					('spin','f'),('breadth_first_id',np.int64),('depth_first_id',np.int64),
 					('tree_root_id',np.int64),('orig_halo_id',np.int64),
 					('snap_num',np.int64),('next_prog_depth_first_id',np.int64),
 					('last_prog_depth_first_id',np.int64),('klypin_rs','f'),
@@ -196,8 +194,7 @@ class RockstarMergerTree(MergerTree):
 
 	def __init__(self, simulation, filename=None, make_grp=None):
 		# TODO - Read/store header
-		# TODO - Abstract out file reading so a RockstarMergerTree can be a sub-catalogue of 
-itself
+		# TODO - Abstract out file reading so a RockstarMergerTree can be a sub-catalogue of itself
 		if not self._can_load(simulation):
 			raise Exception("Cannot locate/load consistent trees")
 
@@ -216,8 +213,7 @@ itself
 		try:
 			f = open_(self._rsFilename)
 		except IOError:
-			raise IOError("Consistent tree not found -- check the file name of catalogue 
-data or try specifying a catalogue using the filename keyword")
+			raise IOError("Consistent tree not found -- check the file name of catalogue data or try specifying a catalogue using the filename keyword")
 
 		#self._head = np.fromstring(f.read(self.head_type.itemsize),
 		#	dtype=self.head_type)

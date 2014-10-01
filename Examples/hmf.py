@@ -24,4 +24,3 @@ if __name__ == "__main__":
 	plt.xlabel(r'log$_{10}$(M) [M$_{\odot}$/h]')
 	plt.ylabel('dN / dlog$_{10}$(M) [Mpc$^{-3}$ h$^{3}$]')
 	fig.savefig('hmf_test.png')
-

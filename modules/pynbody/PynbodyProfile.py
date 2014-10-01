@@ -50,7 +50,6 @@ class PynbodyProfile(Profile.Profile):
 
 	#TODO Filter by property e.g temperature
 	def fgas_halomass(self, halos=None, baryon_fraction=False):
-
 		cosmo = self._snapshot.cosmology()
 		h = cosmo['h']
 
@@ -71,6 +70,7 @@ class PynbodyProfile(Profile.Profile):
 				stellar_mass = np.sum(halo.s['mass']*h)
 				total_mass = np.sum(halo['mass']*h)
 				if(verbose): print 'mg = %e, mtot = %e, fg = %d'%(gas_mass, total_mass, gas_mass/total_mass)
+
 				#If baryon_fraction is true, calculate fraction of baryons in halo instead of just gas
 				mhalo.append(total_mass)
 				if baryon_fraction:
@@ -81,4 +81,5 @@ class PynbodyProfile(Profile.Profile):
 				#if j == 50: break
 		except KeyError:
 			print 'KeyError on halo %d'%j
+
 		return np.array(fgas), np.array(mhalo)

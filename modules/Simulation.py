@@ -8,13 +8,18 @@ TODO: Add features similar to Hamu i.e Automatic generation of axis labels for p
 
 @author: dsullivan, bthompson
 '''
+<<<<<<< HEAD
 from __future__ import division
 from ramses_pp import config
 
+=======
+from .. import config
+>>>>>>> e3a7470df625fb3d1566b7b448dd3f744b808256
 
 pymses_loaded = config.pymses_enabled
 pynbody_loaded = config.pynbody_enabled
 yt_loaded = config.yt_enabled
+<<<<<<< HEAD
 
 if config.quick_import:
 	if config.pymses_enabled:
@@ -51,6 +56,8 @@ else:
 		if (pymses_loaded or pynbody_loaded or yt_loaded) is False:
 			raise RuntimeError("Could not import any modules!")
 			
+=======
+>>>>>>> e3a7470df625fb3d1566b7b448dd3f744b808256
 import numpy as np
 import json, os, glob, uuid
 
@@ -389,8 +396,6 @@ class Simulation():
 		idx = self.redshift(z)
 		return redshifts[idx]
 
-		
-
 
 	def redshift_deprecated(self, z):
 		'''
@@ -511,8 +516,6 @@ class Simulation():
 			}
 		return infodata
 	
-
-
 	def info(self):
 		'''
 		List all snapshots with some basic info

@@ -6,10 +6,12 @@ Currently depends on yt-3.0 for unit handling. I'll try and code this
 dependency out sometime in the future if needed.
 
 @author dsullivan, bthompson
+=======
 '''
 
 super_verbose=True
 
+<<<<<<< HEAD
 import yt
 import numpy as np
 import sys, os.path, glob
@@ -18,6 +20,12 @@ import re, uuid
 from ramses_pp import config as pp_cfg
 import abc
 
+=======
+import numpy as np
+import sys, os.path, glob
+import weakref, copy
+from ramses_pp import config as pp_cfg
+>>>>>>> e3a7470df625fb3d1566b7b448dd3f744b808256
 #from yt.units.yt_array import YTArray
 #import logging
 
@@ -369,7 +377,6 @@ class Halo():
 		return 
 
 class HaloCatalogue(object):
-
 	'''
 	Generic halo catalogue bases on pynbody, but with non-essential functionality
 	stripped out
@@ -413,7 +420,6 @@ class HaloCatalogue(object):
 			except RuntimeError:
 				break
 
-
 	def is_subhalo(self, childid, parentid):
 		"""
 		Checks whether the specified 'childid' halo is a subhalo
@@ -434,7 +440,6 @@ class HaloCatalogue(object):
 	@staticmethod
 	def can_run(self):
 		return False
-
 
 	def sort(self, field, reverse=True):
 		'''
@@ -491,6 +496,7 @@ class HaloCatalogue(object):
 #		if gen_inputs:
 #			self._snap.vide_input(halo_min_masses=halo_min_masses,finder=finder)
 		return
+
 
 #Rockstar
 class RockstarCatalogue(HaloCatalogue):
@@ -577,6 +583,9 @@ class RockstarCatalogue(HaloCatalogue):
 
 		if make_grp:
 			self.make_grp()
+
+	def __str__(self):
+		return 'HaloCatalogue - Snapshot %s'%self._base()
 
 	def make_grp(self):
 		'''
@@ -912,8 +921,6 @@ class AHFCatalogue(HaloCatalogue):
 		if os.path.exists(fname):
 			return True
 		return False
-
-
 
 
 def open_(filename, *args):

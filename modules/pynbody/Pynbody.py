@@ -1,3 +1,4 @@
+
 '''
 Based on Pymses.py from the Hamu project https://github.com/samgeen/Hamu
 
@@ -16,8 +17,12 @@ from ramses_pp import config
 pynbody.ramses.multiprocess_num = 16
 pynbody.config['number_of_threads'] = 16
 
-def load(folder, ioutput=None):
-	return PynbodySnapshot(folder, ioutput)
+#Multithreading
+pynbody.ramses.multiprocess_num = 16
+pynbody.config['number_of_threads'] = 16
+
+def load(folder, ioutput=None, **kwargs):
+	return PynbodySnapshot(folder, ioutput, **kwargs)
 
 
 class PynbodySnapshot(Snapshot.Snapshot):
@@ -75,16 +80,15 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		Return the current redshift
 		'''
 		s = self.raw_snapshot()
-		#return s.properties['z']
 		aexp = s.properties['a']
-		z = 1/aexp - 1
-		return z
+		return (1/aexp) - 1
 
 	def cosmology(self):
 		'''
 		Return an object with cosmological parameters
 		'''
 		s = self.raw_snapshot()
+
 		#We need the ramses snapshot for this
 		if (type(s) == pynbody.tipsy.TipsySnap):
 			ramses_path = os.path.abspath(os.path.join(self.path(), '../../../'))
@@ -96,6 +100,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		omega_m_0 = info['omegaM0']
 		omega_l_0 = info['omegaL0']
 		h = info['h']
+		aexp = info['a']
 
 # pynbody does not natively load omega_k and omega_b... processing these now from the last snapshot (since these values do not change)
 		n = self.output_number()
@@ -134,10 +139,6 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		M, sigma, N = pynbody.analysis.halo_mass_function(s)
 		return M, sigma, N
 
-
-
-
-
 ### tipsy conversion utlitlies
 
 	def tipsy_dir(self):
@@ -160,14 +161,13 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		from ..utils import constants
 		s = self.raw_snapshot()
 
-		# figure out the units
-
 		#We need the ramses snapshot for this
 		if (type(s) == pynbody.tipsy.TipsySnap):
 			ramses_path = os.path.abspath(os.path.join(self.path(), '../../../'))
 			snap = load(ramses_path, self.output_number())
 			s = snap.raw_snapshot()
-	 
+
+		# figure out the units			 
 		cmtokpc = constants.cmtokpc
 		G_u = constants.G_u
 
@@ -248,12 +248,12 @@ class PynbodySnapshot(Snapshot.Snapshot):
 # see here for more doccumentation http://pynbody.github.io/pynbody/tutorials/halos.html
 
 
-	def halos(self, LgridDomain=256, LgridMax=2097152, VescTune=1.0, Dvir=200, nmin_per_halo = 50, MaxGatherRad=1.0, num_threads=16, run_ahf=False, rewrite_tipsy=False, configloc=True):
+	def halos(self, LgridDomain=256, LgridMax=2097152, VescTune=1.0, Dvir=200, nmin_per_halo = 50,
+		 MaxGatherRad=1.0, num_threads=16, run_ahf=False, rewrite_tipsy=False, gas=False):
 		import glob
 		s = self.raw_snapshot()
 		isRamses = (type(s) == pynbody.ramses.RamsesSnap)
 		fname = self.tipsy_fname() if isRamses else self.path()
-		ahf_files = glob.glob('%s.*.AHF_*'%fname)
 
 		if run_ahf:
 			#Remove the AHF files
@@ -273,7 +273,8 @@ class PynbodySnapshot(Snapshot.Snapshot):
 				print 'Would remove %s'%rmdir
 				#os.system('rm -rf %s'%(rmdir))
 
-			if os.path.exists(fname) is False and isRamses: self.tipsy(gas=False)
+			if os.path.exists(fname) is False and isRamses: self.tipsy(gas=gas)
+			
 			lenunit, massunit, timeunit = self.tipsy_units()
 
 			l_unit = Unit('%f kpc'%lenunit)
@@ -316,13 +317,12 @@ class PynbodySnapshot(Snapshot.Snapshot):
 				print appstring
 				exe_string = appstring + " " + filename
 				os.system(exe_string)
-	
-
 
 		#Return the halos. We need the tipsy snap now to load them
 		if isRamses:
 			#print 'Warning: Analysis of RAMSES output with tipsy halos can result in unexpected results...'
 			s = self.tipsy().raw_snapshot()
+
 		halos = s.halos()
 		print 'Loaded %d halos'%len(halos)
 		return halos
@@ -338,7 +338,6 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		return (len(ahf_files) != 0)
 
 	def halos_deprec(self, nmin_per_halo = 150, num_threads=16, configloc = True):
-
 		import glob
 		s = self.raw_snapshot()
 		snap = self
@@ -410,10 +409,6 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		if isTipsy is False:
 			s = self.tipsy().raw_snapshot()
 		return s.halos()
-
-
-
-
 
 class Species:
 	GAS = 1

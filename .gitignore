@@ -25,7 +25,6 @@ python/scipy/*
 python/Cython/*
 python/mpi4py/*
 movie/*
-movie*
 movie_selene_nochemo*
 movie_selene_nochemo/*
 ramses_pp/config.py
