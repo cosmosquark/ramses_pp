@@ -1,0 +1,18 @@
+#!/usr/local/bin/bash 
+#PBS -l platform=LINUX 
+#PBS -l proc=6 
+#PBS -l u_sps_cral=6 
+#PBS -l machine=2 
+#PBS -l ptype=MPICH2 
+#PBS -l M=4GB 
+#PBS -l T=4000000 
+#PBS -N HM 
+#PBS -o log.txt 
+#PBS -e errors.txt 
+ 
+cd $PBS_O_WORKDIR 
+. /usr/local/shared/bin/mpich2_env.sh 
+mpdboot -n $BQS_HOSTNUMBER -f $BQS_HOSTLISTPATH.GIGA --ifhn=$(hostname)p --verbose --ncpus=${BQS_PROCBYHOST} --rsh=/usr/local/products/bqs/bqsrsh 
+mpiexec -machinefile $BQS_PROCLISTPATH.GIGA.MPIEXEC -np $BQS_PROCNUMBER ../../MultiProcStarter/mpp_starter /sps/cral/leo/ramses/Run_H1joki/Catalogs/DM/cmdFile.sh > run.log 
+mpdallexit 
+ 

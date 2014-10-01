@@ -2,23 +2,27 @@
 Module config object to store app wide settings
 '''
 
-# TODO - Rewrite this entirely (nice to have a system like pynbody where you can
-#	do config_parser.getboolean('Rockstar', "some_prop"))
-
 #Enable/disable modules
+quick_import = True
+
 yt_enabled = True
 pymses_enabled = True
 pynbody_enabled = True
-quick_import = True
 
-default_module = 'yt'
+default_module='pynbody'
 
-ramses_f90_dir='/home/d/ds/ds381/Code/ramses-rt/trunk/ramses/utils/f90/'
-json_dir = '/home/d/ds/ds381/.local/lib/python2.6/site-packages/ramses_pp/data'
+ramses_f90_dir='/gpfs/home/bthompson1/ramses_pp/ramses_pp/ramses_f90'
+json_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/data'
+simulation_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/simulations'
+applications_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/applications'
+root_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp'
+vide_catalogue_root = '/starpulse/pool/cosmic/bthompson/voids' # the directory where you run VIDE
+
+rockstar_base=""
+rockstar_autogrp=False
+
 override = True
 verbose = True
-rockstar_base='rockstar/full_cat/rockstar_halos/'
-rockstar_autogrp=False
 
 #Methods
 

@@ -8,7 +8,7 @@ def Hubble_z(z, omega_m, H0):
 	aexp = 1./(1. + z)
 	return ((omega_m/aexp**3) + (1-omega_m))**0.5 * H0
 
-def del_c(z, omega_m=0.27):
+def del_c(z, omega_m=0.3):
 	a = 1./(1 + z)
 	x = -( (1 - omega_m)*a**3) / (omega_m + (1 - omega_m)*a**3)
 	del_c = (178 + 82*x - 39*(x**2))/(1 + x)
@@ -17,7 +17,7 @@ def del_c(z, omega_m=0.27):
 	return del_c
 
 #Hoeft et al. 2006 characteristic mass
-def hoeft_Mc(z, omega_m=0.27):
+def hoeft_Mc(z, omega_m=0.3):
 	if z < 0: z = 0
 	#Tau encodes evolution of min. virial temp.
 	tau_z = 0.73 * (z + 1)**0.18 * np.exp(-(0.25 * z)**2.1)
@@ -39,6 +39,7 @@ def okamoto_Mc(z, Vc, H0, omega_m=0.27):
 	return ((Vc_3 * A * B) / (C.G * H0)) / C.Msun # Msun
 
 #Okamoto 2008 Virial Temperature
+
 def T_vir(M, z, omega_m, H0, mu=0.59):
 	import constants as C
 	delta_vir = del_c(z, omega_m)

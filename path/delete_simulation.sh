@@ -6,7 +6,7 @@ if (len(sys.argv) != 2):
 	print 'Usage: python %s <name> '%sys.argv[0]
 	sys.exit(1)
 
-from ramses_pp.modules import Simulation
+from modules import Simulation
 
 name = sys.argv[1]
 sim = Simulation.load(name)

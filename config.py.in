@@ -1,0 +1,37 @@
+'''
+Module config object to store app wide settings
+'''
+
+# TODO - Rewrite this entirely (nice to have a system like pynbody where you can
+#	do config_parser.getboolean('Rockstar', "some_prop"))
+
+#enable/disable modules
+yt_enabled = True
+pymses_enabled = True
+pynbody_enabled = True
+quick_import = True
+
+default_module='yt'
+
+ramses_f90_dir='..ramses_f90'
+json_dir = '..data'
+simulation_dir = '..simulations'
+applications_dir = '..applications'
+ramses_pp_dir = '..thing'
+vide_catalogue_root = '/starpulse/pool/cosmic/bthompson/voids'
+
+rockstar_base=""
+rockstar_autogrp=False
+
+
+
+override = True
+verbose = True
+
+#Methods
+
+def list_modules():
+	print 'Enabled modules:'
+	print 'yt: ', yt_enabled
+	print 'pymses: ', pymses_enabled
+	print 'pynbody: ', pynbody_enabled

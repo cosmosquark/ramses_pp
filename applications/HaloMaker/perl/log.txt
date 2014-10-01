@@ -1,0 +1,5 @@
+
+   job started at
+Wed Jan 18 12:47:17 CET 2012
+   job ended at
+Wed Jan 18 12:50:42 CET 2012

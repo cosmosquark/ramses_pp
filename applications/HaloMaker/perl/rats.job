@@ -1,0 +1,20 @@
+#!/usr/local/bin/bash -l 
+#$ -P P_cral 
+#$ -l sps=1 
+#$ -l ct=18000       # cpu in s 
+#$ -l vmem=4G        # (required memory) 
+#$ -l fsize=2G       # required DISK 
+#$ -N rats 
+#$ -o log.txt 
+#$ -e errors.txt 
+#$ -cwd              # run on current working directory 
+#$ -pe mpich2_hf 3 
+#$ -q pa_long 
+echo '   job started at' 
+date 
+cd /sps/cral/leo/Ramses_v3.07/boxlen20_n1024_W5/Zoom331/Feedbk/Catalogs/HaloMaker/ 
+. /usr/local/shared/bin/mpich2_hydra_env.sh 
+export MPICH2_ROOT=/usr/local/mpich2/hydra 
+/usr/local/mpich2/hydra/bin/mpiexec -rmk sge -iface eth2 -np $NSLOTS /sps/cral/leo/RATS_vLeo/MultiProcStarter/mpp_starter /sps/cral/leo/Ramses_v3.07/boxlen20_n1024_W5/Zoom331/Feedbk/Catalogs/HaloMaker/cmdFile.sh > run.log 
+echo '   job ended at' 
+date 

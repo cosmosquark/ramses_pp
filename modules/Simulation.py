@@ -6,15 +6,62 @@ quite a drain on resources....
 
 TODO: Add features similar to Hamu i.e Automatic generation of axis labels for plots etc
 
-@author: dsullivan
+@author: dsullivan, bthompson
 '''
+<<<<<<< HEAD
+from __future__ import division
+from ramses_pp import config
+
+=======
 from .. import config
+>>>>>>> e3a7470df625fb3d1566b7b448dd3f744b808256
 
 pymses_loaded = config.pymses_enabled
 pynbody_loaded = config.pynbody_enabled
 yt_loaded = config.yt_enabled
+<<<<<<< HEAD
+
+if config.quick_import:
+	if config.pymses_enabled:
+		from .pymses import Pymses
+	if config.pynbody_enabled:
+		from .pynbody import Pynbody
+	if config.yt_enabled:
+		from .yt import YT
+else:
+
+	config.list_modules()
+
+	if pymses_loaded:
+		try:
+			from .pymses import Pymses
+		except ImportError as e:
+			print 'Unable to import pymses'
+			pymses_loaded = False
+			print e
+	if pynbody_loaded:
+		try:
+			from .pynbody import Pynbody
+		except ImportError as e:
+			print 'Unable to import pynbody'
+			pynbody_loaded = False
+			print e
+	if yt_loaded:
+		try:
+			from .yt import YT
+		except ImportError as e:
+			print 'Unable to import yt'
+			yt_loaded = False
+			print e
+		if (pymses_loaded or pynbody_loaded or yt_loaded) is False:
+			raise RuntimeError("Could not import any modules!")
+			
+=======
+>>>>>>> e3a7470df625fb3d1566b7b448dd3f744b808256
 import numpy as np
 import json, os, glob, uuid
+
+#from ramses_pp.analysis.halo_analysis import Halomaker
 
 def load(name):
 	'''
@@ -25,16 +72,29 @@ def load(name):
 	if os.path.isfile(filename):
 		with open(filename, 'rb') as fp:
 			data = json.load(fp)
-		return Simulation(str(data['_name']), str(data['_path']), data['_oid'])
+		return Simulation(str(data['_name']), str(data['_path']), str(data['_boxsize']), data['_halomaker_info'], data['_periodic'], data['_oid'])
 	else:
 		raise Exception("No simulation with the name: %s"%name)
 
-def init(name):
+
+def init(name,path=None):
 	'''
 	Create a simulation from the current directory
 	'''
-	path = os.getcwd()
+
+	if path == None and config_path==False:
+		path = os.getcwd()
 	return create(name, path)
+
+def new(name,rename=None):
+	'''
+	Create a simulation from the Simulation Directory
+	'''
+	path = config.simulation_dir + '/' + name
+	if rename != None:
+		name = rename # if you wish to call your simulation in the database by a different name
+	return create(name, path)
+
 
 def create(name, path):
 	'''
@@ -46,8 +106,8 @@ def create(name, path):
 		simulation = Simulation(name, path)
 		simulation.save()
 
-		data_dir = '%s/%s'%(json_dir, simulation._name)
-		if not os.path.isdir(data_dir): os.mkdir(data_dir)
+#		data_dir = '%s/%s'%(json_dir, simulation._name)
+#		if not os.path.isdir(data_dir): os.mkdir(data_dir)
 		return simulation
 	else:
 		raise Exception("Path does not exist: %s"%path)
@@ -63,21 +123,97 @@ def list():
 
 
 class Simulation():
-	def __init__(self, name, path, oid=None):
+	def __init__(self, name, path, boxsize=100, halomaker=None, periodic=True, oid=None):
 		# This should never change
 		if oid is None: self._oid = str(uuid.uuid4())
 		else:
 			print oid 
 			self._oid = str(oid)
 
+# calculate box size
+
+		
+
 		self._name = name
 		self._path = path
+		self._boxsize = self.box_size() #100   #100 #in Mpc h^-1
+		self._halomaker_info = {  # store input parameters for HaloMaker
+				'method': 'MSM',  
+				'b': 0.2,
+				'cdm' : ".false.",
+				'npart' : '20',
+				'adaptahop' : {
+					'nvoisins' : 32,
+					'nhop' : 16,
+					'rhot' : 80,
+					'fudge' : 4.0,
+					'fudgepsilon' : 0.0,
+					'alphap' : 3.0,
+					'megaverbose' : ".false.",	
+					} ,
+				'verbose' : ".true.",
+			} ,
+		self._periodic = True,
+
+	# add new methods based on "what modules (pymses, pynbody) are working
+
+		if pynbody_loaded:
+			from ramses_pp.analysis.halo_analysis.ahf import AHF
+			for f in dir(AHF):
+				if f[0] != "_": # ignore hidden functions
+					self.func = self.call(getattr(AHF,f))  # loads any arbitary function
+			self.run_ahf = self.call(getattr(AHF,dir(AHF)[2]))
+			self.run_ahf_merger = self.call(getattr(AHF,dir(AHF)[3]))
+			self.run_ahf_tracker = self.call(getattr(AHF,dir(AHF)[4]))
+
+					
+
+	def func(self,a):
+		print("Not Defined")
+
+	def call(self,func,*args,**kwargs):
+		return lambda *args, **kwargs : func(self, *args, **kwargs)
 
 	def set_name(self, name):
 		self._name = name
 
 	def set_path(self, path):
 		self._path = path
+
+#	def set_boxsize(self, boxsize):
+#		if isinstance(boxsize, int):
+#			self._boxsize = int(boxsize)  # may mess up with your simulation if this is incorrect
+#		else:
+#			print "Invalid boxsize, boxsize needs to be an integer"
+#			return
+	def box_size(self):
+		cmtokpc = 3.24077929e-22
+		kpctompc = 0.001
+		last_snap = self.num_snapshots()
+		info = ("%s/output_%05d/info_%05d.txt" % (self._path, last_snap, last_snap))
+		f = open(info, 'r')
+		nline = 1  # read the last info file
+		while nline <= 18:
+			line = f.readline()
+			if(nline == 11): h0 = np.float32(line.split("=")[1])
+			if(nline == 16): lunit = np.float32(line.split("=")[1])
+			nline += 1
+		h = h0 / 100
+		boxsize = lunit * cmtokpc * kpctompc * h
+		return boxsize
+		
+
+
+	def set_periodic(self, periodic):
+		if isinstance(boxsize, bool):
+			self._periodic = periodic
+		else:
+			print "Invalid input, True or False"
+			return
+
+	def is_periodic(self):
+		return self._periodic
+		
 
 	def jdefault(self, o):
 		if isinstance(o, set):
@@ -166,33 +302,88 @@ class Simulation():
 		'''
 		return self._path
 
-	def snapshot(self, ioutput, module=config.default_module):
+	def snapshot(self, ioutput, module=config.default_module, **kwargs):
 		'''
 		Return a snapshot from the simulation
 		'''
 		if (module == 'yt') and yt_loaded:
 			from .yt import YT
-			return YT.load(self._path, ioutput)
+			return YT.load(folder=self.path(), ioutput=ioutput, **kwargs)
 		elif (module == 'pymses') and pymses_loaded:
 			from .pymses import Pymses
-			return Pymses.load(self._path, ioutput)
+			return Pymses.load(self.path(), ioutput)
 		elif (module == 'pynbody') and pynbody_loaded:
 			from .pynbody import Pynbody
-			return Pynbody.load(self._path, ioutput)
+			return Pynbody.load(self.path(), ioutput)
 		else:
 			print 'yt loaded: ', yt_loaded
 			print 'pymses loaded: ', pymses_loaded
 			print 'pynbody loaded: ', pynbody_loaded
 			raise Exception("Unknown module: %s or not loaded"%module)
 
+
+	def initial_conditions(self):
+		'''
+		Returns the cosmology at z=0
+		'''
+		last_snap = self.num_snapshots()
+		info = ("%s/output_%05d/info_%05d.txt" % (self._path, last_snap, last_snap))
+		f = open(info, 'r')
+		nline = 1  # read the last info file
+		while nline <= 18:
+			line = f.readline()
+			if(nline == 10): faexp = np.float32(line.split("=")[1])
+			if(nline == 11): h0 = np.float32(line.split("=")[1])
+			if(nline == 12): omega_m_0 = np.float32(line.split("=")[1])
+			if(nline == 13): omega_l_0 = np.float32(line.split("=")[1])
+			if(nline == 14): omega_k_0 = np.float32(line.split("=")[1])
+			if(nline == 15): omega_b_0 = np.float32(line.split("=")[1])
+			if(nline == 16): lunit = np.float32(line.split("=")[1])
+			if(nline == 17): dunit = np.float32(line.split("=")[1])
+			if(nline == 18): tunit = np.float32(line.split("=")[1])
+			nline += 1
+		f.close()
+		h = h0 / 100
+
+		first_snap = 1
+		info = ("%s/output_%05d/info_%05d.txt" % (self._path, first_snap, first_snap))
+		f = open(info, 'r')
+		nline = 1  # read the last info file
+		while nline <= 18:
+			line = f.readline()
+			if(nline == 10): iaexp = np.float32(line.split("=")[1])
+			nline += 1
+		f.close()
+		# store variables into a dictionary
+
+		iz = 1.0/iaexp -1.0
+		fz = 1.0/faexp -1.0
+
+		initial_cons = {
+			'iaexp':iaexp,		# initial a
+			'faexp':faexp,		# final a
+			'iz':iz, 			# initial z
+			'fz':fz, 			# final z
+			'omega_m_0':omega_m_0,
+			'omega_l_0':omega_l_0,
+			'omega_k_0':omega_k_0,
+			'omega_b_0':omega_b_0,
+			'h':h,
+			'H0':h0,
+			'lunit':lunit,
+			'dunit':dunit,
+			'tunit':tunit,
+		}
+		
+		return initial_cons
+
 	def redshift(self, z):
 		'''
 		Locate the snapshot closest to the given redshift
 		'''
 		from .utils import array_utils
-
 		redshifts = self.avail_redshifts()
-		idx = array_utils.argmin(redshifts, z)
+		idx = array_utils.argmin(redshifts, z)	
 		if config.verbose: print 'ioutput %05d closest to redshift %f'%(idx+1, z)
 
 		return idx+1
@@ -205,9 +396,10 @@ class Simulation():
 		idx = self.redshift(z)
 		return redshifts[idx]
 
+
 	def redshift_deprecated(self, z):
 		'''
-		Locate the snapshot closest to the given redshift
+		Locate the snapshot closest to the given redshift, deprecated since it assumes you have all the snapshots in one location, replaced by redshift and avail_redshift
 		'''
 		#First, gather list of redshifts
 		num_snapshots = self.num_snapshots()
@@ -251,15 +443,79 @@ class Simulation():
 
 		return np.array(redshifts)
 
-	def ordered_outputs(self):
-		'''
-		Return an ordered list of outputs
-		'''
-		from .utils import string_utils
-		outputs = glob.glob('%s/output_00*'%self.path())
-		outputs.sort(key=string_utils.natural_keys)
-		return outputs
+ 	def ordered_outputs(self):
+ 		'''
+ 		Return an ordered list of outputs
+ 		'''
 
+		from .utils import string_utils
+ 		outputs = glob.glob('%s/output_00*'%self.path())
+ 		outputs.sort(key=string_utils.natural_keys)
+ 		return outputs
+
+
+	def pos_to_codepos(self,val):
+		''' simple dirty code to convert a position in Mpc/h into code units'''
+		if val > self.box_size():
+			print "value is larger than the box size"
+			print "the boxsize is " + str(self.box_size())
+			return
+		else:
+			new_val = val / self.box_size()
+			print str(val) + " Mpc/h in code units is " + str(new_val)
+			return new_val
+
+
+
+### halomaker stuff
+
+	def halomaker_info(self):
+		return self._halomaker_info
+
+	def halomaker(self, subvol=False, ncpu=1):
+		return Halomaker.Halomaker(self, subvol=False, ncpu=1)
+
+
+
+#### end halomaker stuff
+
+	def info_snap(self,ioutput):
+		'''
+		return the basic infomation of an individual snapshot without loading it
+		'''
+		num = self.num_snapshots()
+		if ioutput > num or ioutput < 1:
+			print "Snapshot needs to be in range of 1 and " + str(self.num_snapshots())
+			raise e
+			return
+
+		infopath = ("%s/output_%05d" % (self._path, ioutput))
+		if not os.path.isdir(infopath):
+			print "Snapshot does not exist"
+			raise e
+			return
+		
+		info = infopath + ("/info_%05d.txt" % (ioutput))
+		f = open(info,'r')
+		nline = 1
+		while nline <= 18:
+			line = f.readline()
+			if(nline == 10): aexp = np.float32(line.split("=")[1])
+			if(nline == 16): lunit = np.float32(line.split("=")[1])
+			if(nline == 17): dunit = np.float32(line.split("=")[1])
+			if(nline == 18): tunit = np.float32(line.split("=")[1])
+			nline += 1
+		z = (1.0/aexp) - 1.0
+
+		f.close()
+		infodata = {
+			'aexp': aexp,
+			'lunit': lunit,
+			'dunit': dunit,
+			'z':z,
+			}
+		return infodata
+	
 	def info(self):
 		'''
 		List all snapshots with some basic info
@@ -280,3 +536,4 @@ class Simulation():
 				nline += 1
 			z = (1.0/aexp) - 1.0
 			print "    %5d  %10.5f  %10.5f  %12.5e  %12.5e  %12.5e" % (ioutput, aexp, z, lunit, dunit, tunit)
+		f.close()

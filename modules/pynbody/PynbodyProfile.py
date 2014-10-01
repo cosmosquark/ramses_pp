@@ -55,7 +55,6 @@ class PynbodyProfile(Profile.Profile):
 
 		if (halos == None):
 			halos = self._snapshot.halos()
-
 		fgas = [] # len(halos) - 1 ?
 		mhalo = []
 

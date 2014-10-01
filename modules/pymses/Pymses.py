@@ -27,6 +27,7 @@ class PymsesSnapshot(Snapshot.Snapshot):
 		'''
 		self._path = folder
 		self._ioutput = ioutput
+		self._snappath = os.path.join('%s/output_%05d/'%(self._path, ioutput))
 		self._snapshot = pymses.RamsesOutput(folder, ioutput)
 
 	#Implement abstract methods from Snapshot.py
@@ -42,6 +43,12 @@ class PymsesSnapshot(Snapshot.Snapshot):
 		Return the path to this snapshot
 		'''
 		return self._path
+
+	def snappath(self):
+		'''
+		Return the path to this snapshot
+		'''
+		return self._snappath
 
 	def amr_source(self, fields):
 		if isinstance(fields, list):
