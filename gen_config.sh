@@ -8,4 +8,3 @@ sed -i 's,'"..data"','"${DIRPATH}/data"',g' config.py
 sed -i 's,'"..simulations"','"${DIRPATH}/simulations"',g' config.py
 sed -i 's,'"..applications"','"${DIRPATH}/applications"',g' config.py
 sed -i 's,'"..thing"','"${DIRPATH}"',g' config.py
-sed -i 's,'"..really"','"${DIRPATH}/applications"',g' config.py

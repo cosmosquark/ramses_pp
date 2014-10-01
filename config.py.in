@@ -18,6 +18,8 @@ json_dir = '..data'
 simulation_dir = '..simulations'
 applications_dir = '..applications'
 ramses_pp_dir = '..thing'
+vide_catalogue_root = '/starpulse/pool/cosmic/bthompson/voids'
+
 rockstar_base=""
 rockstar_autogrp=False
 
