@@ -307,6 +307,8 @@ class Snapshot():
 		if not os.path.isdir('%s/vide'%(sim_path)):
 			os.mkdir('%s/vide'%(sim_path))
 
+		if not os.path.isdir('%s/vide/halos'%(sim_path)):
+			os.mkdir('%s/vide/halos'%(sim_path))
 
 		if particles:
 			filename = os.path.join('%s/vide/vide_input_particles_%05d.py'%(sim_path,ioutput))

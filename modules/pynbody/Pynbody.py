@@ -32,8 +32,10 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		self._ioutput = ioutput
 		if ioutput is not None:
 			self._snapshot = pynbody.load('%s/output_%05d'%(folder, ioutput),force_gas=False)
+			self._snappath = os.path.join('%s/output_%05d/'%(self._path, ioutput))
 		else:
 			self._snapshot = pynbody.load(folder,force_gas=False)
+			self._snappath = None
 
 	#Implement abstract methods from Snapshot.py
 
@@ -48,6 +50,12 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		Return the path to this snapshot
 		'''
 		return self._path
+	
+	def snappath(self):
+		'''
+		Return the path to this snapshot
+		'''
+		return self._snappath
 
 	def raw_snapshot(self):
 		'''
@@ -230,6 +238,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 				s.write(filename='%s'%newfile, fmt=pynbody.tipsy.TipsySnap, binary_aux_arrays = True)
 				t = load(newfile)
 				setattr(t, '_ioutput', self.output_number())
+				setattr(t, '_snappath', self.tipsy_dir())
 				return t
 			else:
 				raise Exception("Tipsy file not found: %s"%ftipsy)
@@ -261,7 +270,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 			#First, convert to tipsy
 			if rewrite_tipsy:
 				rmdir = self.tipsy_dir()
-				print 'Would remove &s'%rmdir
+				print 'Would remove %s'%rmdir
 				#os.system('rm -rf %s'%(rmdir))
 
 			if os.path.exists(fname) is False and isRamses: self.tipsy(gas=False)
@@ -284,7 +293,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 			f.write('NminPerHalo = %d\n'%nmin_per_halo)
 			f.write('RhoVir = 0\n')
 			f.write('Dvir = %f\n'%Dvir)
-			f.write('MaxGatherRad = 1.1f\n'%MaxGatherRad)
+			f.write('MaxGatherRad = %1.1f\n'%MaxGatherRad)
 			f.write('[TIPSY]\n')
 			f.write('TIPSY_BOXSIZE = %e\n'%(s.properties['boxsize'].in_units('Mpc')*s.properties['h']/s.properties['a']))
 			f.write('TIPSY_MUNIT   = %e\n'%(massunit*s.properties['h']*(1/omega_m_z)))
