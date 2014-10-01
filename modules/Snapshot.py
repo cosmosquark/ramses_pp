@@ -260,7 +260,7 @@ class Snapshot():
 			raise Exception("Unimplemented finder: %s"%finder)
 
 
-	def vide_inputs(self,lightcone=False, pecval = False, threads=4, divisions=1, slices=1, subvolumes = 1, particles=True, subsamples = [1.0], halo_min_masses = ["none"], finder=None):
+	def vide_input(self,lightcone=False, pecval = False, threads=4, divisions=1, slices=1, subvolumes = 1, particles=True, subsamples = [1.0], halo_min_masses = ["none"], finder=None):
 		'''
 		Because VIDE is OpenMP and not MPI parallalised, I would not recommend running VIDE on a cluster.
 		to get around this, run vide on a computer with a high amount of RAM.
