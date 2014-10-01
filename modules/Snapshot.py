@@ -356,7 +356,6 @@ class Snapshot():
 		f = open(filename,'w')
 		f.write('# remember, this is free software.. GNU stuff.. no warranty... GNU licensing.. etc same as any other free software.. free as in free beer \n')
 		f.write('# if you wish to know what any of these lines do, then look at the sample ramses file or sample files online https://bitbucket.org/cosmicvoids/vide_public \n')
-		f.write('import OS \n')
 	
 		# configuration
 
