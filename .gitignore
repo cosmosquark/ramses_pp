@@ -18,6 +18,7 @@ simulations/*
 data/*
 applications/AHF*
 config.py
+pythin/*
 python/pynbody/*
 python/pymses_4.0.0/*
 python/Python-2.7.8/*
