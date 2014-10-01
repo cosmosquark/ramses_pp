@@ -9,7 +9,6 @@ dependency out sometime in the future if needed.
 '''
 
 super_verbose=True
-OFFSET=30 # This is to match rockstar outputs to snapshot numbers (in the event that cayalogue does not start at 1) - manual at the moment (I cba to fix it)
 
 import yt
 import numpy as np
@@ -17,6 +16,8 @@ import sys, os.path, glob
 import weakref, copy
 import re, uuid
 from ramses_pp import config as pp_cfg
+import abc
+
 #from yt.units.yt_array import YTArray
 #import logging
 
@@ -373,7 +374,7 @@ class HaloCatalogue(object):
 	Generic halo catalogue bases on pynbody, but with non-essential functionality
 	stripped out
 	'''
-	def __init__(self,finder,path,ioutput,snap):
+	def __init__(self,finder,path,ioutput):
 		self._halos = {}
 		self._finder = finder
 		self._simpath = path
@@ -407,10 +408,11 @@ class HaloCatalogue(object):
 			try:
 				yield self[i]
 				i += 1
-				if i > len(self._halos):
+				if i > len(self._halos)-1:
 					break
 			except RuntimeError:
 				break
+
 
 	def is_subhalo(self, childid, parentid):
 		"""
@@ -432,6 +434,7 @@ class HaloCatalogue(object):
 	@staticmethod
 	def can_run(self):
 		return False
+
 
 	def sort(self, field, reverse=True):
 		'''
@@ -457,7 +460,7 @@ class HaloCatalogue(object):
 		
 		return mbinmps, mhist, mbinsize
 
-	def vide_input(self,halo_min_masses = ["none"], finder=None):
+	def vide_input(self,halo_min_masses = ["none"], finder=None, gen_inputs=True):
 		'''
 		generates an input for VIDE ... don't do this with a sub catalogue or weird things may happen
 		'''
@@ -471,21 +474,23 @@ class HaloCatalogue(object):
 		if not os.path.isdir('%s/vide/halos'%(sim_path)):
 			os.mkdir('%s/vide/halos'%(sim_path))
 
-		for i in range(0,len(self)):
-			haloobj = self._get_halo[i]
-			vide_array[i,0] = haloobj["pos"][0].in_units("code_length").value
-			vide_array[i,1] = haloobj["pos"][1].in_units("code_length").value
-			vide_array[i,2] = haloobj["pos"][2].in_units("code_length").value
-			vide_array[i,3] = haloobj["vel"][0].in_units("code_length/code_time").value # need to check the velocity stuff
-			vide_array[i,4] = haloobj["vel"][1].in_units("code_length/code_time").value
-			vide_array[i,5] = haloobj["vel"][2].in_units("code_length/code_time").value
-			vide_array[i,4] = haloobj["vel"][1].in_units("code_length/code_time").value
-			vide_array[i,6] = haloobj["Mvir"].in_units("Msun/h").value
+		for i in range(0, len(self)):
+			halo = self[i]
+			vide_array[i,0] = halo["pos"][0].in_units("code_length").value
+			vide_array[i,1] = halo["pos"][1].in_units("code_length").value
+			vide_array[i,2] = halo["pos"][2].in_units("code_length").value
+			vide_array[i,3] = halo["vel"][0].in_units("code_length/code_time").value # need to check the velocity stuff
+			vide_array[i,4] = halo["vel"][1].in_units("code_length/code_time").value
+			vide_array[i,5] = halo["vel"][2].in_units("code_length/code_time").value
+			vide_array[i,4] = halo["vel"][1].in_units("code_length/code_time").value
+			vide_array[i,6] = halo["Mvir"].in_units("Msun/h").value
 
-		file_location = snap.path() + str("/vide/halos/output_%s_%05d.txt" % str(finder,self._ioutput))
+		file_location = str(self._simpath) + ("/vide/halos/output_%s_%05d.txt" % (finder,self._ioutput))
 		header_txt = "# finder = " + str(self._finder)
 		np.savetxt(file_location,vide_array,delimiter=",",header=header_txt)
-		snap.vide_input(halo_min_masses=halo_min_masses,finder=finder)
+#		if gen_inputs:
+#			self._snap.vide_input(halo_min_masses=halo_min_masses,finder=finder)
+		return
 
 #Rockstar
 class RockstarCatalogue(HaloCatalogue):
@@ -537,7 +542,7 @@ class RockstarCatalogue(HaloCatalogue):
 			raise Exception("Cannot locate/load rockstar catalogue")
 
 		self._base = weakref.ref(snap)
-		HaloCatalogue.__init__(self,"rockstar",snap.path(),snap.output_number(),snap)
+		HaloCatalogue.__init__(self,"rockstar",snap.path(),snap.output_number())
 		
 		if filename is not None: self._rsFilename = filename
 		else:
@@ -770,7 +775,7 @@ class AHFCatalogue(HaloCatalogue):
 			raise Exception("Cannot locate/load AHF catalogue")
 
 		self._base = weakref.ref(snap)
-		HaloCatalogue.__init__(self,"AHF",snap.path(),snap.output_number(),snap)
+		HaloCatalogue.__init__(self,"AHF",snap.path(),snap.output_number())
 		if filename is not None: self._AHFFilename = filename
 		else:
 			# get the file name
@@ -1017,7 +1022,7 @@ class AHFHaloTracker(HaloCatalogue):
 			raise Exception("Cannot locate/load AHF catalogue")
 
 		self._base = weakref.ref(snap)
-		HaloCatalogue.__init__(self,"AHFtrack",snap.path(),snap.output_number(),snap)
+		HaloCatalogue.__init__(self,"AHFtrack",snap.path(),snap.output_number())
 		if filename is not None: self._AHFFilename = filename
 		else:
 			# get the file name
