@@ -260,7 +260,7 @@ class Snapshot():
 			raise Exception("Unimplemented finder: %s"%finder)
 
 
-	def vide_inputs(self,lightcone=False, pecval = False, threads=4, divisions=1, slices=1, subvolumes = 1, particles=True, subsamples = [1.0], halo_min_masses = ["none"], finder=None):
+	def vide_input(self,lightcone=False, pecval = False, threads=4, divisions=1, slices=1, subvolumes = 1, particles=True, subsamples = [1.0], halo_min_masses = ["none"], finder=None):
 		'''
 		Because VIDE is OpenMP and not MPI parallalised, I would not recommend running VIDE on a cluster.
 		to get around this, run vide on a computer with a high amount of RAM.
@@ -356,7 +356,6 @@ class Snapshot():
 		f = open(filename,'w')
 		f.write('# remember, this is free software.. GNU stuff.. no warranty... GNU licensing.. etc same as any other free software.. free as in free beer \n')
 		f.write('# if you wish to know what any of these lines do, then look at the sample ramses file or sample files online https://bitbucket.org/cosmicvoids/vide_public \n')
-		f.write('import OS \n')
 	
 		# configuration
 
