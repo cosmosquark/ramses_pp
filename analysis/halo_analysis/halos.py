@@ -936,7 +936,7 @@ class HaloMakerSimpleCatalogue(HaloCatalogue):
 			'numSubStruct':'dimensionless',
 			'nextSub':'dimensionless',
 			'Etot':'dimensionless', ### not sure about this one as such
-			'Mvir':'Msun', 
+			'Mvir':'Msun/h', 
 			'Rvir':'code_length',
 			'Rmax':'code_length',
 			'num_p':'dimensionless',
