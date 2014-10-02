@@ -1,0 +1,12 @@
+HaloMaker
+
+HaloMaker is composed of 3 parts, HaloFinder, TreeMaker and GalaxyMaker.
+
+atm ramses_pp is compatible with HaloFinder. TreeMaker and GalaxyMaker pipelines are coming soon
+
+to install HaloFinder
+
+  cd applications/HaloMaker/f90
+  make
+
+it is as simple as that
