@@ -3,7 +3,6 @@
 
 #Remove temporary files
 *~
-_*
 *~
 *.o
 *.so
@@ -13,6 +12,7 @@ _*
 *.avi
 *.mp4
 *.x256
+config.py
 python/yt/yt*
 simulations/*
 data/*

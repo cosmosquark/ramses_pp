@@ -38,13 +38,6 @@ class Snapshot():
 		return
 
 	@abc.abstractmethod
-	def snappath(self):
-		'''
-		Return the path to this snapshot including the snapshot folder
-		'''
-		return
-
-	@abc.abstractmethod
 	def raw_snapshot(self):
 		'''
 		Return the raw snapshot object
@@ -237,7 +230,7 @@ class Snapshot():
 
 		return friedman
 
-	def halos(self, finder='AHF'):
+	def halos(self, finder=config.default_finder):
 
 		'''
 
@@ -248,14 +241,10 @@ class Snapshot():
 		from ..analysis.halo_analysis import halos
 
 		if finder=='rockstar':
-
 			return halos.RockstarCatalogue(self)
 
 		elif finder=="AHF":
 			return halos.AHFCatalogue(self)
-
-		elif finder=="halomaker_simple":
-			return halos.HaloMakerSimpleCatalogue(self)
 
 		else:
 
