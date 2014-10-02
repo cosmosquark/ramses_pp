@@ -246,6 +246,9 @@ class YTSnapshot(Snapshot.Snapshot):
 		elif finder == "rockstar":
 			return halos.RockstarCatalogue(self)
 
+		elif finder == "halomaker_simple":
+			return halos.HaloMakerSimpleCatalogue(self)
+
 		else:
 			raise Exception("Unimplemented finder: %s" %finder)
 

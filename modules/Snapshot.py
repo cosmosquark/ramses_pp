@@ -252,8 +252,10 @@ class Snapshot():
 			return halos.RockstarCatalogue(self)
 
 		elif finder=="AHF":
-			print "things are happening"
 			return halos.AHFCatalogue(self)
+
+		elif finder=="halomaker_simple":
+			return halos.HaloMakerSimpleCatalogue(self)
 
 		else:
 

@@ -440,14 +440,19 @@ class HaloCatalogue(object):
 		'''
 		return sorted(self, key = lambda x: x[field], reverse=reverse)
 
-	def mass_function(self, units='Msun/h', nbins=100):
+	def mass_function(self, units='Msun/h', nbins=100, subhalos=False):
 		'''
 		Compute the halo mass function for the given catalogue
 		'''
 		masses =[]
 		for halo in self:
-			Mvir = halo['Mvir'].in_units(units)
-			masses.append(Mvir)
+			if subhalos: # usually not good to include subhalos in the halo mass function
+				Mvir = halo['Mvir'].in_units(units)
+				masses.append(Mvir)
+			else:
+	#			if not self.is_subhalo(halo["id"],halo["hostHalo"]):
+					Mvir = halo['Mvir'].in_units(units)
+					masses.append(Mvir)
 
 		mhist, mbin_edges = np.histogram(np.log10(masses),bins=nbins)
 		mbinmps = np.zeros(len(mhist))
@@ -914,6 +919,189 @@ class AHFCatalogue(HaloCatalogue):
 		if os.path.exists(fname):
 			return True
 		return False
+
+class HaloMakerSimpleCatalogue(HaloCatalogue):
+	'''
+	Class to handle catalogues produced by HaloMaker.
+	'''	
+	halo_type =  np.dtype([('id',np.int64),('haloLevel',np.int64),('hostHalo',np.int64),('hostSubHalo',np.int64),
+					  ('numSubStruct',np.int64),('nextSub',np.int64),
+					  ('Etot','f'),('Mvir','f'),('Rvir','f'),('Rmax','f'),
+					  ('num_p',np.int64),('Mmax','f'),('pos','f',3)])
+# need to check the non_code units stuff
+	units = {'id':'dimensionless',
+			'haloLevel':'dimensionless',
+			'hostHalo':'dimensionless',
+			'hostSubHalo':'dimensionless',
+			'numSubStruct':'dimensionless',
+			'nextSub':'dimensionless',
+			'Etot':'dimensionless', ### not sure about this one as such
+			'Mvir':'Msun/h', 
+			'Rvir':'code_length',
+			'Rmax':'code_length',
+			'num_p':'dimensionless',
+			'Mmax':'Msun',
+			'pos':'code_length',
+		}
+
+
+	def __init__(self, snap, filename=None, make_grp=None):
+		# TODO - Read/store header
+		if not self._can_load(snap):
+			raise Exception("Cannot locate/load HaloMaker simple catalogue (does it exist? can it exist?)")
+
+		self._base = weakref.ref(snap)
+		HaloCatalogue.__init__(self,"HaloMakerSimple",snap.path(),snap.output_number())
+		if filename is not None: self._AHFFilename = filename
+		else:
+			# get the file name
+			halo_dir = str("%s/HaloMaker/%s/" % (snap.path(), snap.output_number()))
+			if not os.path.isdir(halo_dir):
+				print "HaloMaker not run, or no halos exist"
+				raise Exception("HaloMaker not run, or no halos exist")
+
+			if len(glob.glob('%shalomaker_%05d.nod'% (halo_dir, snap.output_number()) )) == 0:
+				print "HaloMaker has been run, but no halos exist here"
+				raise Exception("No Halos exist here")
+				
+			fname = glob.glob('%shalomaker_%05d.nod'% (halo_dir, snap.output_number() ))[0]
+			self._HaloMakerfilename = fname
+			print 'Loading HaloMaker simple from %s'%fname
+
+		#Try and open the files
+		try:
+			f = open_(self._HaloMakerfilename)
+		except IOError:
+			raise IOError("Halo Simple catalogue not found -- check the file name of catalogue data or try specifying a catalogue using the filename keyword")
+
+		#self._head = np.fromstring(f.read(self.head_type.itemsize),
+		#	dtype=self.head_type)
+		#unused = f.read(256 - self._head.itemsize)
+
+		#self._nhalos = self._head['num_halos'][0]
+
+		if super_verbose == True:
+			print "HaloMaker simple catalogue: loading halos...",
+			sys.stdout.flush()
+
+		self._load_halos(self._HaloMakerfilename, snap)
+		f.close()
+
+		self._setup_children()
+
+		# Mvir is in units of 1e11!!!
+#		for halo in self:
+#			halo['Mtot'] = halo['Mtot'] * 1.0e11
+#			halo['Mvir'] = halo['Mvir'] * 1.0e11
+
+#		if make_grp is None:
+#			make_grp = pp_cfg.rockstar_autogrp
+
+		if make_grp:
+			print "make grp not implemented yet"
+#			self.make_grp()
+
+	def make_grp(self):
+		'''
+		Creates a 'grp' array which labels each particle according to
+		its parent halo.
+		'''
+		#try:
+		#	self.base['grp']
+		#except:
+		#	self.base['grp'] = np.zeros(len(self.base),dtype='i')
+
+		#for halo in self._halos.values():
+		#	halo[name][:] = halo._halo_id
+
+		#if config['verbose']:  print "writing %s"%(self._base().filename+'.grp')
+		#self._base().write_array('grp',overwrite=True,binary=False)
+		raise NotImplementedError("Requires pynbody functionality")
+
+	def _setup_children(self):
+		'''
+		Creates a 'children' array inside each halo's 'properties'
+		listing the halo IDs of its children. Used in case the reading
+		of substructure data from the AHF-supplied _substructure file
+		fails for some reason.
+		'''
+		for i in xrange(self._nhalos):
+			self._halos[i]._children = []
+
+		for i in xrange(self._nhalos):
+			host = self._halos[i].properties['hostHalo']
+			if host > -1:
+				try:
+					self._halos[host]._children.append(i)
+				except KeyError:
+					pass
+
+	def _get_halo(self, i):
+		if self.base is None:
+			raise RuntimeError("Parent snapshot has been deleted")
+
+		return self._halos[i]
+
+	def _get_by_id(self, halo_id):
+		#Nasty! But, allows lookup by id only (do we need this?)
+		idx = np.where(self._haloprops[:]['id'] == halo_id)[0][0]
+		hn = np.where(self._num_p_rank==idx)[0][0]
+		#print 'hn=', hn
+		halo = self._halos[hn]
+		return halo
+
+	@property
+	def base(self):
+		return self._base()
+
+
+	def _load_halos(self, f, snap):
+		haloprops = np.loadtxt(f, dtype=self.halo_type, comments='#')
+		self._nhalos = len(haloprops)
+		self._haloprops = np.array(haloprops)
+		# sort by number of particles to make compatible with AHF
+		self._num_p_rank = np.flipud(self._haloprops[:]['num_p'].argsort(axis=0))
+
+		for h in xrange(self._nhalos): # self._nhalos + 1?
+			# Mvir is in units of 1e11!!!
+#			self._haloprops[h]['Mmax'] = self._haloprops[h]['Mmax'] * 1.0e11
+#			self._haloprops[h]['Mvir'] = self._haloprops[h]['Mvir'] * 1.0e11		
+
+
+			# AHF halos index start from 0... python start from 0.. lets be consitant :P
+			hn = np.where(self._num_p_rank==(h))[0][0]
+
+			#Is this really memory inefficient?
+			self._halos[hn] = Halo(self._haloprops[h]['id']-1, self)
+	
+			# properties are in Msun / h, Mpc / h
+			self._halos[hn].properties = self._haloprops[h]
+
+	def load_copy(self, i):
+		'''
+		Load a fresh SimSnap with only the particle in halo i
+		'''
+		raise NotImplementedError("Requires pynbody functionality")
+
+	def _load_particles(self, f, snap):
+		NotImplementedError("Only halo loading implemented")
+
+	@staticmethod
+	def _can_load(snap, **kwargs):
+
+		halo_dir = str("%s/HaloMaker/%s/" % (snap.path(), snap.output_number()))
+		if not os.path.isdir(halo_dir):
+			return False
+
+		if len(glob.glob('%shalomaker_%05d.nod'% (halo_dir, snap.output_number()) )) == 0:
+			return False
+				
+		fname = glob.glob('%shalomaker_%05d.nod'%(halo_dir, snap.output_number()) )[0]
+		if os.path.exists(fname):
+			return True
+		return False
+
+
 
 
 def open_(filename, *args):
