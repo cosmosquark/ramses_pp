@@ -249,7 +249,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 
 
 	def halos(self, LgridDomain=256, LgridMax=2097152, VescTune=1.0, Dvir=200, nmin_per_halo = 50,
-		 MaxGatherRad=1.0, num_threads=16, run_ahf=False, rewrite_tipsy=False, gas=False):
+		 MaxGatherRad=1.0, num_threads=16, run_ahf=False, rewrite_tipsy=False, gas=False, configloc = True):
 		import glob
 		s = self.raw_snapshot()
 		isRamses = (type(s) == pynbody.ramses.RamsesSnap)

@@ -11,7 +11,7 @@ if __name__ == "__main__":
 	halos = snap.halos()
 	mbinmps, mhist, mbinsize = halos.mass_function(units='Msun/h', nbins=100)
 	snap_pynbody = sim.snapshot(sim.num_snapshots(), module='pynbody')
-	M, sigma, N = snap_pynbody.analytical_mass_function(kern='REEDU')
+	M, sigma, N = snap_pynbody.analytical_mass_function()
 
 	boxsize = ds.arr(ds.parameters['unit_l'], 'cm').in_units('Mpccm/h')
 	print 'boxsize= ', boxsize
@@ -23,4 +23,4 @@ if __name__ == "__main__":
 	ax.semilogy(mbinmps,mhist/(boxsize**3)/mbinsize,'o')
 	plt.xlabel(r'log$_{10}$(M) [M$_{\odot}$/h]')
 	plt.ylabel('dN / dlog$_{10}$(M) [Mpc$^{-3}$ h$^{3}$]')
-	fig.savefig('hmf_test.png')
+	fig.savefig('hmf_test_' + str(sys.argv[1]) + "_" + str(sys.argv[2]) + '_.png')

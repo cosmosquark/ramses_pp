@@ -11,7 +11,7 @@ dependency out sometime in the future if needed.
 
 super_verbose=True
 
-<<<<<<< HEAD
+
 import yt
 import numpy as np
 import sys, os.path, glob
@@ -19,13 +19,6 @@ import weakref, copy
 import re, uuid
 from ramses_pp import config as pp_cfg
 import abc
-
-=======
-import numpy as np
-import sys, os.path, glob
-import weakref, copy
-from ramses_pp import config as pp_cfg
->>>>>>> e3a7470df625fb3d1566b7b448dd3f744b808256
 #from yt.units.yt_array import YTArray
 #import logging
 
