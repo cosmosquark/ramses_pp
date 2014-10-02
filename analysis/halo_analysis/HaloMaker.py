@@ -1,33 +1,98 @@
-import loader
-#from ramses_pp.modules import Simulation, Snapshot
 from ramses_pp import config
-import Halomaker_Utils
 import os
 
-class Halomaker():
+
+def write_string(var, val):
+	widthform = 20
+	string = var.ljust(widthform) + " = " + str(val) + '\n'
+	return string
+
+def write_string_final(var, val):
+	widthform = 20
+	string = var.ljust(widthform) + " = " + str(val)
+	return string
+
+
+def make_inputfiles(direct, nsteps, snapno, snaploc, simtype="Ra3"):
+	filename = direct + '/inputfiles_HaloMaker.dat'
+	if os.path.exists(filename):
+		os.remove(filename)	
+
+	f = open(filename, 'w')
+	string = "'" + snaploc + " '  " + simtype + "   " + nsteps + "  " + snapno
+	f.write(string)
+	f.close()
+
+def make_input(direct, sim_info, halomaker_stats, nsteps):
+	filename = direct + '/input_HaloMaker.dat'
+	# check if file already exists
+	if os.path.exists(filename):
+		os.remove(filename)	
+
+	# write the file
+	f = open(filename, 'w')
+	f.write(write_string('af',sim_info['faexp']))
+	f.write(write_string('lbox',sim_info['lbox(Mpc)']))
+	f.write(write_string('H_f',sim_info['H0']))
+	f.write(write_string('omega_f',sim_info['omega_m_0']))
+	f.write(write_string('omega_b',sim_info['omega_b_0']))
+	f.write(write_string('lambda_f',sim_info['omega_l_0']))
+	f.write(write_string('FlagPeriod',sim_info['FlagPeriod']))
+	f.write(write_string('npart',halomaker_stats['npart']))
+	f.write(write_string('method',halomaker_stats['method']))
+	f.write(write_string('cdm',halomaker_stats['cdm']))
+	f.write(write_string('b',halomaker_stats['b']))
+	f.write(write_string('nsteps',nsteps))
+	f.write(write_string('nvoisins',halomaker_stats['adaptahop']['nvoisins']))
+	f.write(write_string('nhop',halomaker_stats['adaptahop']['nhop']))
+	f.write(write_string('rhot',halomaker_stats['adaptahop']['rhot']))
+	f.write(write_string('fudge',halomaker_stats['adaptahop']['fudge']))
+	f.write(write_string('fudgepsilon',halomaker_stats['adaptahop']['fudgepsilon']))
+	f.write(write_string('alphap',halomaker_stats['adaptahop']['alphap']))
+	f.write(write_string('verbose',halomaker_stats['verbose']))
+	f.write(write_string_final('megaverbose',halomaker_stats['adaptahop']['megaverbose']))
+
+	f.close()
+	return
+
+class HaloMaker():
 	def __init__(self, Simulation, subvol=False, ncpu=1):
+		'''
+		Store initial properties and simulation infomation
+		'''
 		self.Simulation = Simulation
 		self._subvol=subvol
 		self._ncpu=ncpu
+		self._halomaker_info = {  # store input parameters for HaloMaker
+				'method': 'MSM',
+				'b': 0.2,
+				'cdm' : ".false.",
+				'npart' : '20',
+				'adaptahop' : {
+					'nvoisins' : 32,
+					'nhop' : 16,
+					'rhot' : 80,
+					'fudge' : 4.0,
+					'fudgepsilon' : 0.0,
+					'alphap' : 3.0,
+					'megaverbose' : ".false.",
+					} ,
+				'verbose' : ".true.",
+			 } 
+
 		is_simulation = hasattr(Simulation, 'initial_conditions')
 		if is_simulation == False:
 			print "this is not a simulation object"
 			return None
-
-		is_simulation = hasattr(Simulation, '_halomaker_info')
-		if is_simulation == False:
-			print "No Halomaker data is stored. Returning"
-			return None
 	
-		halomaker_dir = self.Simulation.data_dir() + "/HaloMaker"
+		data_dir = self.Simulation.path() + "/HaloMaker"
 
 		# make the halomaker data dir if it does not exist
-		if not os.path.exists(halomaker_dir):
-			os.makedirs(halomaker_dir)
+		if not os.path.exists(data_dir):
+			os.makedirs(data_dir)
 
 		print "loading halomaker location"
 		application_dir = config.applications_dir
-		data_dir = config.json_dir + '/' + str(self.Simulation.name()) + '/' + 'HaloMaker'
 		halomaker_dir = application_dir + "/HaloMaker/f90"
 		post_analysis_dir = application_dir + "/HaloMaker/post_analysis"
 		TreeMaker_dir = application_dir + "/HaloMaker/TreeMaker"
@@ -43,27 +108,25 @@ class Halomaker():
 
 
 		self._nsteps = "1"
-		self._halomaker_stats = self.Simulation.halomaker_info()[0]
-		self.halomaker_info()
 
 
 	def halomaker_info(self):
 		widthform = 14
 		print "current halomaker variables as defined are"
 		print "##################################"
-		print "method".ljust(widthform), self._halomaker_stats['method']
-		print "b".ljust(widthform), self._halomaker_stats['b']
-		print "cdm".ljust(widthform), self._halomaker_stats['cdm']
-		print "npart".ljust(widthform), self._halomaker_stats['npart']
-		print "nsteps".ljust(widthform), str(self._nsteps).ljust(widthform), "(not editable)"
-		print "nvoisins".ljust(widthform), self._halomaker_stats['adaptahop']['nvoisins']
-		print "nhop".ljust(widthform), self._halomaker_stats['adaptahop']['nhop']
-		print "rhot".ljust(widthform), self._halomaker_stats['adaptahop']['rhot']
-		print "fudge".ljust(widthform), self._halomaker_stats['adaptahop']['fudge']
-		print "fudgepsilon".ljust(widthform), self._halomaker_stats['adaptahop']['fudgepsilon']
-		print "alphap".ljust(widthform), self._halomaker_stats['adaptahop']['alphap']
-		print "megaverbose".ljust(widthform), self._halomaker_stats['adaptahop']['megaverbose']
-		print "verbose".ljust(widthform), self._halomaker_stats['verbose']
+		print "method".ljust(widthform) +  str(self._halomaker_info['method'])
+		print "b".ljust(widthform) + str(self._halomaker_info['b'])
+		print "cdm".ljust(widthform) + str(self._halomaker_info['cdm'])
+		print "npart".ljust(widthform) + str(self._halomaker_info['npart'])
+		print "nsteps".ljust(widthform) +  str(self._nsteps).ljust(widthform), "(not editable)"
+		print "nvoisins".ljust(widthform) + str(self._halomaker_info['adaptahop']['nvoisins'])
+		print "nhop".ljust(widthform) + str(self._halomaker_info['adaptahop']['nhop'])
+		print "rhot".ljust(widthform) + str(self._halomaker_info['adaptahop']['rhot'])
+		print "fudge".ljust(widthform) + str(self._halomaker_info['adaptahop']['fudge'])
+		print "fudgepsilon".ljust(widthform) + str(self._halomaker_info['adaptahop']['fudgepsilon'])
+		print "alphap".ljust(widthform) + str(self._halomaker_info['adaptahop']['alphap'])
+		print "megaverbose".ljust(widthform) + str(self._halomaker_info['adaptahop']['megaverbose'])
+		print "verbose".ljust(widthform) + str(self._halomaker_info['verbose'])
 		print "##################################"
 		print ""
 		print "use .edit_halomaker_info(variable=new) to update any of this info"
@@ -145,8 +208,8 @@ class Halomaker():
 			print "working with " + direct
 
 		# make input files
-			Halomaker_Utils.make_input(direct, self.sim_info(), self._halomaker_stats, self._nsteps)
-			Halomaker_Utils.make_inputfiles(direct, nsteps, snapno, snaploc, simtype="Ra3")
+			make_input(direct, self.sim_info(), self._halomaker_info, self._nsteps)
+			make_inputfiles(direct, nsteps, snapno, snaploc, simtype="Ra3")
 			os.chdir(direct)
 			command = "ln -s " + self._halomaker_exe + " ."
 			os.system(command)
@@ -214,11 +277,4 @@ class Halomaker():
 #	def edit_halomaker_info(self,method=None,b=None,cdm=None,adaptahop=None,nvoisins=None,nhop=None,rhot=None,fudge=None,fudgeepsilon=None,alphap=None,megaverbose=None,verbose=None):
 		
 
-
-
-
-
-
-
-		
 

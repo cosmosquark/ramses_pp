@@ -128,22 +128,6 @@ class Simulation():
 		self._name = name
 		self._path = path
 		self._boxsize = self.box_size() #100   #100 #in Mpc h^-1
-		self._halomaker_info = {  # store input parameters for HaloMaker
-				'method': 'MSM',  
-				'b': 0.2,
-				'cdm' : ".false.",
-				'npart' : '20',
-				'adaptahop' : {
-					'nvoisins' : 32,
-					'nhop' : 16,
-					'rhot' : 80,
-					'fudge' : 4.0,
-					'fudgepsilon' : 0.0,
-					'alphap' : 3.0,
-					'megaverbose' : ".false.",	
-					} ,
-				'verbose' : ".true.",
-			} ,
 		self._periodic = True,
 
 	# add new methods based on "what modules (pymses, pynbody) are working
@@ -460,11 +444,12 @@ class Simulation():
 
 ### halomaker stuff
 
-	def halomaker_info(self):
-		return self._halomaker_info
-
-	def halomaker(self, subvol=False, ncpu=1):
-		return Halomaker.Halomaker(self, subvol=False, ncpu=1)
+	def load_halomaker(self, subvol=False, ncpu=1):
+		'''
+		Returns the Halomaker Application Object
+		'''
+		from ramses_pp.analysis.halo_analysis.HaloMaker import HaloMaker
+		return HaloMaker(self, subvol=False, ncpu=1)
 
 
 
