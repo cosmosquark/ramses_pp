@@ -702,21 +702,21 @@ class AHFCatalogue(HaloCatalogue):
 			'numSubStruct':'dimensionless',
 			'Mvir':'Msun / h',
 			'num_p':'dimensionless',
-			'pos':'kpc / h',
+			'pos':'kpccm / h',
 			'vel':'km / s',
-			'Rvir':'kpc / h',
-			'Rmax':'kpc / h',
-			'r2':'kpc / h',
-			'mpb_offset': 'kpc / h',
-			'com_offset': 'kpc / h',
+			'Rvir':'kpccm / h',
+			'Rmax':'kpccm, / h',
+			'r2':'kpccm / h',
+			'mpb_offset': 'kpccm / h',
+			'com_offset': 'kpccm / h',
 			'v_max':'km / s',
 			'v_esc':'km / s',
 			'sigV': 'km / s',
 			'bullock_spin': 'dimensionless',
 			'spin': 'dimensionless',
 			'L':'dimensionless',
-			'b_to_a':'kpc / h',
-			'c_to_a':'kpc / h',
+			'b_to_a':'kpccm / h',
+			'c_to_a':'kpccm / h',
 			'Ea':'dimensionless',
 			'Eb':'dimensionless',
 			'Ec':'dimensionless',
@@ -732,8 +732,8 @@ class AHFCatalogue(HaloCatalogue):
 			'bullock_spin_gas': 'dimensionless',
 			'spin_gas': 'dimensionless',
 			'L_gas':'dimensionless',
-			'b_to_a_gas':'kpc / h',
-			'c_to_a_gas':'kpc / h',
+			'b_to_a_gas':'kpccm / h',
+			'c_to_a_gas':'kpccm / h',
 			'Ea_gas':'dimensionless',
 			'Eb_gas':'dimensionless',
 			'Ec_gas':'dimensionless',
@@ -744,8 +744,8 @@ class AHFCatalogue(HaloCatalogue):
 			'bullock_spin_star': 'dimensionless',
 			'spin_star': 'dimensionless',
 			'L_star':'dimensionless',
-			'b_to_a_star':'kpc / h',
-			'c_to_a_star':'kpc / h',
+			'b_to_a_star':'kpccm / h',
+			'c_to_a_star':'kpccm / h',
 			'Ea_star':'dimensionless',
 			'Eb_star':'dimensionless',
 			'Ec_star':'dimensionless',
@@ -754,39 +754,21 @@ class AHFCatalogue(HaloCatalogue):
 			'Epot_star': 'Msun / h (km / sec)**2',
 		}
 
-#	halo_type = np.dtype([('id',np.int64),('hostHalo',np.int64),('Mvir','f'),
-#					  ('v_max','f'),('v_rms','f'),('Rvir','f'),
-#					  ('Rs','f'),('num_p',np.int64),
-#					  ('pos','f',3),('vel','f',3),
-#					  ('J','f',3),('spin','f'),('klypin_rs','f'),
-#					  ('Mvir_all','f'),
-#					  ('M200b','f'),('M200c','f'),('M500c','f'),
-#					  ('Xoff','f'),('Voff','f'),
-#					  ('bullock_spin','f'),('b_to_a','f'),('c_to_a','f'),
-#					  ('A','f',3),('T/|U|','f')])
-
-#	units = {'id':'dimensionless','hostHalo':'dimensionless','Mvir':'Msun / h',
-#					  'v_max':'km / s','v_rms':'km / s','Rvir':'kpc / h',
-#					  'Rs':'kpc / h','num_p':'dimensionless',
-#					  'pos':'Mpc / h','vel':'km / s',
-#					  'J':'(Msun/h)**2 / (km/s)','spin':'dimensionless','klypin_rs':'dimensionless',
-#					  'Mvir_all':'Msun / h',
-#					  'M200b':'Msun / h','M200c':'Msun / h','M500c':'Msun / h',
-#					  'Xoff':'kpc / h','Voff':'km / s',
-#					  'bullock_spin':'dimensionless','b_to_a':'kpc / h','c_to_a':'kpc / h',
-#					  'A':'?','T/|U|':'K(?)'}
 
 	def __init__(self, snap, filename=None, make_grp=None):
 		# TODO - Read/store header
 		if not self._can_load(snap):
-			raise Exception("Cannot locate/load AHF catalogue")
+			try:
+				self._run(snap):
+			except Exception:
+				raise Exception("Cannot locate/load AHF catalogue")
 
 		self._base = weakref.ref(snap)
 		HaloCatalogue.__init__(self,"AHF",snap.path(),snap.output_number())
 		if filename is not None: self._AHFFilename = filename
 		else:
 			# get the file name
-			tipsy_dir = str("%soutput_%05d_tipsy/" % (snap.snappath(), snap.output_number()))
+			tipsy_dir = str("%s/output_%05d/output_%05d_tipsy/" % (snap.path(), snap.output_number(), snap.output_number()))
 			if not os.path.isdir(tipsy_dir):
 				print "AHF not run on this snapshot.. aborting"
 				raise Exception("AHF not run, run AHF plz")
@@ -826,6 +808,26 @@ class AHFCatalogue(HaloCatalogue):
 		if make_grp:
 			print "make grp not implemented yet"
 #			self.make_grp()
+
+	def mass_function(self, units='Msun/h', nbins=100):
+		'''
+		Compute the halo mass function for the given catalogue
+		'''
+		print 'HERE'
+		masses =[]
+		for halo in self:
+			Mvir = halo['Mvir'].in_units(units) - halo['M_gas'].in_units(units) - halo['M_star'].in_units(units)
+			masses.append(Mvir)
+
+		mhist, mbin_edges = np.histogram(np.log10(masses),bins=nbins)
+		mbinmps = np.zeros(len(mhist))
+		mbinsize = np.zeros(len(mhist))
+		for i in np.arange(len(mhist)):
+			mbinmps[i] = np.mean([mbin_edges[i],mbin_edges[i+1]])
+			mbinsize[i] = mbin_edges[i+1] - mbin_edges[i]
+
+		return mbinmps, mhist, mbinsize
+
 
 	def make_grp(self):
 		'''
@@ -908,7 +910,7 @@ class AHFCatalogue(HaloCatalogue):
 
 	@staticmethod
 	def _can_load(snap, **kwargs):
-		tipsy_dir = str("%soutput_%05d_tipsy/" % (snap.snappath(), snap.output_number()))
+		tipsy_dir = str("%s/output_%05d/output_%05d_tipsy/" % (snap.path(), snap.output_number(), snap.output_number()))
 		if not os.path.isdir(tipsy_dir):
 			return False
 
@@ -919,6 +921,18 @@ class AHFCatalogue(HaloCatalogue):
 		if os.path.exists(fname):
 			return True
 		return False
+
+	@staticmethod
+
+	def _run(snap, **kwargs):
+		# need to run from pynbody
+		if type(snap) == 'ramses_pp.modules.pynbody.Pynbody.PynbodySnapshot':
+			snap.halos()
+		else:
+			from ramses_pp.modules.pynbody import Pynbody
+			pyn = Pynbody.load(snap.path(), snap.output_number())
+			pyn.halos()
+
 
 class HaloMakerSimpleCatalogue(HaloCatalogue):
 	'''

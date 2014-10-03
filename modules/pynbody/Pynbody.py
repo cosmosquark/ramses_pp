@@ -37,10 +37,8 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		self._ioutput = ioutput
 		if ioutput is not None:
 			self._snapshot = pynbody.load('%s/output_%05d'%(folder, ioutput),force_gas=False)
-			self._snappath = os.path.join('%s/output_%05d/'%(self._path, ioutput))
 		else:
 			self._snapshot = pynbody.load(folder,force_gas=False)
-			self._snappath = None
 
 	#Implement abstract methods from Snapshot.py
 
@@ -56,11 +54,6 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		'''
 		return self._path
 	
-	def snappath(self):
-		'''
-		Return the path to this snapshot
-		'''
-		return self._snappath
 
 	def raw_snapshot(self):
 		'''
@@ -119,7 +112,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 			'omega_k_0':omega_k_0,
 			'omega_b_0':omega_b_0,
 			'h':h,
-			'aexp':aexp,
+			'aexp':aexp
 		}
 		return cosmology
 
@@ -131,15 +124,16 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		#return self.raw_snapshot().properties
 		return self.raw_snapshot()._info
 
-	def analytical_mass_function(self):
+	def analytical_mass_function(self, kern='ST'):
 		'''
-		Return the Sheth-Tormen mass function (can edit this method to include more)
+		Return the Sheth-Tormen mass function
+		Units: Mpc^-3 h^3 and Msun/h
 		'''
+		
 		s = self._snapshot
-		M, sigma, N = pynbody.analysis.halo_mass_function(s)
+		M, sigma, N = pynbody.analysis.halo_mass_function(s, kern=kern)
 		return M, sigma, N
 
-### tipsy conversion utlitlies
 
 	def tipsy_dir(self):
 		path = self.path()
@@ -171,13 +165,17 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		cmtokpc = constants.cmtokpc
 		G_u = constants.G_u
 
-		lenunit  = s._info['unit_l']/s.properties['a']*cmtokpc
+		lenunit  = s._info['unit_l']*cmtokpc #/s.properties['a']*cmtokpc
 		massunit = pynbody.analysis.cosmology.rho_crit(s, z=0, unit='Msol kpc^-3')*lenunit**3
 		timeunit = np.sqrt(1/G_u * lenunit**3/massunit)
 
+		print '****************************'
+		print lenunit, massunit, timeunit
+		print '****************************'
+
 		return lenunit, massunit, timeunit
 
-	def tipsy(self, gas=False, convert=True):
+	def tipsy(self, convert=True, gas=False):
 		# note RAMSES-CH does not handle very well with the pynbody conversion... tbh gas converted to particles is bad news anyway
 		#Grab the tipsy output for this snapshot, if it exists
 		print "if you are using RAMSES-CH, this will probably break, unless you set has_gas = False in RamsesSnap__init__ within pynbody"
@@ -223,22 +221,21 @@ class PynbodySnapshot(Snapshot.Snapshot):
 				print 'Writing file %s'%newfile
 				#s['mass'].convert_units('%f Msol'%massunit)
 				s['mass'].convert_units('%f Msol'%massunit)
-				if gas == True:
+				if gas == True and len(s.g) > 0:
 					s.g['rho'].convert_units(m_unit/l_unit**3) # get gas variables
 					s.g['temp']
 					s.g['metals'] = s.g['metal']
-				s['pos'].convert_units(l_unit)
-				s['vel'].convert_units(v_unit)
-				if gas == True:
 					s['eps'] = s.g['smooth'].min()   # smooth the gas
 					s['eps'].units = s['pos'].units
 					del(s.g['metal'])
 					del(s['smooth'])
+
+				s['pos'].convert_units(l_unit)
+				s['vel'].convert_units(v_unit)
 				
 				s.write(filename='%s'%newfile, fmt=pynbody.tipsy.TipsySnap, binary_aux_arrays = True)
 				t = load(newfile)
 				setattr(t, '_ioutput', self.output_number())
-				setattr(t, '_snappath', self.tipsy_dir())
 				return t
 			else:
 				raise Exception("Tipsy file not found: %s"%ftipsy)
@@ -248,11 +245,12 @@ class PynbodySnapshot(Snapshot.Snapshot):
 # see here for more doccumentation http://pynbody.github.io/pynbody/tutorials/halos.html
 
 
-	def halos(self, LgridDomain=256, LgridMax=2097152, VescTune=1.0, Dvir=200, nmin_per_halo = 50,
-		 MaxGatherRad=1.0, num_threads=16, run_ahf=False, rewrite_tipsy=False, gas=False, configloc = True):
+	def halos(self, LgridDomain=128, LgridMax=1073741824, VescTune=1.5, Dvir=200, nmin_per_halo = 50,
+		 MaxGatherRad=3.0, num_threads=16, run_ahf=False, rewrite_tipsy=False, gas=False, configloc = True):
 		import glob
 		s = self.raw_snapshot()
 		isRamses = (type(s) == pynbody.ramses.RamsesSnap)
+
 		fname = self.tipsy_fname() if isRamses else self.path()
 
 		if run_ahf:
@@ -300,11 +298,14 @@ class PynbodySnapshot(Snapshot.Snapshot):
 			f.write('TIPSY_MUNIT   = %e\n'%(massunit*s.properties['h']*(1/omega_m_z)))
 			f.write('TIPSY_OMEGA0  = %f\n'%s.properties['omegaM0'])
 			f.write('TIPSY_LAMBDA0 = %f\n'%s.properties['omegaL0'])			
+
 		 #   velunit = Unit('%f cm'%s._info['unit_l'])/Unit('%f s'%s._info['unit_t'])			
-			f.write('TIPSY_VUNIT   = %e\n'%v_unit.ratio('km s^-1 a', **s.conversion_context()))			
+
+			f.write('TIPSY_VUNIT   = %e\n'%v_unit.ratio('km s^-1', **s.conversion_context()))			
 			# the thermal energy in K -> km^2/s^2		 
 			f.write('TIPSY_EUNIT   = %e\n'%((pynbody.units.k/pynbody.units.m_p).in_units('km^2 s^-2 K^-1')*5./3.))
 			f.close()			
+
 			os.environ['OMP_NUM_THREADS'] = str(num_threads)
 			if not configloc:
 				print "running AHF from your applications dir"
@@ -410,7 +411,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 			s = self.tipsy().raw_snapshot()
 		return s.halos()
 
-class Species:
+class Type:
 	GAS = 1
 	STAR = 2
 	DM = 3

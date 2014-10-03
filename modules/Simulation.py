@@ -9,50 +9,13 @@ TODO: Add features similar to Hamu i.e Automatic generation of axis labels for p
 @author: dsullivan, bthompson
 '''
 from __future__ import division
-from ramses_pp import config
+from .. import config
 pymses_loaded = config.pymses_enabled
 pynbody_loaded = config.pynbody_enabled
 yt_loaded = config.yt_enabled
-
-if config.quick_import:
-	if config.pymses_enabled:
-		from .pymses import Pymses
-	if config.pynbody_enabled:
-		from .pynbody import Pynbody
-	if config.yt_enabled:
-		from .yt import YT
-else:
-
-	config.list_modules()
-
-	if pymses_loaded:
-		try:
-			from .pymses import Pymses
-		except ImportError as e:
-			print 'Unable to import pymses'
-			pymses_loaded = False
-			print e
-	if pynbody_loaded:
-		try:
-			from .pynbody import Pynbody
-		except ImportError as e:
-			print 'Unable to import pynbody'
-			pynbody_loaded = False
-			print e
-	if yt_loaded:
-		try:
-			from .yt import YT
-		except ImportError as e:
-			print 'Unable to import yt'
-			yt_loaded = False
-			print e
-		if (pymses_loaded or pynbody_loaded or yt_loaded) is False:
-			raise RuntimeError("Could not import any modules!")
-			
 import numpy as np
 import json, os, glob, uuid
 
-#from ramses_pp.analysis.halo_analysis import Halomaker
 
 def load(name):
 	'''
@@ -63,7 +26,7 @@ def load(name):
 	if os.path.isfile(filename):
 		with open(filename, 'rb') as fp:
 			data = json.load(fp)
-		return Simulation(str(data['_name']), str(data['_path']), str(data['_boxsize']), data['_halomaker_info'], data['_periodic'], data['_oid'])
+		return Simulation(str(data['_name']), str(data['_path']), data['_oid'])
 	else:
 		raise Exception("No simulation with the name: %s"%name)
 
@@ -97,8 +60,8 @@ def create(name, path):
 		simulation = Simulation(name, path)
 		simulation.save()
 
-#		data_dir = '%s/%s'%(json_dir, simulation._name)
-#		if not os.path.isdir(data_dir): os.mkdir(data_dir)
+		data_dir = '%s/%s'%(json_dir, simulation._name)
+		if not os.path.isdir(data_dir): os.mkdir(data_dir)
 		return simulation
 	else:
 		raise Exception("Path does not exist: %s"%path)
@@ -114,7 +77,7 @@ def list():
 
 
 class Simulation():
-	def __init__(self, name, path, boxsize=100, halomaker=None, periodic=True, oid=None):
+	def __init__(self, name, path, oid=None):
 		# This should never change
 		if oid is None: self._oid = str(uuid.uuid4())
 		else:
@@ -142,12 +105,14 @@ class Simulation():
 			self.run_ahf_tracker = self.call(getattr(AHF,dir(AHF)[4]))
 
 					
-
+	# 
 	def func(self,a):
 		print("Not Defined")
 
 	def call(self,func,*args,**kwargs):
 		return lambda *args, **kwargs : func(self, *args, **kwargs)
+
+	# end custom method calling
 
 	def set_name(self, name):
 		self._name = name
@@ -155,12 +120,6 @@ class Simulation():
 	def set_path(self, path):
 		self._path = path
 
-#	def set_boxsize(self, boxsize):
-#		if isinstance(boxsize, int):
-#			self._boxsize = int(boxsize)  # may mess up with your simulation if this is incorrect
-#		else:
-#			print "Invalid boxsize, boxsize needs to be an integer"
-#			return
 	def box_size(self):
 		cmtokpc = 3.24077929e-22
 		kpctompc = 0.001
@@ -239,7 +198,7 @@ class Simulation():
 		filename = '%s/%s_%05d.png'%(self.data_dir(), prefix, ioutput)
 		if os.path.isfile(filename) and config.override is not True:
 			raise Exception("File: %s already exists. Override is disabled"%filename)
-		plt.savefig(filename)
+		plt.savefig(filename, **kwargs)
 
 	def write_array(self, prefix, ioutput, array, **kwargs):
 		'''
@@ -283,13 +242,13 @@ class Simulation():
 		'''
 		if (module == 'yt') and yt_loaded:
 			from .yt import YT
-			return YT.load(folder=self.path(), ioutput=ioutput, **kwargs)
+			return YT.load(self._path, ioutput=ioutput, **kwargs)
 		elif (module == 'pymses') and pymses_loaded:
 			from .pymses import Pymses
-			return Pymses.load(self.path(), ioutput)
+			return Pymses.load(self._path, ioutput, **kwargs)
 		elif (module == 'pynbody') and pynbody_loaded:
 			from .pynbody import Pynbody
-			return Pynbody.load(self.path(), ioutput)
+			return Pynbody.load(self._path, ioutput, **kwargs)
 		else:
 			print 'yt loaded: ', yt_loaded
 			print 'pymses loaded: ', pymses_loaded
@@ -352,13 +311,25 @@ class Simulation():
 		
 		return initial_cons
 
+	def merger_tree(self, finder=config.default_finder):
+		'''
+		Load a generic mergertree. Default is set in config if not overwritten
+		'''
+
+		from ..analysis.halo_analysis import trees
+		if finder == 'rockstar':
+			return trees.RockstarMergerTree(self):
+		else:
+			raise Exception("Unimplemented finder: %s" % finder)
+
+
 	def redshift(self, z):
 		'''
 		Locate the snapshot closest to the given redshift
 		'''
 		from .utils import array_utils
 		redshifts = self.avail_redshifts()
-		idx = array_utils.argmin(redshifts, z)	
+		idx = array_utils.argmin(redshifts, z)
 		if config.verbose: print 'ioutput %05d closest to redshift %f'%(idx+1, z)
 
 		return idx+1
@@ -374,7 +345,7 @@ class Simulation():
 
 	def redshift_deprecated(self, z):
 		'''
-		Locate the snapshot closest to the given redshift, deprecated since it assumes you have all the snapshots in one location, replaced by redshift and avail_redshift
+		Locate the snapshot closest to the given redshift
 		'''
 		#First, gather list of redshifts
 		num_snapshots = self.num_snapshots()
@@ -392,6 +363,7 @@ class Simulation():
 			redshift = 1.0/aexp -1.0
 			redshifts[i] = float(redshift)
 			i += 1
+			f.close()
 
 		idx = np.argmin(np.abs(redshifts - z))
 		if config.verbose: print 'ioutput %05d closest to redshift %f'%(idx+1, z)
@@ -415,6 +387,7 @@ class Simulation():
 			redshift = 1.0/aexp -1.0
 			if (redshift >= zmin) and (redshift < zmax):
 				redshifts.append(float(redshift))
+			f.close()
 
 		return np.array(redshifts)
 

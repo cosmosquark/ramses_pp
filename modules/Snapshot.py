@@ -151,6 +151,85 @@ class Snapshot():
 			return True
 		
 
+	def a_dot(self):
+		cosmology = self.cosmology()
+		omega_m_0 = cosmology['omega_m_0']
+		omega_l_0 = cosmology['omega_l_0']
+		omega_k_0 = cosmology['omega_k_0']
+		aexp = cosmology['aexp']
+		h0 = cosmology['h']*100
+		a_dot = h0 * np.sqrt(omega_m_0 * (aexp ** -3) + omega_k_0 * (aexp ** -2) + omega_m_0)
+		return a_dot
+
+	def a_dot_recip(self):
+		return 1. / self.a_dot()
+
+	def hzoverh0(self):
+		""" returns: H(a) / H0  = [omegam/a**3 + (1-omegam)]**0.5 """
+		cosmology = self.cosmology()
+		omega_m_0 = cosmology['omega_m_0']
+		aexp = cosmology['aexp']
+		return numpy.sqrt(omega_m_0 * numpy.power(aexp, -3) + (1. - omega_m_0))
+
+	def _lingrowthintegrand(self):
+		""" (e.g. eq. 8 in lukic et al. 2008)   returns: da / [a*H(a)/H0]**3 """
+		cosmology = self.cosmology()
+		return numpy.power((cosmology['aexp'] * self.hzoverh0()), -3)
+
+
+	def _lingrowthfac(self, return_norm=False):
+		"""
+		returns: linear growth factor, b(a) normalized to 1 at z=0, good for flat lambda only
+		a = 1/1+z
+		b(a) = Delta(a) / Delta(a=1)   [ so that b(z=0) = 1 ]
+		(and b(a) [Einstein de Sitter, omegam=1] = a)
+		Delta(a) = 5 omegam / 2 H(a) / H(0) * integral[0:a] [da / [a H(a) H0]**3]
+		equation  from  peebles 1980 (or e.g. eq. 8 in lukic et al. 2008) 
+
+		"""
+
+		cosmology = self.cosmology()
+		omega_m_0 = cosmology['omega_m_0']
+		omega_l_0 = cosmology['omega_l_0']
+		aexp = cosmology['aexp']
+
+		import scipy.integrate
+		if (abs(omega_m_0 + omega_l_0 - 1.) > 1.e-4):
+			raise RuntimeError, "Linear growth factors can only be calculated for flat cosmologies"
+		
+		lingrowth = scipy.integrate.quad(self._lingrowthintegrand(), 0., a, (omega_m_0))[0]
+		lingrowth *= 5. / 2. * omega_m_0 * self.hzoverh0(a, omega_m_0)
+
+		# then calc. for z=0 (for normalization)
+
+		a0 = 1.0
+		lingrowtha0 = scipy.integrate.quad( _lingrowthintegrand, 0., a0, (omega_m_0))[0]
+		lingrowtha0 *= 5. / 2. * omega_m_0 * self.hzoverh0()
+		
+		lingrowthfactor = lingrowth / lingrowtha0
+		if return_norm:
+			return lingrowthfactor, lingrowtha0
+		else:
+			return lingrowthfactor
+
+	def linear_growth_factor(self):
+		"""Calculate the linear growth factor b(a), normalized to 1
+		at z=0, for the cosmology of snapshot f.
+
+		The output is dimensionless. If a redshift z is
+		specified, it is used in place of the redshift in
+		output f."""
+
+		return self._lingrowthfac(return_norm=False):
+
+	
+
+
+
+	def H(self):
+		cosmology = self.cosmology()
+		H = 100 * cosmology['h'] * 
+
 	def tform(self, tform, rt=False):
 
 		if hasattr(self, '_friedman') is False:
@@ -237,7 +316,7 @@ class Snapshot():
 
 		return friedman
 
-	def halos(self, finder='AHF'):
+	def halos(self, finder=config.default_finder):
 
 		'''
 

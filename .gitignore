@@ -3,7 +3,6 @@
 
 #Remove temporary files
 *~
-_*
 *~
 *.o
 *.so
@@ -13,12 +12,10 @@ _*
 *.avi
 *.mp4
 *.x256
-python/yt/yt*
+config.py
 simulations/*
 data/*
-applications/AHF*
 config.py
-pythin/*
 python/pynbody/*
 python/pymses_4.0.0/*
 python/Python-2.7.8/*
@@ -26,9 +23,6 @@ python/scipy/*
 python/Cython/*
 python/mpi4py/*
 movie/*
-movie_selene_nochemo*
-movie_selene_nochemo/*
-ramses_pp/config.py
 tipsy.info
 AHF.in
 ahf_mtree_infile

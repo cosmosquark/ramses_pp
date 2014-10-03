@@ -115,11 +115,6 @@ class YTSnapshot(Snapshot.Snapshot):
 		'''
 		return self._path
 
-	def snappath(self):
-		'''
-		Return the path to this snapshot
-		'''
-		return self._snappath
 
 	def ncpu(self):
 		'''
@@ -148,6 +143,9 @@ class YTSnapshot(Snapshot.Snapshot):
 		omega_b_0 = info['omega_b']
 		aexp = info['aexp']
 		h = info['H0']/100
+		if aexp > 1.0
+			aexp = 1.0
+		z = 1.0/exp - 1.0
 
 		cosmology = {
 			'omega_m_0':omega_m_0,
@@ -202,7 +200,7 @@ class YTSnapshot(Snapshot.Snapshot):
 
 
 	#Return the HOP halo catalogue. Can override run_hop to force re-running
-	def halos(self, finder="AHF", run_finder=False):
+	def halos(self, finder=config.default_finder, run_finder=False):
 		ds = self._snapshot
 		from ...analysis.halo_analysis import halos
 		#Check if HOP file exists (note we will adopt a naming convention here)

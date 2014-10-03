@@ -44,11 +44,6 @@ class PymsesSnapshot(Snapshot.Snapshot):
 		'''
 		return self._path
 
-	def snappath(self):
-		'''
-		Return the path to this snapshot
-		'''
-		return self._snappath
 
 	def amr_source(self, fields):
 		if isinstance(fields, list):
