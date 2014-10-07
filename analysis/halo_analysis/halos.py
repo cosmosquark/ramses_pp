@@ -21,14 +21,14 @@ from ramses_pp import config as pp_cfg
 import abc
 
 from yt.data_objects.particle_filters import add_particle_filter
+from ...modules.yt.YT import star_filter
+from yt.units.yt_array import YTArray
+
 #from yt.units.yt_array import YTArray
 #import logging
 
 #Should adopt this throughout
 #logger = logging.getLogger('ramses_pp.halo')
-def star_filter(pfilter,data):
-	filter = np.logical_and(data.particles.source["particle_age"] != 0, data.particles.source["particle_age"] != None)
-	return filter
 
 
 class DummyHalo(object):
@@ -68,27 +68,44 @@ class Halo():
 
 		return self._halo_catalogue.is_subhalo(self._halo_id, otherhalo._halo_id)
 
-	def get_sphere(self, Rvir_fact=1.0):
+	def get_sphere(self, r_fact=1.0,radius=None,units=None):
 		'''
 		YT only function. Currently, there is a bug with ds.sphere which ignores / h units.
 		So for the time being this function will take care of that
 		'''
+		if (radius == None and units != None) or (radius != None and units == None):
+			print "Either radius or units are None.. both need to be filled in"
+			return None
+	
 		centre = self['pos']
-		Rvir = self['Rvir']
+		if radius != None and units != None:
+			radius = YTArray(radius,units)	# user defined radius
+
+		else:   # shall we just use the virial radius of the Halo?
+			print "using halo virial radius"
+			radius = self['Rvir']
+
 		snapshot = self._halo_catalogue._base()
 		if not (str(type(snapshot)) == "<class 'ramses_pp.modules.yt.YT.YTSnapshot'>"):
 			raise NotImplementedError("sphere only implemented for YT")
 		ds = snapshot.raw_snapshot()
-	#	print Rvir
 
-#		if(centre.uq == YTArray(1.0, 'Mpc/h') or (Rvir.uq == YTArray(1.0, 'kpc/h'))):
-#			if super_verbose:
-#				print "Warning: YT ds.sphere() but does not recognise /h units. Correcting, but double check!"
-#			return ds.sphere(centre/ds.hubble_constant, Rvir/ds.hubble_constant)
+		try:
+			sphere = ds.sphere(centre, (radius* r_fact))
+			return sphere, None
+		except yt.utilities.exceptions.YTSphereTooSmall:  # well yeah, we want the smallest possible dx in radius really
+			print "sphere too small, correcting to smallest dx (although this might be too small in some respects for what you may or may not care about... who am I kidding, have a YT sphere"
+			if units != None:
+				radius = ds.index.get_smallest_dx().in_units(units)
+			else:
+				radius = ds.index.get_smallest_dx().in_units("code_length")
+			print "radius is now ", radius
+			sphere = ds.sphere(centre, radius)
+			return sphere, radius
+			
 
-		return ds.sphere(centre, (Rvir* Rvir_fact))
 
-	def projection_plot(self, Rvir_fact=1.0,fixed_length=None,stars=False,axis="x",units="kpc/h",quantity="density",stars_part=False):
+	def projection_plot(self, r_fact=1.0,radius=None,axis="x",units="kpc/h",quantity="density", stars=True):
 		'''
 		YT only function, produce and save a gas projection plot of the Halo of interest
 		Rvir_fact = multiply Rvir or fixed_length by a factor of something
@@ -97,18 +114,30 @@ class Halo():
 		units = projection axis units
 		quantity = whatever you feel like plotting
 		'''
-		halo_sphere = self.get_sphere(Rvir_fact=Rvir_fact)
+		if radius == None:
+			radius = self["Rvir"]
+		else:
+			radius = YTArray(radius,units)
 
-		if fixed_length == None:
-			fixed_length = self["Rvir"]
-		region = halo_sphere.ds.region(center=self["pos"],left_edge=[(i.in_units('code_length').value - (self["Rvir"].in_units('code_length').value * Rvir_fact ) ) for i in self["pos"] ], right_edge=[(i.in_units('code_length').value + (self["Rvir"].in_units('code_length').value * Rvir_fact ) ) for i in self["pos"] ])
+		halo_sphere, radius_check  = self.get_sphere(radius=radius.value,units=units)
+
+		if radius_check != None:
+			radius = radius_check
+
+
+		region = halo_sphere.ds.region(center=self["pos"],left_edge=[(i.in_units('code_length').value - (radius.in_units('code_length').value * r_fact ) ) for i in self["pos"] ], right_edge=[(i.in_units('code_length').value + (radius.in_units('code_length').value * r_fact ) ) for i in self["pos"] ])
 		if quantity=="density":
-			plt = yt.ProjectionPlot(halo_sphere.ds,axis,quantity,center=self["pos"].in_units(units), width=(fixed_length.in_units('code_length').value*Rvir_fact), axes_unit=units, data_source=region )
+			plt = yt.ProjectionPlot(halo_sphere.ds,axis,quantity,center=self["pos"].in_units(units), width=(radius.in_units('code_length').value*r_fact), axes_unit=units, data_source=region )
 		else:
 			print quantity, " is being plotted"
-			plt = yt.ProjectionPlot(halo_sphere.ds,axis,quantity,center=self["pos"].in_units(units), width=(fixed_length.in_units('code_length').value*Rvir_fact), axes_unit=units, data_source=region, weight_field='density' )
-		if stars_part:
+			plt = yt.ProjectionPlot(halo_sphere.ds,axis,quantity,center=self["pos"].in_units(units), width=(radius.in_units('code_length').value*r_fact), axes_unit=units, data_source=region, weight_field='density' )
+		if stars:
+			print "adding star particles"
 			print dir(halo_sphere.ds)
+			add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
+			halo_sphere.ds.add_particle_filter("stars")
+			plt.annotate_particles((radius,units),ptype="stars",p_size=10.0,col="m",marker="*")
+
 #			add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
 #			stars = halo_sphere.particles.source['particle_age'] != 0
 #			print len(stars)
@@ -118,9 +147,10 @@ class Halo():
 #			halo_sphere.ds.add_particle_filter("stars")
 #			print len(halo_sphere.ds["stars","particle_mass"])
 #			plt.annotate_particles((500,'kpc'),ptype="stars",p_size=10.0,col="m",marker="*")
-		plt.save(("Halo_gas_" + str(self["id"].value)) )
-		plt_dm = yt.ProjectionPlot(halo_sphere.ds,axis,("deposit","io_cic"),center=self["pos"].in_units(units), width=(fixed_length.in_units('code_length').value*Rvir_fact), axes_unit=units, data_source=region )
-		plt_dm.save(("Halo_dm_" + str(self["id"].value)) )
+		sim_name = os.path.split(self._halo_catalogue._base().path())[1] 
+		plt.save(("Halo_gas_" + str(self["id"].value) + "_" + str(sim_name) + "_" + str(self._halo_catalogue._base().output_number() ) ) )
+		plt_dm = yt.ProjectionPlot(halo_sphere.ds,axis,("deposit","io_cic"),center=self["pos"].in_units(units), width=(radius.in_units('code_length').value*r_fact), axes_unit=units, data_source=region )
+		plt_dm.save(("Halo_dm_" + str(self["id"].value) + "_" + str(sim_name) + "_" +  str(self._halo_catalogue._base().output_number() ) ))
 
 	def dbscan(self, eps=0.4, min_samples=20):
 		'''
@@ -128,7 +158,7 @@ class Halo():
 		eps defines the linking length to use, min_samples defines the minimum number of stars to define a galaxyTODO - normalise positions AND eps by the virial radius of the halo
 		'''
 		#First, we will need a sphere
-		sphere = self.get_sphere()
+		sphere, change  = self.get_sphere()
 
 		#Now, identify only star particles
 		stars = sphere.particles.source['particle_age'] != 0
@@ -145,10 +175,17 @@ class Halo():
 						sphere['particle_position_y'][stars].value, \
 						sphere['particle_position_z'][stars].value, \
 						sphere['particle_index'][stars].value
+		print x, y, z
+		# lets have a sensible cut off .. no point running dbscan if there are < 5 stars
+		if len(x) < 5:
+			raise Exception("too few star particles found within the region (need >= 5 stars)")
 
 		#Normalise these based on the virial radius
 		pos = self['pos'].convert_to_units('code_length').value
-		Rvir = self['Rvir'].convert_to_units('code_length').value
+		if change == None:
+			Rvir = self['Rvir'].convert_to_units('code_length').value
+		else:
+			Rvir = change.convert_to_units('code_length').value
 
 		min_x, max_x = pos[0] - Rvir, pos[0] + Rvir
 		min_y, max_y = pos[1] - Rvir, pos[1] + Rvir
