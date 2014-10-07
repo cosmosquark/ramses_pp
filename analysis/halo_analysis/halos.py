@@ -19,11 +19,17 @@ import weakref, copy
 import re, uuid
 from ramses_pp import config as pp_cfg
 import abc
+
+from yt.data_objects.particle_filters import add_particle_filter
 #from yt.units.yt_array import YTArray
 #import logging
 
 #Should adopt this throughout
 #logger = logging.getLogger('ramses_pp.halo')
+def star_filter(pfilter,data):
+	filter = np.logical_and(data.particles.source["particle_age"] != 0, data.particles.source["particle_age"] != None)
+	return filter
+
 
 class DummyHalo(object):
 
@@ -82,7 +88,7 @@ class Halo():
 
 		return ds.sphere(centre, (Rvir* Rvir_fact))
 
-	def projection_plot(self, Rvir_fact=1.0,fixed_length=None,stars=False,axis="x",units="kpc/h",quantity="density"):
+	def projection_plot(self, Rvir_fact=1.0,fixed_length=None,stars=False,axis="x",units="kpc/h",quantity="density",stars_part=False):
 		'''
 		YT only function, produce and save a gas projection plot of the Halo of interest
 		Rvir_fact = multiply Rvir or fixed_length by a factor of something
@@ -92,12 +98,29 @@ class Halo():
 		quantity = whatever you feel like plotting
 		'''
 		halo_sphere = self.get_sphere(Rvir_fact=Rvir_fact)
+
 		if fixed_length == None:
 			fixed_length = self["Rvir"]
 		region = halo_sphere.ds.region(center=self["pos"],left_edge=[(i.in_units('code_length').value - (self["Rvir"].in_units('code_length').value * Rvir_fact ) ) for i in self["pos"] ], right_edge=[(i.in_units('code_length').value + (self["Rvir"].in_units('code_length').value * Rvir_fact ) ) for i in self["pos"] ])
-		
-		plt = yt.ProjectionPlot(halo_sphere.ds,axis,quantity,center=self["pos"].in_units(units), width=(fixed_length.in_units('code_length').value*Rvir_fact), axes_unit=units, data_source=region )
-		plt.save(("Halo_" + str(self["id"].value)) )
+		if quantity=="density":
+			plt = yt.ProjectionPlot(halo_sphere.ds,axis,quantity,center=self["pos"].in_units(units), width=(fixed_length.in_units('code_length').value*Rvir_fact), axes_unit=units, data_source=region )
+		else:
+			print quantity, " is being plotted"
+			plt = yt.ProjectionPlot(halo_sphere.ds,axis,quantity,center=self["pos"].in_units(units), width=(fixed_length.in_units('code_length').value*Rvir_fact), axes_unit=units, data_source=region, weight_field='density' )
+		if stars_part:
+			print dir(halo_sphere.ds)
+#			add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
+#			stars = halo_sphere.particles.source['particle_age'] != 0
+#			print len(stars)
+#			print halo_sphere.ds.derived_field_list
+#			print halo_sphere["io","particle_age"]
+#			print halo_sphere["io","particle_age"].max()
+#			halo_sphere.ds.add_particle_filter("stars")
+#			print len(halo_sphere.ds["stars","particle_mass"])
+#			plt.annotate_particles((500,'kpc'),ptype="stars",p_size=10.0,col="m",marker="*")
+		plt.save(("Halo_gas_" + str(self["id"].value)) )
+		plt_dm = yt.ProjectionPlot(halo_sphere.ds,axis,("deposit","io_cic"),center=self["pos"].in_units(units), width=(fixed_length.in_units('code_length').value*Rvir_fact), axes_unit=units, data_source=region )
+		plt_dm.save(("Halo_dm_" + str(self["id"].value)) )
 
 	def dbscan(self, eps=0.4, min_samples=20):
 		'''
@@ -759,7 +782,7 @@ class AHFCatalogue(HaloCatalogue):
 		# TODO - Read/store header
 		if not self._can_load(snap):
 			try:
-				self._run(snap):
+				self._run(snap)
 			except Exception:
 				raise Exception("Cannot locate/load AHF catalogue")
 
@@ -815,17 +838,24 @@ class AHFCatalogue(HaloCatalogue):
 		'''
 		print 'HERE'
 		masses =[]
-		for halo in self:
-			Mvir = halo['Mvir'].in_units(units) - halo['M_gas'].in_units(units) - halo['M_star'].in_units(units)
-			masses.append(Mvir)
 
+		for halo in self:
+		#	print halo["Mvir"], halo["M_gas"], halo["M_star"]
+			Mvir = halo['Mvir'].in_units(units).value - halo['M_gas'].in_units(units).value - halo['M_star'].in_units(units).value
+			if Mvir <= 1.0:
+				print "WARNING", halo["id"],  halo["Mvir"], halo["M_gas"], halo["M_star"], halo["pos"], halo["Rvir"], "has no dark matter"
+			else:
+				masses.append(Mvir)
+		print masses
+		print min(masses), max(masses)
 		mhist, mbin_edges = np.histogram(np.log10(masses),bins=nbins)
 		mbinmps = np.zeros(len(mhist))
 		mbinsize = np.zeros(len(mhist))
+		print mhist
+		print mbin_edges
 		for i in np.arange(len(mhist)):
 			mbinmps[i] = np.mean([mbin_edges[i],mbin_edges[i+1]])
 			mbinsize[i] = mbin_edges[i+1] - mbin_edges[i]
-
 		return mbinmps, mhist, mbinsize
 
 

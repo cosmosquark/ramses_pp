@@ -175,13 +175,13 @@ class PynbodySnapshot(Snapshot.Snapshot):
 
 		return lenunit, massunit, timeunit
 
-	def tipsy(self, convert=True, gas=False):
+	def tipsy(self, convert=True, gas=False, rewrite=False):
 		# note RAMSES-CH does not handle very well with the pynbody conversion... tbh gas converted to particles is bad news anyway
 		#Grab the tipsy output for this snapshot, if it exists
 		print "if you are using RAMSES-CH, this will probably break, unless you set has_gas = False in RamsesSnap__init__ within pynbody"
 		ftipsy = self.tipsy_fname()
 
-		if os.path.exists(ftipsy):
+		if os.path.exists(ftipsy) and rewrite == False:
 			t = load(ftipsy)
 			setattr(t, '_ioutput', self.output_number())
 			return t
@@ -190,6 +190,11 @@ class PynbodySnapshot(Snapshot.Snapshot):
 				"""
 				Credit to Rok Roskar (roskar@physik.uzh.ch)
 				"""
+				if rewrite and os.path.exists(self.tipsy_dir()):
+					print "deleting tipsy conversion"
+					rmdir = self.tipsy_dir()
+					os.system('rm -rf %s'%(rmdir))
+
 				s = self.raw_snapshot()
 
 				newdir = self.tipsy_dir()
@@ -266,12 +271,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 			omega_m_z = cosmo.omega_z(s.properties['omegaM0'], z)
 
 			#First, convert to tipsy
-			if rewrite_tipsy:
-				rmdir = self.tipsy_dir()
-				print 'Would remove %s'%rmdir
-				#os.system('rm -rf %s'%(rmdir))
-
-			if os.path.exists(fname) is False and isRamses: self.tipsy(gas=gas)
+			if os.path.exists(fname) is False and isRamses: self.tipsy(gas=gas, rewrite=rewrite_tipsy)
 			
 			lenunit, massunit, timeunit = self.tipsy_units()
 

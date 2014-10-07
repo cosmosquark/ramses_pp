@@ -26,7 +26,7 @@ vide_catalogue_root = '/starpulse/pool/cosmic/bthompson/voids' # the directory w
 void_finder = "vide"
 
 
-rockstar_base=""
+rockstar_base="rockstar/rockstar_halos/"
 rockstar_autogrp=False
 rockstar_load_ctree=False
 default_finder="AHF"

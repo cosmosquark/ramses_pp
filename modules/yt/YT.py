@@ -6,7 +6,7 @@ Based on Pymses.py from the Hamu project https://github.com/samgeen/Hamu
 
 from .. import Snapshot
 import sys, os
-#from ramses_pp import config
+from ... import config as ramses_pp_cfg
 
 #from yt.config import ytcfg; ytcfg["yt","loglevel"] = "20"
 import yt
@@ -23,6 +23,7 @@ from yt.data_objects.particle_filters import add_particle_filter
 verbose = True
 #simulation_dir = config.simulation_dir
 
+
 def rho_crit_now(data, units='cgs'):
 	if units == 'SI':
 		G = 6.6743E-11
@@ -34,24 +35,24 @@ def rho_crit_now(data, units='cgs'):
 
 #Add some useful fields
 def _Temperature(field, data):
-	rv = data["Pressure"]/data["Density"]
+	rv = data["ramses","Pressure"]/data["ramses","Density"]
 	rv *= mass_hydrogen_cgs/boltzmann_constant_cgs
 	return rv
 
 def _NumDens(field, data):
-	rv = data["Density"]/mass_hydrogen_cgs
+	rv = data["ramses","Density"]/mass_hydrogen_cgs
 	return rv
 
 def _OverDensity(field, data):
 	omega_baryon_now = data.ds.parameters['omega_b']
 	#return data['Density'] / (omega_baryon_now * rho_crit_now * (data.pf.hubble_constant**2) * ((1+data.pf.current_redshift)**3))
-	return data['Density'] / (omega_baryon_now * rho_crit_now(data) * ((1+data.ds.current_redshift)**3))
+	return data["ramses",'Density'] / (omega_baryon_now * rho_crit_now(data) * ((1+data.ds.current_redshift)**3))
 
 def load(folder, ioutput, **kwargs):
-	add_field(("gas", "Temperature"), function=_Temperature, units=r"\rm{K}")
-	add_field(("gas", "Number Density"), function=_NumDens, units=r"\rm{cm}^{-3}")
-	add_field(("gas", "Baryon Overdensity"), function=_OverDensity,
-          units=r"")
+#	add_field(("gas", "Temperature"), function=_Temperature, units=r"\rm{K}")
+#	add_field(("gas", "Number Density"), function=_NumDens, units=r"\rm{cm}^{-3}")
+#	add_field(("gas", "Baryon Overdensity"), function=_OverDensity,
+ #         units=r"")
 	return YTSnapshot(folder, ioutput, **kwargs)
 
 def star_filter(pfilter,data):
@@ -143,7 +144,7 @@ class YTSnapshot(Snapshot.Snapshot):
 		omega_b_0 = info['omega_b']
 		aexp = info['aexp']
 		h = info['H0']/100
-		if aexp > 1.0
+		if aexp > 1.0:
 			aexp = 1.0
 		z = 1.0/exp - 1.0
 
@@ -182,6 +183,18 @@ class YTSnapshot(Snapshot.Snapshot):
 		raw_snap_all.ds    # patch to get the pf functionality working nicely... bit of a hack
 		return raw_snap_all
 
+	def raw_snapshot_rockstar(self):
+
+		ds = self.raw_snapshot_all()
+		ds["particle_position_x"].convert_to_units("Mpc/h")
+		ds["particle_position_y"].convert_to_units("Mpc/h")
+		ds["particle_position_z"].convert_to_units("Mpc/h")
+		ds["particle_mass"].convert_to_units("Msun/h")
+		ds["particle_velocity_x"].convert_to_units("km/s")
+		ds["particle_velocity_y"].convert_to_units("km/s")
+		ds["particle_velocity_z"].convert_to_units("km/s")
+		return ds
+
 	def field_list(self):
 		ds = self.raw_snapshot_all()
 		for field in ds.derived_field_list:
@@ -200,7 +213,7 @@ class YTSnapshot(Snapshot.Snapshot):
 
 
 	#Return the HOP halo catalogue. Can override run_hop to force re-running
-	def halos(self, finder=config.default_finder, run_finder=False):
+	def halos(self, finder=ramses_pp_cfg.default_finder, run_finder=False):
 		ds = self._snapshot
 		from ...analysis.halo_analysis import halos
 		#Check if HOP file exists (note we will adopt a naming convention here)

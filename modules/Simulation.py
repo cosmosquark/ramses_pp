@@ -318,7 +318,7 @@ class Simulation():
 
 		from ..analysis.halo_analysis import trees
 		if finder == 'rockstar':
-			return trees.RockstarMergerTree(self):
+			return trees.RockstarMergerTree(self)
 		else:
 			raise Exception("Unimplemented finder: %s" % finder)
 

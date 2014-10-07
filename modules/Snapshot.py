@@ -37,12 +37,6 @@ class Snapshot():
 		'''
 		return
 
-	@abc.abstractmethod
-	def snappath(self):
-		'''
-		Return the path to this snapshot including the snapshot folder
-		'''
-		return
 
 	@abc.abstractmethod
 	def raw_snapshot(self):
@@ -220,15 +214,15 @@ class Snapshot():
 		specified, it is used in place of the redshift in
 		output f."""
 
-		return self._lingrowthfac(return_norm=False):
+		return self._lingrowthfac(return_norm=False)
 
 	
 
 
 
-	def H(self):
-		cosmology = self.cosmology()
-		H = 100 * cosmology['h'] * 
+#	def H(self):
+#		cosmology = self.cosmology()
+#		H = 100 * cosmology['h'] * 
 
 	def tform(self, tform, rt=False):
 

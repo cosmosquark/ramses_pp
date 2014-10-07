@@ -69,4 +69,8 @@ finally run
 
 ramses_pp/gen_config.sh
 
+pip install mpi4py
+pip install scikit-learn
+
+
 and we're ready to go
