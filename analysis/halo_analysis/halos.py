@@ -21,8 +21,7 @@ from ramses_pp import config as pp_cfg
 import abc
 
 from yt.data_objects.particle_filters import add_particle_filter
-from ...modules.yt.YT import star_filter
-from yt.units.yt_array import YTArray
+from ...modules.yt.YT import star_filter, dark_filter
 
 #from yt.units.yt_array import YTArray
 #import logging
@@ -79,7 +78,7 @@ class Halo():
 	
 		centre = self['pos']
 		if radius != None and units != None:
-			radius = YTArray(radius,units)	# user defined radius
+			radius = self._halo_catalogue._base().raw_snapshot().arr(radius, units) # user defined radius in the context of the simulation
 
 		else:   # shall we just use the virial radius of the Halo?
 			print "using halo virial radius"
@@ -105,7 +104,7 @@ class Halo():
 			
 
 
-	def projection_plot(self, r_fact=1.0,radius=None,axis="x",units="kpc/h",quantity="density", stars=True):
+	def projection_plot(self, r_fact=1.0,radius=None,axis="x",units="kpc/h",quantity="density", stars=True, dark=True):
 		'''
 		YT only function, produce and save a gas projection plot of the Halo of interest
 		Rvir_fact = multiply Rvir or fixed_length by a factor of something
@@ -117,8 +116,10 @@ class Halo():
 		if radius == None:
 			radius = self["Rvir"]
 		else:
-			radius = YTArray(radius,units)
-
+			ds = self._halo_catalogue._base().raw_snapshot()
+			radius = ds.arr(radius, units)
+		print radius
+		print radius.value
 		halo_sphere, radius_check  = self.get_sphere(radius=radius.value,units=units)
 
 		if radius_check != None:
@@ -133,24 +134,18 @@ class Halo():
 			plt = yt.ProjectionPlot(halo_sphere.ds,axis,quantity,center=self["pos"].in_units(units), width=(radius.in_units('code_length').value*r_fact), axes_unit=units, data_source=region, weight_field='density' )
 		if stars:
 			print "adding star particles"
-			print dir(halo_sphere.ds)
 			add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
 			halo_sphere.ds.add_particle_filter("stars")
 			plt.annotate_particles((radius,units),ptype="stars",p_size=10.0,col="m",marker="*")
 
-#			add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
-#			stars = halo_sphere.particles.source['particle_age'] != 0
-#			print len(stars)
-#			print halo_sphere.ds.derived_field_list
-#			print halo_sphere["io","particle_age"]
-#			print halo_sphere["io","particle_age"].max()
-#			halo_sphere.ds.add_particle_filter("stars")
-#			print len(halo_sphere.ds["stars","particle_mass"])
-#			plt.annotate_particles((500,'kpc'),ptype="stars",p_size=10.0,col="m",marker="*")
 		sim_name = os.path.split(self._halo_catalogue._base().path())[1] 
 		plt.save(("Halo_gas_" + str(self["id"].value) + "_" + str(sim_name) + "_" + str(self._halo_catalogue._base().output_number() ) ) )
-		plt_dm = yt.ProjectionPlot(halo_sphere.ds,axis,("deposit","io_cic"),center=self["pos"].in_units(units), width=(radius.in_units('code_length').value*r_fact), axes_unit=units, data_source=region )
-		plt_dm.save(("Halo_dm_" + str(self["id"].value) + "_" + str(sim_name) + "_" +  str(self._halo_catalogue._base().output_number() ) ))
+
+		if dark:
+#			add_particle_filter("dark", function=dark_filter, filtered_type="io", requires=["particle_age"])
+#			halo_sphere.ds.add_particle_filter("dark") will fix later
+			plt_dm = yt.ProjectionPlot(halo_sphere.ds,axis,("deposit","io_cic"),center=self["pos"].in_units(units), width=(radius.in_units('code_length').value*r_fact), axes_unit=units, data_source=region )
+			plt_dm.save(("Halo_dm_" + str(self["id"].value) + "_" + str(sim_name) + "_" +  str(self._halo_catalogue._base().output_number() ) ))
 
 	def dbscan(self, eps=0.4, min_samples=20):
 		'''
@@ -350,23 +345,22 @@ class Halo():
 
 	def galaxy_disk(self,n_disks=5,disk_h=(10,"kpc/h"),disk_w=(50,"kpc/h"),center=None):
 		# n_disks need to be odd... you have 1 disk.. or 1 disk sandwiched inbetween 2 others (n_disk=3) etc
+
+		snapshot = self._halo_catalogue._base()
+		if not (str(type(snapshot)) == "<class 'ramses_pp.modules.yt.YT.YTSnapshot'>"):
+			raise NotImplementedError("sphere only implemented for YT")
+		ds = snapshot.raw_snapshot()
+
 		if center == None:
 			center = self.iterative_com(stars=True, dark=False, gas=True)
 		if n_disks % 2 == 0: # check for even number
 			print "n_disks must be odd"
 			return
 
-		from yt.units.yt_array import YTArray
-
-		print disk_h[0], disk_h[1]
-		disk_h = YTArray(disk_h[0],disk_h[1])
+		disk_h = ds.arr(disk_h[0],disk_h[1])
 		print disk_h
 		# get angular momentum
 		Rvir = self['Rvir']
-		snapshot = self._halo_catalogue._base()
-		if not (str(type(snapshot)) == "<class 'ramses_pp.modules.yt.YT.YTSnapshot'>"):
-			raise NotImplementedError("sphere only implemented for YT")
-		ds = snapshot.raw_snapshot()
 
 		for i in range(0,10):
 			Rvir_fact = 1.0 - (i * 0.1) # shrink virial radius by 0.1 upon each run.. center on the new CoM

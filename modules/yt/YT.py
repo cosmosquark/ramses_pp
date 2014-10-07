@@ -143,7 +143,7 @@ class YTSnapshot(Snapshot.Snapshot):
 		omega_k_0 = info['omega_k']
 		omega_b_0 = info['omega_b']
 		aexp = info['aexp']
-		h = info['H0']/100
+		h  = info['H0']/100
 		if aexp > 1.0:
 			aexp = 1.0
 		z = 1.0/exp - 1.0
