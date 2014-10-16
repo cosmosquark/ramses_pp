@@ -48,12 +48,12 @@ def _OverDensity(field, data):
 	#return data['Density'] / (omega_baryon_now * rho_crit_now * (data.pf.hubble_constant**2) * ((1+data.pf.current_redshift)**3))
 	return data["ramses",'Density'] / (omega_baryon_now * rho_crit_now(data) * ((1+data.ds.current_redshift)**3))
 
-def load(folder, ioutput, **kwargs):
+def load(folder, simulation, ioutput, **kwargs):
 #	add_field(("gas", "Temperature"), function=_Temperature, units=r"\rm{K}")
 #	add_field(("gas", "Number Density"), function=_NumDens, units=r"\rm{cm}^{-3}")
 #	add_field(("gas", "Baryon Overdensity"), function=_OverDensity,
  #         units=r"")
-	return YTSnapshot(folder, ioutput, **kwargs)
+	return YTSnapshot(folder, simulation, ioutput, **kwargs)
 
 def star_filter(pfilter,data):
 	filter = np.logical_and(data.particles.source["particle_age"] != 0, data.particles.source["particle_age"] != None)
@@ -64,7 +64,7 @@ def dark_filter(pfilter,data):
 	return filter
 
 class YTSnapshot(Snapshot.Snapshot):
-	def __init__(self, folder, ioutput, **kwargs):
+	def __init__(self, folder, simulation, ioutput, **kwargs):
 		Snapshot.Snapshot.__init__(self, "yt")
 		'''
 		Load the snapshot
@@ -73,6 +73,7 @@ class YTSnapshot(Snapshot.Snapshot):
 		self._path = folder #simulation_dir + "/" + folder
 		self._ioutput = ioutput
 		self._snappath = os.path.join('%s/output_%05d/'%(self._path, ioutput))
+		self._simulation = simulation
 		
 		try:
 			stars = kwargs.get("stars",False)
@@ -146,7 +147,7 @@ class YTSnapshot(Snapshot.Snapshot):
 		h  = info['H0']/100
 		if aexp > 1.0:
 			aexp = 1.0
-		z = 1.0/exp - 1.0
+		z = 1.0/aexp - 1.0
 
 		cosmology = {
 			'omega_m_0':omega_m_0,
@@ -154,7 +155,8 @@ class YTSnapshot(Snapshot.Snapshot):
 			'omega_k_0':omega_k_0,
 			'omega_b_0':omega_b_0,
 			'h':h,
-			'aexp':aexp
+			'aexp':aexp,
+			'z':z,
 		}
 		return cosmology
 

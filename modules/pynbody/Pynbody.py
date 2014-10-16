@@ -21,12 +21,12 @@ pynbody.config['number_of_threads'] = 16
 pynbody.ramses.multiprocess_num = 16
 pynbody.config['number_of_threads'] = 16
 
-def load(folder, ioutput=None, **kwargs):
-	return PynbodySnapshot(folder, ioutput, **kwargs)
+def load(folder, simulation=None, ioutput=None, **kwargs):
+	return PynbodySnapshot(folder, simulation ioutput, **kwargs)
 
 
 class PynbodySnapshot(Snapshot.Snapshot):
-	def __init__(self, folder, ioutput=None, gas=False, **kwargs):
+	def __init__(self, folder, simulation=None, ioutput=None, gas=False, **kwargs):
 		# gas is default to FALSE since pynbody does weird things with gas conversion to tipsy (pymses/yt is better for the gas data)
 		Snapshot.Snapshot.__init__(self, "Pynbody", **kwargs)
 		'''
@@ -35,6 +35,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		'''
 		self._path = folder
 		self._ioutput = ioutput
+		self._simulation = simulation
 		if ioutput is not None:
 			self._snapshot = pynbody.load('%s/output_%05d'%(folder, ioutput),force_gas=False)
 		else:
@@ -85,7 +86,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		#We need the ramses snapshot for this
 		if (type(s) == pynbody.tipsy.TipsySnap):
 			ramses_path = os.path.abspath(os.path.join(self.path(), '../../../'))
-			snap = load(ramses_path, self.output_number())
+			snap = load(ramses_path, self._simulation, self.output_number())
 			s = snap.raw_snapshot()
 
 		info = s.properties
@@ -158,7 +159,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		#We need the ramses snapshot for this
 		if (type(s) == pynbody.tipsy.TipsySnap):
 			ramses_path = os.path.abspath(os.path.join(self.path(), '../../../'))
-			snap = load(ramses_path, self.output_number())
+			snap = load(ramses_path, self._simulation, self.output_number())
 			s = snap.raw_snapshot()
 
 		# figure out the units			 
@@ -351,7 +352,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 			if isTipsy:
 				#Switch to the raw ramses output to run AHF
 				ramses_path = os.path.abspath(os.path.join(self.path(), '../../../'))
-				snap = load(ramses_path, self.output_number())
+				snap = load(ramses_path, self._simulation, self.output_number())
 				s = snap.raw_snapshot()
 			else:
 				print 'Warning: Analysis of RAMSES output with tipsy halos can result in unexpected results...'

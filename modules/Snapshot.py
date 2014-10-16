@@ -314,7 +314,7 @@ class Snapshot():
 
 		'''
 
-		Load a generic halo catalogue - default to AHF if not overridden
+		Load a generic halo catalogue
 
 		'''
 
@@ -332,6 +332,23 @@ class Snapshot():
 
 		else:
 
+			raise Exception("Unimplemented finder: %s"%finder)
+
+
+	def voids(self, finder=config.void_finder,particles=True, subsample=1.0, subvol="00", untrimmed=False, dataportion="central"):
+		'''
+		Load a generic void catalogue
+		'''
+
+		from ..analysis.void_analysis import voids
+
+		finder="VIDE"
+		print finder
+		if finder=="VIDE":
+
+			return voids.VIDECatalogue(self,particles=True, subsample=1.0, subvol="00", untrimmed=False, dataportion="central")
+
+		else:
 			raise Exception("Unimplemented finder: %s"%finder)
 
 
@@ -504,9 +521,3 @@ class Snapshot():
 		print "VIDE input file saved as ", filename
 		return
 
-	def voids(self, finder="VIDE"):
-		'''
-		Load a generic void catalogue - default to VIDE if not overridden
-		'''
-		print "not implimented yet"
-		return

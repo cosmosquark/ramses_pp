@@ -991,7 +991,7 @@ class AHFCatalogue(HaloCatalogue):
 			snap.halos()
 		else:
 			from ramses_pp.modules.pynbody import Pynbody
-			pyn = Pynbody.load(snap.path(), snap.output_number())
+			pyn = Pynbody.load(snap.path(), snap._simulation, snap.output_number())
 			pyn.halos()
 
 

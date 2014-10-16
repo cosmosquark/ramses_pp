@@ -15,11 +15,11 @@ RamsesOutput.amr_field_descrs_by_file = {"3D": {
 	"grav"  : [ output.Vector("g", [0, 1, 2]) ]
 	} }
 
-def load(folder, ioutput):
-	return PymsesSnapshot(folder, ioutput)
+def load(folder, simulation, ioutput):
+	return PymsesSnapshot(folder, simulation, ioutput)
 
 class PymsesSnapshot(Snapshot.Snapshot):
-	def __init__(self, folder, ioutput):
+	def __init__(self, folder, simulation, ioutput):
 		Snapshot.Snapshot.__init__(self, "Pymses")
 		'''
 		Load the snapshot using pymses.RamsesOutput
@@ -27,6 +27,7 @@ class PymsesSnapshot(Snapshot.Snapshot):
 		'''
 		self._path = folder
 		self._ioutput = ioutput
+		self._simulation = simulation
 		self._snappath = os.path.join('%s/output_%05d/'%(self._path, ioutput))
 		self._snapshot = pymses.RamsesOutput(folder, ioutput)
 

@@ -92,6 +92,8 @@ class Simulation():
 		self._path = path
 		self._boxsize = self.box_size() #100   #100 #in Mpc h^-1
 		self._periodic = True,
+		self._parent = None # assign a parent simulation
+		self._parent_domain = [0.50,0.50,0.50] #coordinate in parent simulation which is this simulations centre in code units 
 
 	# add new methods based on "what modules (pymses, pynbody) are working
 
@@ -136,6 +138,8 @@ class Simulation():
 		boxsize = lunit * cmtokpc * kpctompc * h
 		return boxsize
 		
+
+
 
 
 	def set_periodic(self, periodic):
@@ -187,6 +191,37 @@ class Simulation():
 			return glob.glob('%s/%s'%(self.data_dir(), string))
 		else:
 			return glob.glob('%s/*'%self.data_dir())
+
+
+
+	def assign_parent_domain(self,domain):
+		if isinstance(domain, list):
+			if len(domain) == 3 and sum(list) <= 3.0:
+				self._parent_domain = domain
+				return
+		# else
+		print "invalid domain"
+		return
+
+
+	def assign_parent(self, name, domain):
+		'''
+		for most zoom runs, you will have based a simulation off it's parent. Usually it is a unigrid simulation
+		this function will store
+		domain = 3 vector describing the position shift
+		name = name of parent simulation
+		'''
+		# check if it exists first
+		json_dir = config.json_dir
+		filename = '%s/%s.json'%(json_dir, name)
+		if os.path.isfile(filename):
+			self._parent = name
+			self.assign_parent_domain(domain)
+			print parent, domain
+			return	
+		else:
+			raise Exception("No simulation with the name: %s"%name)
+			return
 
 	def num_snapshots(self):
 		return len(glob.glob('%s/output_00*'%self._path))
@@ -242,13 +277,13 @@ class Simulation():
 		'''
 		if (module == 'yt') and yt_loaded:
 			from .yt import YT
-			return YT.load(self._path, ioutput=ioutput, **kwargs)
+			return YT.load(self._path, self, ioutput=ioutput, **kwargs)
 		elif (module == 'pymses') and pymses_loaded:
 			from .pymses import Pymses
-			return Pymses.load(self._path, ioutput, **kwargs)
+			return Pymses.load(self._path, self, ioutput, **kwargs)
 		elif (module == 'pynbody') and pynbody_loaded:
 			from .pynbody import Pynbody
-			return Pynbody.load(self._path, ioutput, **kwargs)
+			return Pynbody.load(self._path, self, ioutput, **kwargs)
 		else:
 			print 'yt loaded: ', yt_loaded
 			print 'pymses loaded: ', pymses_loaded

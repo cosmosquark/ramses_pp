@@ -72,5 +72,40 @@ ramses_pp/gen_config.sh
 pip install mpi4py
 pip install scikit-learn
 
-
 and we're ready to go
+
+optional extras
+
+------
+mplayer (needs ffmpeg)
+
+cd yasm*
+./configure make and make install
+in the root mplayer dir ./config --prefix=/home/bthompson1/mplayer_build --yasm=/home/bthompson1/mplayer_build/yasm-1.2.0/yasm
+and you are done.
+
+
+---------
+
+VIDE
+
+VIDE writes to netCDF4 files, we need to access those files if we want to
+access more infomation about VIDE things
+
+take a copy of netCDF4 (the tar.gz file is within ramses_pp for convenience)
+
+./configure --prefix=/home/bthompson1/local
+--libdir=/home/bthompson1/local/lib --enable-netcdf-4 --with-pic
+--disable-shared --disable-dap --disable-cdmremote --disable-rpc
+--disable-example CPPFLAGS="-I$HDF5_DIR/include -I/home/bthompson1/local"
+LDFLAGS="-L$HDF5_DIR/lib -L/home/bthompson1/local/lib" CC=/usr/bin/gcc
+CXX=/usr/bin/c++
+
+then run make and make install
+
+finally run
+pip install netcdf4
+
+where HDF5_DIR is pointing to the root of your yt directory
+
+
