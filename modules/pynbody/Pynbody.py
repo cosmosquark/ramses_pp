@@ -22,7 +22,7 @@ pynbody.ramses.multiprocess_num = 16
 pynbody.config['number_of_threads'] = 16
 
 def load(folder, simulation=None, ioutput=None, **kwargs):
-	return PynbodySnapshot(folder, simulation ioutput, **kwargs)
+	return PynbodySnapshot(folder, simulation, ioutput, **kwargs)
 
 
 class PynbodySnapshot(Snapshot.Snapshot):

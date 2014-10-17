@@ -185,17 +185,47 @@ class YTSnapshot(Snapshot.Snapshot):
 		raw_snap_all.ds    # patch to get the pf functionality working nicely... bit of a hack
 		return raw_snap_all
 
-	def raw_snapshot_rockstar(self):
+	def shift_parent(self, pos):
+		domain=self._simulation._parent_domain
+		if domain:
+			x_min = self.raw_snapshot().arr([0.0,0.0,0.0],"code_length")
+			x_max = self.raw_snapshot().arr([1.0,1.0,1.0],"code_length")
+			x_cent = self.raw_snapshot().arr([0.5,0.5,0.5],"code_length")
+#			shift = x_cent - pos
+			domain = self.raw_snapshot().arr(domain,"code_length")
+			units = pos.units # store the current units
+			pos = pos.convert_to_units("code_length")
+			print domain
+			shift = x_cent - domain
+			print shift
+			pos = pos + shift
+			print pos
+			# check for periodic boundries etc
+			for i in range(0,2):
+				if pos[i] < 0.00:
+					pos[i] = pos[i] + 1.00
+				if pos[i] > 1.00:
+					pos[i] = pos[i] - 1.00
+			print pos
+			pos = pos.convert_to_units(units) # convert back to origional units
+			return pos
 
-		ds = self.raw_snapshot_all()
-		ds["particle_position_x"].convert_to_units("Mpc/h")
-		ds["particle_position_y"].convert_to_units("Mpc/h")
-		ds["particle_position_z"].convert_to_units("Mpc/h")
-		ds["particle_mass"].convert_to_units("Msun/h")
-		ds["particle_velocity_x"].convert_to_units("km/s")
-		ds["particle_velocity_y"].convert_to_units("km/s")
-		ds["particle_velocity_z"].convert_to_units("km/s")
-		return ds
+		else:
+			print "No parent domain/center set, returning"
+			return None
+
+
+#	def raw_snapshot_rockstar(self):
+#
+#		ds = self.raw_snapshot_all()
+#		ds["particle_position_x"].convert_to_units("Mpc/h")
+#		ds["particle_position_y"].convert_to_units("Mpc/h")
+#		ds["particle_position_z"].convert_to_units("Mpc/h")
+#		ds["particle_mass"].convert_to_units("Msun/h")
+#		ds["particle_velocity_x"].convert_to_units("km/s")
+#		ds["particle_velocity_y"].convert_to_units("km/s")
+#		ds["particle_velocity_z"].convert_to_units("km/s")
+#		return ds
 
 	def field_list(self):
 		ds = self.raw_snapshot_all()

@@ -133,7 +133,7 @@ class VIDECatalogue(VoidCatalogue):
         #cm = comoving
         #nocm = physical
         units = {'id':'dimensionless',
-                        'FileVoidId':'dimensionless',
+                        'FileVoidID':'dimensionless',
                         'CoreParticle':'dimensionless',
                         'CoreDens':'dimensionless',
                         'ZoneVol':'dimensionless',

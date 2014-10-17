@@ -91,9 +91,25 @@ class Simulation():
 		self._name = name
 		self._path = path
 		self._boxsize = self.box_size() #100   #100 #in Mpc h^-1
-		self._periodic = True,
+
+		# load more data
+		json_dir = config.json_dir
+		filename = '%s/%s.json'%(json_dir, name)
+		with open(filename, 'rb') as fp:
+			data = json.load(fp)
+		self._periodic = True
+		if "_periodic" in data:
+			if data["_periodic"] is not None:
+				self._periodic = data["_periodic"]
 		self._parent = None # assign a parent simulation
+		if "_parent" in data:
+			if data["_parent"] is not None:
+				self._periodic = data["_parent"]
+
 		self._parent_domain = [0.50,0.50,0.50] #coordinate in parent simulation which is this simulations centre in code units 
+		if "_parent_domain" in data:
+			if data["_parent_domain"] != None:
+				self._parent_domain = data["_parent_domain"]
 
 	# add new methods based on "what modules (pymses, pynbody) are working
 
@@ -195,10 +211,10 @@ class Simulation():
 
 
 	def assign_parent_domain(self,domain):
-		if isinstance(domain, list):
-			if len(domain) == 3 and sum(list) <= 3.0:
-				self._parent_domain = domain
-				return
+		if len(domain) == 3 and sum(domain) <= 3.0:
+			self._parent_domain = domain
+			self.save()
+			return
 		# else
 		print "invalid domain"
 		return
@@ -217,7 +233,8 @@ class Simulation():
 		if os.path.isfile(filename):
 			self._parent = name
 			self.assign_parent_domain(domain)
-			print parent, domain
+			print name, domain
+			self.save()
 			return	
 		else:
 			raise Exception("No simulation with the name: %s"%name)
