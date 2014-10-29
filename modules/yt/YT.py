@@ -194,21 +194,18 @@ class YTSnapshot(Snapshot.Snapshot):
 #			shift = x_cent - pos
 			domain = self.raw_snapshot().arr(domain,"code_length")
 			units = pos.units # store the current units
-			pos = pos.convert_to_units("code_length")
-			print domain
+			pos_new = pos.in_units("code_length")
+##			print domain
 			shift = x_cent - domain
-			print shift
-			pos = pos + shift
-			print pos
+##			print shift
+			pos_new = pos_new + shift
+##			print pos_new
 			# check for periodic boundries etc
 			for i in range(0,2):
-				if pos[i] < 0.00:
-					pos[i] = pos[i] + 1.00
-				if pos[i] > 1.00:
-					pos[i] = pos[i] - 1.00
-			print pos
-			pos = pos.convert_to_units(units) # convert back to origional units
-			return pos
+				pos_new[i] %= x_max[i]
+##			print pos_new
+			pos_new = pos_new.convert_to_units(units) # convert back to origional units
+			return pos_new
 
 		else:
 			print "No parent domain/center set, returning"

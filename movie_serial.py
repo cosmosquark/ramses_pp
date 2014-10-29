@@ -30,7 +30,7 @@ def projection(snapshot, source_type, field, method='RayTracer', cmap='jet'):
 	else: factor = 1
 
 	#Set our camera
-	cam = PymsesProjection.camera(center=[0.5, 0.5, 0.5], region_size=[0.1, 0.1])
+	cam = PymsesProjection.camera(center=[0.5, 0.5, 0.5], region_size=[0.15, 0.15])
 	op = PymsesProjection.scalar_operator(field, factor)
 
 	#cam = PymsesProjection.default_camera()

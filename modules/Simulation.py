@@ -241,7 +241,7 @@ class Simulation():
 			return
 
 	def num_snapshots(self):
-		return len(glob.glob('%s/output_00*'%self._path))
+		return len(glob.glob('%s/output_*'%self._path))
 
 	def save_image(self, prefix, ioutput, plt, **kwargs):
 		'''
