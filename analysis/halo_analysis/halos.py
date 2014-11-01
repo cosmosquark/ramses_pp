@@ -440,19 +440,14 @@ class HaloCatalogue(object):
 		'''
 		return sorted(self, key = lambda x: x[field], reverse=reverse)
 
-	def mass_function(self, units='Msun/h', nbins=100, subhalos=False):
+	def mass_function(self, units='Msun/h', nbins=100):
 		'''
 		Compute the halo mass function for the given catalogue
 		'''
 		masses =[]
 		for halo in self:
-			if subhalos: # usually not good to include subhalos in the halo mass function
-				Mvir = halo['Mvir'].in_units(units)
-				masses.append(Mvir)
-			else:
-	#			if not self.is_subhalo(halo["id"],halo["hostHalo"]):
-					Mvir = halo['Mvir'].in_units(units)
-					masses.append(Mvir)
+			Mvir = halo['Mvir'].in_units(units)
+			masses.append(Mvir)
 
 		mhist, mbin_edges = np.histogram(np.log10(masses),bins=nbins)
 		mbinmps = np.zeros(len(mhist))
@@ -702,21 +697,21 @@ class AHFCatalogue(HaloCatalogue):
 			'numSubStruct':'dimensionless',
 			'Mvir':'Msun / h',
 			'num_p':'dimensionless',
-			'pos':'kpc / h',
+			'pos':'kpccm / h',
 			'vel':'km / s',
-			'Rvir':'kpc / h',
-			'Rmax':'kpc / h',
-			'r2':'kpc / h',
-			'mpb_offset': 'kpc / h',
-			'com_offset': 'kpc / h',
+			'Rvir':'kpccm / h',
+			'Rmax':'kpccm / h',
+			'r2':'kpccm / h',
+			'mpb_offset': 'kpccm / h',
+			'com_offset': 'kpccm / h',
 			'v_max':'km / s',
 			'v_esc':'km / s',
 			'sigV': 'km / s',
 			'bullock_spin': 'dimensionless',
 			'spin': 'dimensionless',
 			'L':'dimensionless',
-			'b_to_a':'kpc / h',
-			'c_to_a':'kpc / h',
+			'b_to_a':'kpccm / h',
+			'c_to_a':'kpccm / h',
 			'Ea':'dimensionless',
 			'Eb':'dimensionless',
 			'Ec':'dimensionless',
@@ -732,8 +727,8 @@ class AHFCatalogue(HaloCatalogue):
 			'bullock_spin_gas': 'dimensionless',
 			'spin_gas': 'dimensionless',
 			'L_gas':'dimensionless',
-			'b_to_a_gas':'kpc / h',
-			'c_to_a_gas':'kpc / h',
+			'b_to_a_gas':'kpccm / h',
+			'c_to_a_gas':'kpccm / h',
 			'Ea_gas':'dimensionless',
 			'Eb_gas':'dimensionless',
 			'Ec_gas':'dimensionless',
@@ -744,8 +739,8 @@ class AHFCatalogue(HaloCatalogue):
 			'bullock_spin_star': 'dimensionless',
 			'spin_star': 'dimensionless',
 			'L_star':'dimensionless',
-			'b_to_a_star':'kpc / h',
-			'c_to_a_star':'kpc / h',
+			'b_to_a_star':'kpccm / h',
+			'c_to_a_star':'kpccm / h',
 			'Ea_star':'dimensionless',
 			'Eb_star':'dimensionless',
 			'Ec_star':'dimensionless',
@@ -779,14 +774,17 @@ class AHFCatalogue(HaloCatalogue):
 	def __init__(self, snap, filename=None, make_grp=None):
 		# TODO - Read/store header
 		if not self._can_load(snap):
-			raise Exception("Cannot locate/load AHF catalogue")
+			try:
+				self._run(snap)
+			except Exception:
+				raise Exception("Cannot locate/load AHF catalogue")
 
 		self._base = weakref.ref(snap)
 		HaloCatalogue.__init__(self,"AHF",snap.path(),snap.output_number())
 		if filename is not None: self._AHFFilename = filename
 		else:
 			# get the file name
-			tipsy_dir = str("%soutput_%05d_tipsy/" % (snap.snappath(), snap.output_number()))
+			tipsy_dir = str("%s/output_%05d/output_%05d_tipsy/" % (snap.path(), snap.output_number(), snap.output_number()))
 			if not os.path.isdir(tipsy_dir):
 				print "AHF not run on this snapshot.. aborting"
 				raise Exception("AHF not run, run AHF plz")
@@ -826,6 +824,25 @@ class AHFCatalogue(HaloCatalogue):
 		if make_grp:
 			print "make grp not implemented yet"
 #			self.make_grp()
+
+	def mass_function(self, units='Msun/h', nbins=100):
+		'''
+		Compute the halo mass function for the given catalogue
+		'''
+		print 'HERE'
+		masses =[]
+		for halo in self:
+			Mvir = halo['Mvir'].in_units(units) - halo['M_gas'].in_units(units) - halo['M_star'].in_units(units)
+			masses.append(Mvir)
+
+		mhist, mbin_edges = np.histogram(np.log10(masses),bins=nbins)
+		mbinmps = np.zeros(len(mhist))
+		mbinsize = np.zeros(len(mhist))
+		for i in np.arange(len(mhist)):
+			mbinmps[i] = np.mean([mbin_edges[i],mbin_edges[i+1]])
+			mbinsize[i] = mbin_edges[i+1] - mbin_edges[i]
+		
+		return mbinmps, mhist, mbinsize
 
 	def make_grp(self):
 		'''
@@ -908,7 +925,7 @@ class AHFCatalogue(HaloCatalogue):
 
 	@staticmethod
 	def _can_load(snap, **kwargs):
-		tipsy_dir = str("%soutput_%05d_tipsy/" % (snap.snappath(), snap.output_number()))
+		tipsy_dir = str("%s/output_%05d/output_%05d_tipsy/" % (snap.path(), snap.output_number(), snap.output_number()))
 		if not os.path.isdir(tipsy_dir):
 			return False
 
@@ -920,188 +937,15 @@ class AHFCatalogue(HaloCatalogue):
 			return True
 		return False
 
-class HaloMakerSimpleCatalogue(HaloCatalogue):
-	'''
-	Class to handle catalogues produced by HaloMaker.
-	'''	
-	halo_type =  np.dtype([('id',np.int64),('haloLevel',np.int64),('hostHalo',np.int64),('hostSubHalo',np.int64),
-					  ('numSubStruct',np.int64),('nextSub',np.int64),
-					  ('Etot','f'),('Mvir','f'),('Rvir','f'),('Rmax','f'),
-					  ('num_p',np.int64),('Mmax','f'),('pos','f',3)])
-# need to check the non_code units stuff
-	units = {'id':'dimensionless',
-			'haloLevel':'dimensionless',
-			'hostHalo':'dimensionless',
-			'hostSubHalo':'dimensionless',
-			'numSubStruct':'dimensionless',
-			'nextSub':'dimensionless',
-			'Etot':'dimensionless', ### not sure about this one as such
-			'Mvir':'Msun/h', 
-			'Rvir':'code_length',
-			'Rmax':'code_length',
-			'num_p':'dimensionless',
-			'Mmax':'Msun',
-			'pos':'code_length',
-		}
-
-
-	def __init__(self, snap, filename=None, make_grp=None):
-		# TODO - Read/store header
-		if not self._can_load(snap):
-			raise Exception("Cannot locate/load HaloMaker simple catalogue (does it exist? can it exist?)")
-
-		self._base = weakref.ref(snap)
-		HaloCatalogue.__init__(self,"HaloMakerSimple",snap.path(),snap.output_number())
-		if filename is not None: self._AHFFilename = filename
-		else:
-			# get the file name
-			halo_dir = str("%s/HaloMaker/%s/" % (snap.path(), snap.output_number()))
-			if not os.path.isdir(halo_dir):
-				print "HaloMaker not run, or no halos exist"
-				raise Exception("HaloMaker not run, or no halos exist")
-
-			if len(glob.glob('%shalomaker_%05d.nod'% (halo_dir, snap.output_number()) )) == 0:
-				print "HaloMaker has been run, but no halos exist here"
-				raise Exception("No Halos exist here")
-				
-			fname = glob.glob('%shalomaker_%05d.nod'% (halo_dir, snap.output_number() ))[0]
-			self._HaloMakerfilename = fname
-			print 'Loading HaloMaker simple from %s'%fname
-
-		#Try and open the files
-		try:
-			f = open_(self._HaloMakerfilename)
-		except IOError:
-			raise IOError("Halo Simple catalogue not found -- check the file name of catalogue data or try specifying a catalogue using the filename keyword")
-
-		#self._head = np.fromstring(f.read(self.head_type.itemsize),
-		#	dtype=self.head_type)
-		#unused = f.read(256 - self._head.itemsize)
-
-		#self._nhalos = self._head['num_halos'][0]
-
-		if super_verbose == True:
-			print "HaloMaker simple catalogue: loading halos...",
-			sys.stdout.flush()
-
-		self._load_halos(self._HaloMakerfilename, snap)
-		f.close()
-
-		self._setup_children()
-
-		# Mvir is in units of 1e11!!!
-#		for halo in self:
-#			halo['Mtot'] = halo['Mtot'] * 1.0e11
-#			halo['Mvir'] = halo['Mvir'] * 1.0e11
-
-#		if make_grp is None:
-#			make_grp = pp_cfg.rockstar_autogrp
-
-		if make_grp:
-			print "make grp not implemented yet"
-#			self.make_grp()
-
-	def make_grp(self):
-		'''
-		Creates a 'grp' array which labels each particle according to
-		its parent halo.
-		'''
-		#try:
-		#	self.base['grp']
-		#except:
-		#	self.base['grp'] = np.zeros(len(self.base),dtype='i')
-
-		#for halo in self._halos.values():
-		#	halo[name][:] = halo._halo_id
-
-		#if config['verbose']:  print "writing %s"%(self._base().filename+'.grp')
-		#self._base().write_array('grp',overwrite=True,binary=False)
-		raise NotImplementedError("Requires pynbody functionality")
-
-	def _setup_children(self):
-		'''
-		Creates a 'children' array inside each halo's 'properties'
-		listing the halo IDs of its children. Used in case the reading
-		of substructure data from the AHF-supplied _substructure file
-		fails for some reason.
-		'''
-		for i in xrange(self._nhalos):
-			self._halos[i]._children = []
-
-		for i in xrange(self._nhalos):
-			host = self._halos[i].properties['hostHalo']
-			if host > -1:
-				try:
-					self._halos[host]._children.append(i)
-				except KeyError:
-					pass
-
-	def _get_halo(self, i):
-		if self.base is None:
-			raise RuntimeError("Parent snapshot has been deleted")
-
-		return self._halos[i]
-
-	def _get_by_id(self, halo_id):
-		#Nasty! But, allows lookup by id only (do we need this?)
-		idx = np.where(self._haloprops[:]['id'] == halo_id)[0][0]
-		hn = np.where(self._num_p_rank==idx)[0][0]
-		#print 'hn=', hn
-		halo = self._halos[hn]
-		return halo
-
-	@property
-	def base(self):
-		return self._base()
-
-
-	def _load_halos(self, f, snap):
-		haloprops = np.loadtxt(f, dtype=self.halo_type, comments='#')
-		self._nhalos = len(haloprops)
-		self._haloprops = np.array(haloprops)
-		# sort by number of particles to make compatible with AHF
-		self._num_p_rank = np.flipud(self._haloprops[:]['num_p'].argsort(axis=0))
-
-		for h in xrange(self._nhalos): # self._nhalos + 1?
-			# Mvir is in units of 1e11!!!
-#			self._haloprops[h]['Mmax'] = self._haloprops[h]['Mmax'] * 1.0e11
-#			self._haloprops[h]['Mvir'] = self._haloprops[h]['Mvir'] * 1.0e11		
-
-
-			# AHF halos index start from 0... python start from 0.. lets be consitant :P
-			hn = np.where(self._num_p_rank==(h))[0][0]
-
-			#Is this really memory inefficient?
-			self._halos[hn] = Halo(self._haloprops[h]['id']-1, self)
-	
-			# properties are in Msun / h, Mpc / h
-			self._halos[hn].properties = self._haloprops[h]
-
-	def load_copy(self, i):
-		'''
-		Load a fresh SimSnap with only the particle in halo i
-		'''
-		raise NotImplementedError("Requires pynbody functionality")
-
-	def _load_particles(self, f, snap):
-		NotImplementedError("Only halo loading implemented")
-
 	@staticmethod
-	def _can_load(snap, **kwargs):
-
-		halo_dir = str("%s/HaloMaker/%s/" % (snap.path(), snap.output_number()))
-		if not os.path.isdir(halo_dir):
-			return False
-
-		if len(glob.glob('%shalomaker_%05d.nod'% (halo_dir, snap.output_number()) )) == 0:
-			return False
-				
-		fname = glob.glob('%shalomaker_%05d.nod'%(halo_dir, snap.output_number()) )[0]
-		if os.path.exists(fname):
-			return True
-		return False
-
-
+	def _run(snap, **kwargs):
+		#Need to run from pynbody
+		if type(snap) == 'ramses_pp.modules.pynbody.Pynbody.PynbodySnapshot':
+			snap.halos()
+		else:
+			from ramses_pp.modules.pynbody import Pynbody
+			pyn = Pynbody.load(snap.path(), snap.output_number())
+			pyn.halos()
 
 
 def open_(filename, *args):

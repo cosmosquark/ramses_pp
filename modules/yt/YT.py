@@ -115,12 +115,6 @@ class YTSnapshot(Snapshot.Snapshot):
 		'''
 		return self._path
 
-	def snappath(self):
-		'''
-		Return the path to this snapshot
-		'''
-		return self._snappath
-
 	def ncpu(self):
 		'''
 		Return the number of CPUs used
@@ -202,7 +196,7 @@ class YTSnapshot(Snapshot.Snapshot):
 
 
 	#Return the HOP halo catalogue. Can override run_hop to force re-running
-	def halos(self, finder="AHF", run_finder=False):
+	def halos(self, finder=config.default_finder, run_finder=False):
 		ds = self._snapshot
 		from ...analysis.halo_analysis import halos
 		#Check if HOP file exists (note we will adopt a naming convention here)
@@ -245,9 +239,6 @@ class YTSnapshot(Snapshot.Snapshot):
 
 		elif finder == "rockstar":
 			return halos.RockstarCatalogue(self)
-
-		elif finder == "halomaker_simple":
-			return halos.HaloMakerSimpleCatalogue(self)
 
 		else:
 			raise Exception("Unimplemented finder: %s" %finder)

@@ -61,7 +61,7 @@ for ioutput in outputs:
 es = DatasetSeries(dirs, setup_function=setup_ds)
 #es = DatasetSeries(dirs)
 
-readers = int(ncpu/4.)
+readers = int(ncpu/2.) - 1
 #Reserve one cpu for the server
 writers = ncpu - readers - 1
 print 'Running rockstar with %i writers and %i readers'%(writers, readers)
