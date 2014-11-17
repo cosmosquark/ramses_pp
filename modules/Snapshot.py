@@ -310,7 +310,7 @@ class Snapshot():
 
 		return friedman
 
-	def halos(self, finder=config.default_finder):
+	def halos(self, finder=config.default_finder,halo=None):
 
 		'''
 
@@ -325,7 +325,7 @@ class Snapshot():
 			return halos.RockstarCatalogue(self)
 
 		elif finder=="AHF":
-			return halos.AHFCatalogue(self)
+			return halos.AHFCatalogue(self,halo=halo)
 
 		elif finder=="halomaker_simple":
 			return halos.HaloMakerSimpleCatalogue(self)
@@ -335,7 +335,7 @@ class Snapshot():
 			raise Exception("Unimplemented finder: %s"%finder)
 
 
-	def voids(self, finder=config.void_finder,particles=True, subsample=1.0, subvol="00", untrimmed=False, dataportion="central"):
+	def voids(self, finder=config.void_finder,particles=True, subsample=1.0, subvol="00", untrimmed=False, dataportion="central", parent=True):
 		'''
 		Load a generic void catalogue
 		'''
@@ -345,8 +345,15 @@ class Snapshot():
 		finder="VIDE"
 		print finder
 		if finder=="VIDE":
-
-			return voids.VIDECatalogue(self,particles=True, subsample=1.0, subvol="00", untrimmed=False, dataportion="central")
+			# get parent simulation
+			# fuck it.. just going to hack it in for now
+			import Simulation
+#			simparent = Simulation.load("void_sizes_n07_100")
+#			snapparent = simparent.snapshot(simparent.num_snapshots())	
+			voidcat =  voids.VIDECatalogue(self,particles=True, subsample=1.0, subvol="00", untrimmed=False, dataportion="central")
+#			for v in range(0,len(voidcat)):
+#				voidcat[v]["Macrocenter"] = self.shift_parent(voidcat[v]["Macrocenter"])
+			return voidcat
 
 		else:
 			raise Exception("Unimplemented finder: %s"%finder)

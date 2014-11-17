@@ -22,7 +22,7 @@ applications_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/applications'
 root_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp'
 
 # void settings
-vide_catalogue_root = '/starpulse/pool/cosmic/bthompson/voids' # the directory where you run VIDE
+vide_catalogue_root = '/starpulse/pool/cosmic/bthompson/voids/void_gas_runs' # the directory where you run VIDE
 void_finder = "vide"
 
 

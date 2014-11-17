@@ -18,8 +18,8 @@ class AHF():
 		run AHF on all pynbody snapshots
 		"""
 		for i in range(1,self.num_snapshots()):
-			shot = self.snapshot(i)
-			shot.tipsy(gas)
+			shot = self.snapshot(i, module="pynbody")
+			shot.tipsy(convert=True,gas=gas)
 			shot.halos()
 		return
 
@@ -77,7 +77,7 @@ class AHF():
 			return
 
 		if halos == None:
-			snap = self.snapshot(snaptime)
+			snap = self.snapshot(snaptime,module="pynbody")
 			halo_arr = snap.halos()
 			count = len(halo_arr)
 			halos = np.arange(0,count)
@@ -116,7 +116,11 @@ class AHF():
 
 		# write the redshift file
 
+		print snaptime
+		print self.info_snap(snaptime)['z']
 		red = self.avail_redshifts(zmin=self.info_snap(snaptime)['z']) # redshifts based on RAMSES simulation redshifts here
+		print red
+		print len(red)
 		if red[(snaptime-1)] < 0.0000000000: # sometimes, the final snapshot can be less than 0
 			red[(snaptime-1)] = 0
 

@@ -22,6 +22,11 @@ import abc
 
 from yt.data_objects.particle_filters import add_particle_filter
 from ...modules.yt.YT import star_filter, dark_filter
+from yt.utilities.physical_constants import G
+
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MultipleLocator, FormatStrFormatter
+
 
 #from yt.units.yt_array import YTArray
 #import logging
@@ -102,6 +107,100 @@ class Halo():
 			sphere = ds.sphere(centre, radius)
 			return sphere, radius
 			
+
+
+	def rotation_curve(self,r_fact=1.0,radius=None,n_bins=100, min_r = 0.01, inc = 0.01, units="kpc",  stars=True, gas=True):
+		'''
+		YT only function, plot the rotation curve of the dark matter (and gas and stars)
+		'''
+#		if radius == None:
+#			radius = self["Rvir"]
+#		else:
+#			ds = self._halo_catalogue._base().raw_snapshot()
+#			radius = ds.arr(radius, units)
+#		print radius
+#		print radius.value
+#		halo_sphere, radius_check  = self.get_sphere(radius=radius.value,units=units)
+
+#		if radius_check != None:
+#			radius = radius_check
+		
+		V_circ_dm = np.zeros(n_bins + 1) #(we want the 0 point)
+		if stars:
+			V_circ_stars = np.zeros(n_bins + 1)
+		if gas:
+			V_circ_gas = np.zeros(n_bins + 1)
+		V_circ_tot = np.zeros(n_bins + 1)
+		r_vir = np.zeros(n_bins + 1)
+
+		# check for minimum radius
+
+		halo_sphere, radius = self.get_sphere(r_fact=min_r,radius=None,units=None)
+		print dir(halo_sphere.ds)
+		if radius:
+			min_r = radius.in_units("kpc") / self["Rvir"].in_units("kpc")
+
+		for i in range(0,n_bins):
+
+			rad = min_r + (i * inc) # linear
+			halo_sphere, radius = self.get_sphere(r_fact=rad,radius=None,units=None)
+			add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
+			halo_sphere.ds.add_particle_filter("stars")
+			add_particle_filter("dark", function=dark_filter, filtered_type="all", requires=["particle_age"])
+			halo_sphere.ds.add_particle_filter("dark")
+
+			dark_mass = halo_sphere["dark","particle_mass"].sum()
+			# calculate mass
+			if stars:
+				star_mass = halo_sphere["stars","particle_mass"].sum()
+			else:
+				star_mass = 0
+			if gas:
+				gas_mass = halo_sphere["gas","cell_mass"].sum()
+			else:
+				gas_mass = 0
+			total_mass = dark_mass + star_mass + gas_mass
+			print dark_mass.in_units("Msun"), star_mass.in_units("Msun")	
+			rad_units = rad * self["Rvir"]
+#			print i, rad_units.in_units("kpc"), dark_mass.in_units("Msun")
+			r_vir[i+1] = rad_units.in_units("kpc").value
+			V_circ_dm[i+1] = (np.sqrt(G * dark_mass / rad_units)).in_units("km/s").value
+#			print i, rad_units.in_units("kpc"), dark_mass.in_units("Msun"), V_circ_dm[i+1].in_units("km/s")
+
+			if stars:
+				V_circ_stars[i+1] = np.sqrt(G * star_mass / rad_units).in_units("km/s").value
+			if gas:
+				V_circ_gas[i+1] = np.sqrt(G * gas_mass / rad_units).in_units("km/s").value
+			V_circ_tot[i + 1] = np.sqrt(G * total_mass / rad_units).in_units("km/s").value
+	
+		# make the plot
+	#	pp.rc('text', usetex=True)
+		plt.rc('font', family='serif')
+	#	pp.plot(r_vir,V_circ_dm,'ro')
+		plt.plot(r_vir,V_circ_dm,'r--')
+
+	#	pp.plot(r_vir,V_circ_stars,'bo')
+		plt.plot(r_vir,V_circ_stars,'b--')
+	
+	#	pp.plot(r_vir,V_circ_gas,'go')
+		plt.plot(r_vir,V_circ_gas,'g--')
+
+	#	pp.plot(r_vir,V_circ_tot,'ko')
+		plt.plot(r_vir,V_circ_tot,'k--')
+
+		ml = MultipleLocator(1)
+		mf = FormatStrFormatter('%d')
+		majl = MultipleLocator(10)
+
+		plt.xlabel(r'r [kpc]')
+		plt.ylabel(r'Vcirc [km/s]')
+
+	#	fig, ax = plt.subplots()
+	#	ax.xaxis.set_major_locator(majl)
+	#	ax.xaxis.set_major_formatter(mf)
+	#	ax.xaxis.set_minor_locator(ml)
+		plt.savefig(("Halo_circ_vel_" + str(self["id"].value)))	
+		plt.close()
 
 
 	def projection_plot(self, r_fact=1.0,radius=None,axis="x",units="kpc/h",quantity="density", stars=True, dark=True):
@@ -751,7 +850,83 @@ class AHFCatalogue(HaloCatalogue):
 					  ('Ea_star','f',3),('Eb_star','f',3),('Ec_star','f',3,),
 					  ('Ekin_star','f'),('Epot_star','f')])
 
-	units = {'id':'dimensionless',
+	units = {'z':'dimensionless',
+			'id':'dimensionless',
+			'hostHalo':'dimensionless',
+			'numSubStruct':'dimensionless',
+			'Mvir':'Msun / h',
+			'num_p':'dimensionless',
+			'pos':'kpccm / h',
+			'vel':'km / s',
+			'Rvir':'kpccm / h',
+			'Rmax':'kpccm, / h',
+			'r2':'kpccm / h',
+			'mpb_offset': 'kpccm / h',
+			'com_offset': 'kpccm / h',
+			'v_max':'km / s',
+			'v_esc':'km / s',
+			'sigV': 'km / s',
+			'bullock_spin': 'dimensionless',
+			'spin': 'dimensionless',
+			'L':'dimensionless',
+			'b_to_a':'kpccm / h',
+			'c_to_a':'kpccm / h',
+			'Ea':'dimensionless',
+			'Eb':'dimensionless',
+			'Ec':'dimensionless',
+			'ovdens':'dimensionless',
+			'nbins':'dimensionless',
+			'fMhires':'dimensionless',
+			'Ekin': 'Msun / h (km / sec)**2',
+			'Epot': 'Msun / h (km / sec)**2',
+			'SurfP': 'Msun / h (km / sec)**2',
+			'PhiO': '(km / sec)**2',
+			'cNFW': 'dimensionless',
+			'M_gas': 'Msun / h',
+			'bullock_spin_gas': 'dimensionless',
+			'spin_gas': 'dimensionless',
+			'L_gas':'dimensionless',
+			'b_to_a_gas':'kpccm / h',
+			'c_to_a_gas':'kpccm / h',
+			'Ea_gas':'dimensionless',
+			'Eb_gas':'dimensionless',
+			'Ec_gas':'dimensionless',
+			'n_gas':'dimensionless',
+			'Ekin_gas': 'Msun / h (km / sec)**2',
+			'Epot_gas': 'Msun / h (km / sec)**2',
+			'M_star': 'Msun / h',
+			'bullock_spin_star': 'dimensionless',
+			'spin_star': 'dimensionless',
+			'L_star':'dimensionless',
+			'b_to_a_star':'kpccm / h',
+			'c_to_a_star':'kpccm / h',
+			'Ea_star':'dimensionless',
+			'Eb_star':'dimensionless',
+			'Ec_star':'dimensionless',
+			'n_star':'dimensionless',
+			'Ekin_star': 'Msun / h (km / sec)**2',
+			'Epot_star': 'Msun / h (km / sec)**2',
+		}
+
+	halo_type_tracked =  np.dtype([('z','f'),('id',np.int64),('hostHalo',np.int64),('numSubStruct',np.int64),('Mvir','f'),
+					  ('num_p',np.int64),('pos','f',3),('vel','f',3),
+					  ('Rvir','f'),('Rmax','f'),('r2','f'),('mpb_offset','f'),
+					  ('com_offset','f'),('v_max','f'),('v_esc','f'),('sigV','f'),
+					  ('bullock_spin','f'),('spin','f'),('L','f',3),('b','f'),('c','f'),
+					  ('Ea','f',3),('Eb','f',3),('Ec','f',3),('ovdens','f'),
+					  ('nbins',np.int64),('fMhires','f'),('Ekin','f'),
+					  ('Epot','f'),('SurfP','f'),('PhiO','f'),('cNFW','f'),('n_gas',np.int64),
+					  ('M_gas','f'),('bullock_spin_gas','f'),('spin_gas','f'),
+					  ('L_gas','f',3),('b_gas','f'),('c_gas','f'),
+					  ('Ea_gas','f',3),('Eb_gas','f',3),('Ec_gas','f',3,),
+					  ('Ekin_gas','f'),('Epot_gas','f'),('n_star',np.int64),
+					  ('M_star','f'),('bullock_spin_star','f'),('spin_star','f'),
+					  ('L_star','f',3),('b_star','f'),('c_star','f'),
+					  ('Ea_star','f',3),('Eb_star','f',3),('Ec_star','f',3,),
+					  ('Ekin_star','f'),('Epot_star','f')])
+
+	units_tracked = {'z':'dimensionless',
+			'id':'dimensionless',
 			'hostHalo':'dimensionless',
 			'numSubStruct':'dimensionless',
 			'Mvir':'Msun / h',
@@ -809,7 +984,9 @@ class AHFCatalogue(HaloCatalogue):
 		}
 
 
-	def __init__(self, snap, filename=None, make_grp=None):
+
+
+	def __init__(self, snap, filename=None, make_grp=None, halo=None):
 		# TODO - Read/store header
 		if not self._can_load(snap):
 			try:
@@ -822,6 +999,7 @@ class AHFCatalogue(HaloCatalogue):
 		if filename is not None: self._AHFFilename = filename
 		else:
 			# get the file name
+			print "lol"
 			tipsy_dir = str("%s/output_%05d/output_%05d_tipsy/" % (snap.path(), snap.output_number(), snap.output_number()))
 			if not os.path.isdir(tipsy_dir):
 				print "AHF not run on this snapshot.. aborting"
@@ -830,9 +1008,15 @@ class AHFCatalogue(HaloCatalogue):
 			if len(glob.glob('%s*.AHF_particles'%tipsy_dir)) == 0:
 				print "AHF not run on this snapshot.. aborting"
 				raise Exception("AHF not run, run AHF plz")
-				
-			fname = glob.glob('%s*.AHF_halos'%tipsy_dir)[0]
+			if halo == None:	
+				fname = glob.glob('%s*.AHF_halos'%tipsy_dir)[0]
+				self._halo = None
+			else:
+				fname=("%s/ahf_halo_track/halo_%07d.dat" % (tipsy_dir,halo))
+				self._halo = halo
+				print "tracking halo ", halo, "from snapshot ", snap.output_number()
 			self._AHFFilename = fname
+			print fname
 			print 'Loading from %s'%fname
 
 		#Try and open the files
@@ -854,7 +1038,8 @@ class AHFCatalogue(HaloCatalogue):
 		self._load_ahf_halos(self._AHFFilename, snap)
 		f.close()
 
-		self._setup_children()
+		if halo == None:
+			self._setup_children()
 
 #		if make_grp is None:
 #			make_grp = pp_cfg.rockstar_autogrp
@@ -945,20 +1130,29 @@ class AHFCatalogue(HaloCatalogue):
 
 
 	def _load_ahf_halos(self, f, snap):
-		haloprops = np.loadtxt(f, dtype=self.halo_type, comments='#')
+		if self._halo == None:
+			haloprops = np.loadtxt(f, dtype=self.halo_type, comments='#')
+		else:
+			haloprops = np.loadtxt(f, dtype=self.halo_type_tracked, comments='#')
 		self._nhalos = len(haloprops)
 		self._haloprops = np.array(haloprops)
 		# sort by number of particles to make compatible with AHF
 		self._num_p_rank = np.flipud(self._haloprops[:]['num_p'].argsort(axis=0))
 
-		for h in xrange(self._nhalos): # self._nhalos + 1?
-			# AHF halos index start from 0... python start from 0.. lets be consitant :P
-			hn = np.where(self._num_p_rank==h)[0][0]
+		if self._halo == None:
+			for h in xrange(self._nhalos): # self._nhalos + 1?
+				# AHF halos index start from 0... python start from 0.. lets be consitant :P
+				hn = np.where(self._num_p_rank==h)[0][0]
 
-			#Is this really memory inefficient?
-			self._halos[hn] = Halo(self._haloprops[h]['id'], self)
-			# properties are in Msun / h, Mpc / h
-			self._halos[hn].properties = self._haloprops[h]
+				#Is this really memory inefficient?
+				self._halos[hn] = Halo(self._haloprops[h]['id'], self)
+				# properties are in Msun / h, Mpc / h
+				self._halos[hn].properties = self._haloprops[h]
+		else:
+			for i in range(0,len(haloprops)):
+				self._halos[i] = Halo(self._haloprops[i]['z'], self)
+				self._halos[i].properties = self._haloprops[i]
+
 
 	def load_copy(self, i):
 		'''

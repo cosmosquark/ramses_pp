@@ -49,7 +49,85 @@ class Void():
 	def field_list(self):
 		return self._halo_catalogue.void_type
 
+        def get_sphere(self, r_fact=1.0,radius=None,units=None):
+                '''
+                YT only function. Currently, there is a bug with ds.sphere which ignores / h units.
+                So for the time being this function will take care of that
+                '''
+		if (radius == None and units != None) or (radius != None and units == None):
+			print "Either radius or units are None.. both need to be filled in"
+			return None
+
+		centre = self['Macrocenter']
+		if radius != None and units != None:
+			radius = self._void_catalogue._base().raw_snapshot().arr(radius, units) # user defined radius in the context of the simulation
+
+		else:   # shall we just use the virial radius of the Halo?
+			print "using halo virial radius"
+			radius = self['Reff']
+
+		snapshot = self._void_catalogue._base()
+		if not (str(type(snapshot)) == "<class 'ramses_pp.modules.yt.YT.YTSnapshot'>"):
+			raise NotImplementedError("sphere only implemented for YT")
+		ds = snapshot.raw_snapshot()
+
+		try:
+			sphere = ds.sphere(centre, (radius* r_fact))
+			return sphere, None
+		except yt.utilities.exceptions.YTSphereTooSmall:  # well yeah, we want the smallest possible dx in radius really
+			print "sphere too small, correcting to smallest dx (although this might be too small in some respects for what you may or may not care about... who am I kidding, have a YT sphere"
+			if units != None:
+				radius = ds.index.get_smallest_dx().in_units(units)
+			else:
+				radius = ds.index.get_smallest_dx().in_units("code_length")
+			print "radius is now ", radius
+			sphere = ds.sphere(centre, radius)
+			return sphere, radius
 	
+
+	def projection_plot(self, r_fact=1.0,radius=None,axis="x",units="Mpc/h",quantity="density", stars=True, dark=True):
+		'''
+		YT only function, produce and save a gas projection plot of the Halo of interest
+		Rvir_fact = multiply Rvir or fixed_length by a factor of something
+		fixed_length: if None, then use Rvir... otherwise whatever custom length (with units) which you choose
+		axis = projection axis
+		units = projection axis units
+		quantity = whatever you feel like plotting
+                '''
+		if radius == None:
+			radius = self["Rvir"]
+		else:
+			ds = self._void_catalogue._base().raw_snapshot()
+			radius = ds.arr(radius, units)
+		print radius
+		print radius.value
+		void_sphere, radius_check  = self.get_sphere(radius=radius.value,units=units)
+
+		if radius_check != None:
+			radius = radius_check
+
+
+		region = void_sphere.ds.region(center=self["Macrocenter"],left_edge=[(i.in_units('code_length').value - (radius.in_units('code_length').value * r_fact ) ) for i in self["Macrocenter"] ], right_edge=[(i.in_units('code_length').value + (radius.in_units('code_length').value * r_fact ) ) for i in self["pos"] ])
+		if quantity=="density":
+			plt = yt.ProjectionPlot(void_sphere.ds,axis,quantity,center=self["Macrocenter"].in_units(units), width=(radius.in_units('code_length').value*r_fact), axes_unit=units, data_source=region )
+		else:
+			print quantity, " is being plotted"
+			plt = yt.ProjectionPlot(void_sphere.ds,axis,quantity,center=self["Macrocenter"].in_units(units), width=(radius.in_units('code_length').value*r_fact), axes_unit=units, data_source=region, weight_field='density' )
+		if stars:
+			print "adding star particles"
+			add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
+			void_sphere.ds.add_particle_filter("stars")
+			plt.annotate_particles((radius,units),ptype="stars",p_size=10.0,col="m",marker="*")
+
+		sim_name = os.path.split(self._void_catalogue._base().path())[1]
+		plt.save(("Void_gas_" + str(self["id"].value) + "_" + str(sim_name) + "_" + str(self._halo_catalogue._base().output_number() ) ) )
+
+		if dark:
+#                       add_particle_filter("dark", function=dark_filter, filtered_type="io", requires=["particle_age"])
+#                       halo_sphere.ds.add_particle_filter("dark") will fix later
+			plt_dm = yt.ProjectionPlot(void_sphere.ds,axis,("deposit","io_cic"),center=self["pos"].in_units(units), width=(radius.in_units('code_length').value*r_fact), axes_unit=units, data_source=region )
+			plt_dm.save(("Void_dm_" + str(self["id"].value) + "_" + str(sim_name) + "_" +  str(self._void_catalogue._base().output_number() ) ))
+
 
 
 class VoidCatalogue():

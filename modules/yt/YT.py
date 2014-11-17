@@ -74,6 +74,9 @@ class YTSnapshot(Snapshot.Snapshot):
 		self._ioutput = ioutput
 		self._snappath = os.path.join('%s/output_%05d/'%(self._path, ioutput))
 		self._simulation = simulation
+		if "patch" in kwargs:
+                        patch = kwargs.get("patch","default")
+			print patch
 		
 		try:
 			stars = kwargs.get("stars",False)
@@ -85,7 +88,10 @@ class YTSnapshot(Snapshot.Snapshot):
 		except KeyError:
 			dark = False
 
-		self._snapshot = yt.mods.load(os.path.join('%s/output_%05d/info_%05d.txt'%(folder, ioutput, ioutput)))
+		if "patch" in kwargs:
+			self._snapshot = yt.mods.load(os.path.join('%s/output_%05d/info_%05d.txt'%(folder, ioutput, ioutput)), patch=patch)
+		else:
+			self._snapshot = yt.mods.load(os.path.join('%s/output_%05d/info_%05d.txt'%(folder, ioutput, ioutput)))
 
 ## snapshot filter methods ... for example, filtering out DM particles (creation time != 0)
 		if stars == True:
@@ -194,15 +200,19 @@ class YTSnapshot(Snapshot.Snapshot):
 #			shift = x_cent - pos
 			domain = self.raw_snapshot().arr(domain,"code_length")
 			units = pos.units # store the current units
-			pos_new = pos.in_units("code_length")
+			pos_new = pos.convert_to_units("code_length")
+			x_max.convert_to_units("code_length")
 ##			print domain
 			shift = x_cent - domain
 ##			print shift
 			pos_new = pos_new + shift
-##			print pos_new
+			print pos_new, x_max
 			# check for periodic boundries etc
 			for i in range(0,2):
-				pos_new[i] %= x_max[i]
+				thing = pos_new[i].value
+				thing %= 1.0
+				print thing
+				pos_new[i] = thing
 ##			print pos_new
 			pos_new = pos_new.convert_to_units(units) # convert back to origional units
 			return pos_new
@@ -242,7 +252,7 @@ class YTSnapshot(Snapshot.Snapshot):
 
 
 	#Return the HOP halo catalogue. Can override run_hop to force re-running
-	def halos(self, finder=ramses_pp_cfg.default_finder, run_finder=False):
+	def halos(self, finder=ramses_pp_cfg.default_finder, run_finder=False, halo=None):
 		ds = self._snapshot
 		from ...analysis.halo_analysis import halos
 		#Check if HOP file exists (note we will adopt a naming convention here)
@@ -281,7 +291,7 @@ class YTSnapshot(Snapshot.Snapshot):
 
 
 		elif finder == "AHF":
-			return halos.AHFCatalogue(self)
+			return halos.AHFCatalogue(self,halo=halo)
 
 		elif finder == "rockstar":
 			return halos.RockstarCatalogue(self)

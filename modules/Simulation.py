@@ -95,22 +95,26 @@ class Simulation():
 		# load more data
 		json_dir = config.json_dir
 		filename = '%s/%s.json'%(json_dir, name)
-		with open(filename, 'rb') as fp:
-			data = json.load(fp)
-		self._periodic = True
-		if "_periodic" in data:
-			if data["_periodic"] is not None:
-				self._periodic = data["_periodic"]
-		self._parent = None # assign a parent simulation
-		if "_parent" in data:
-			if data["_parent"] is not None:
-				self._periodic = data["_parent"]
+		if os.path.isfile(filename):
+			with open(filename, 'rb') as fp:
+				data = json.load(fp)
+			self._periodic = True
+			if "_periodic" in data:
+				if data["_periodic"] is not None:
+					self._periodic = data["_periodic"]
+			self._parent = None # assign a parent simulation
+			if "_parent" in data:
+				if data["_parent"] is not None:
+					self._periodic = data["_parent"]
 
-		self._parent_domain = [0.50,0.50,0.50] #coordinate in parent simulation which is this simulations centre in code units 
-		if "_parent_domain" in data:
-			if data["_parent_domain"] != None:
-				self._parent_domain = data["_parent_domain"]
-
+			self._parent_domain = [0.50,0.50,0.50] #coordinate in parent simulation which is this simulations centre in code units 
+			if "_parent_domain" in data:
+				if data["_parent_domain"] != None:
+					self._parent_domain = data["_parent_domain"]
+		else:
+			self.box_size()
+			self.set_periodic(True)
+			self.save()
 	# add new methods based on "what modules (pymses, pynbody) are working
 
 		if pynbody_loaded:
@@ -159,7 +163,7 @@ class Simulation():
 
 
 	def set_periodic(self, periodic):
-		if isinstance(boxsize, bool):
+		if isinstance(periodic, bool):
 			self._periodic = periodic
 		else:
 			print "Invalid input, True or False"
@@ -449,7 +453,7 @@ class Simulation():
  		'''
 
 		from .utils import string_utils
- 		outputs = glob.glob('%s/output_00*'%self.path())
+ 		outputs = glob.glob('%s/output_0*'%self.path())
  		outputs.sort(key=string_utils.natural_keys)
  		return outputs
 
