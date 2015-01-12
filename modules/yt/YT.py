@@ -56,12 +56,17 @@ def load(folder, simulation, ioutput, **kwargs):
 	return YTSnapshot(folder, simulation, ioutput, **kwargs)
 
 def star_filter(pfilter,data):
-	filter = np.logical_and(data.particles.source["particle_age"] != 0, data.particles.source["particle_age"] != None)
+	filter = np.logical_and(data["particle_age"] != 0, data["particle_age"] != None)
 	return filter
 
 def dark_filter(pfilter,data):
-	filter = np.logical_and(data.particles.source["particle_age"] == 0, data.particles.source["particle_age"] != None)
+	filter = np.logical_and(data["particle_age"] == 0, data["particle_age"] != None)
 	return filter
+
+def young_star_filter(pfilter,data):
+        filter = np.logical_and(data["particle_age"] != 0, data["particle_total_time"] <= YTArray("100","Myr"))
+        return filter
+
 
 class YTSnapshot(Snapshot.Snapshot):
 	def __init__(self, folder, simulation, ioutput, **kwargs):

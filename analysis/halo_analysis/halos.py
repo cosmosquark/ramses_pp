@@ -442,7 +442,7 @@ class Halo():
 		print "centre found at ", center, " with stars " + str(stars) + " dark " + str(dark) + " gas " + str(gas)
 		return center
 
-	def galaxy_disk(self,n_disks=5,disk_h=(10,"kpc/h"),disk_w=(50,"kpc/h"),center=None):
+	def galaxy_disk(self,n_disks=5,disk_h=(10,"kpc/h"),disk_w=(50,"kpc/h"),center=None,cylinder_w=None,cylinder_h=None):
 		# n_disks need to be odd... you have 1 disk.. or 1 disk sandwiched inbetween 2 others (n_disk=3) etc
 
 		snapshot = self._halo_catalogue._base()
@@ -459,8 +459,12 @@ class Halo():
 		disk_h = ds.arr(disk_h[0],disk_h[1])
 		print disk_h
 		# get angular momentum
-		Rvir = self['Rvir']
-
+		if cylinder_w == None:
+			cylinder_w = self['Rvir']
+		if cylinder_h == None:
+			cylinger_h = self["Rvir"]
+			
+		Rvir = self["Rvir"]
 		for i in range(0,10):
 			Rvir_fact = 1.0 - (i * 0.1) # shrink virial radius by 0.1 upon each run.. center on the new CoM
 			try:
@@ -495,21 +499,21 @@ class Halo():
 		for i in range(0,stacks):
 			if i == 0: # central region first
 				cent = center
-				h_bin = YTArray(0,"kpc/h")
-				d_obj = ds.disk(center,L,Rvir,disk_h)
+				h_bin = ds.arr(0, "kpc/h")
+				d_obj = ds.disk(center,L,disk_w,disk_h)
 				disks.insert(0,[h_bin,cent,d_obj])
 			else:
 				cent_up = [center[0] + ((L_norm[0] * i * disk_h)), center[1] + ((L_norm[1]* i * disk_h)) , center[2] + ((L_norm[2] * i * disk_h))]
 				cent_down = [center[0] - ((L_norm[0] * i * disk_h)), center[1] - ((L_norm[1]* i * disk_h)) , center[2] - ((L_norm[2] * i * disk_h))]
 				h_bin_up = i * disk_h
 				h_bin_down = i *(-disk_h)
-				d_obj_up = ds.disk(cent_up,L,Rvir,disk_h)
-				d_obj_down = ds.disk(cent_down,L,Rvir,disk_h)
+				d_obj_up = ds.disk(cent_up,L,disk_w,disk_h)
+				d_obj_down = ds.disk(cent_down,L,disk_w,disk_h)
 				disks.insert(0,[h_bin_up,cent_up,d_obj_up])
 				disks.append([h_bin_down,cent_down,d_obj_down])
 
 		print disks
-		cylinder = ds.disk(center,L,disk_w,Rvir)
+		cylinder = ds.disk(center,L,cylinder_w,cylinder_h)
 		return disks, cylinder
 
 		
