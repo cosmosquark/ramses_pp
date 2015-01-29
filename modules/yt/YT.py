@@ -6,53 +6,48 @@ Based on Pymses.py from the Hamu project https://github.com/samgeen/Hamu
 
 from .. import Snapshot
 import sys, os
-from ... import config as ramses_pp_cfg
+from ramses_pp import config as cfg 
 
 #from yt.config import ytcfg; ytcfg["yt","loglevel"] = "20"
 import yt
+#from yt import derived_field
+#from yt.units.yt_array import YTQuantity
 from yt.mods import *
 from yt.analysis_modules.halo_finding.api import *
 from yt.utilities.physical_constants import \
 	boltzmann_constant_cgs, \
 	mass_hydrogen_cgs, \
 	mass_sun_cgs, \
-	mh
+	mh \
+	G
 
 from yt.data_objects.particle_filters import add_particle_filter
 
 verbose = True
-#simulation_dir = config.simulation_dir
 
+#def rho_crit_now(data):
+#	#G = 6.6743E-8 # cgs
+#	H0 = YTQuantity((data.pf['H0'] * 1000) / 3.08567758E22, 's**-1') # s^-1
+#	rho_crit_0 = (3 * H0**2) / (8 * np.pi * G.in_cgs())
+#	return rho_crit_0
 
-def rho_crit_now(data, units='cgs'):
-	if units == 'SI':
-		G = 6.6743E-11
-	else:
-		G = 6.6743E-8 # cgs
-	H0 = (data.ds['H0'] * 1000) / 3.08567758E22 # s^-1
-	rho_crit_0 = (3 * H0**2) / (8 * np.pi * G)
-	return rho_crit_0
 
 #Add some useful fields
 def _Temperature(field, data):
-	rv = data["ramses","Pressure"]/data["ramses","Density"]
+	rv = data["pressure"]/data["density"]
 	rv *= mass_hydrogen_cgs/boltzmann_constant_cgs
 	return rv
 
-def _NumDens(field, data):
-	rv = data["ramses","Density"]/mass_hydrogen_cgs
+def _number_density(field, data):
+	rv = data["density"]/mass_hydrogen_cgs
 	return rv
 
-def _OverDensity(field, data):
+def _over_density(field, data):
 	omega_baryon_now = data.ds.parameters['omega_b']
 	#return data['Density'] / (omega_baryon_now * rho_crit_now * (data.pf.hubble_constant**2) * ((1+data.pf.current_redshift)**3))
-	return data["ramses",'Density'] / (omega_baryon_now * rho_crit_now(data) * ((1+data.ds.current_redshift)**3))
+	return data['density'] / (omega_baryon_now * rho_crit_now(data) * ((1+data.ds.current_redshift)**3))
 
 def load(folder, simulation, ioutput, **kwargs):
-#	add_field(("gas", "Temperature"), function=_Temperature, units=r"\rm{K}")
-#	add_field(("gas", "Number Density"), function=_NumDens, units=r"\rm{cm}^{-3}")
-#	add_field(("gas", "Baryon Overdensity"), function=_OverDensity,
- #         units=r"")
 	return YTSnapshot(folder, simulation, ioutput, **kwargs)
 
 def star_filter(pfilter,data):
@@ -69,16 +64,13 @@ def young_star_filter(pfilter,data):
 
 
 class YTSnapshot(Snapshot.Snapshot):
-	def __init__(self, folder, simulation, ioutput, **kwargs):
-		Snapshot.Snapshot.__init__(self, "yt")
+	def __init__(self, path, ioutput, **kwargs):
+		Snapshot.Snapshot.__init__(self, path, ioutput, "yt", **kwargs)
 		'''
 		Load the snapshot
 		'''
-		print folder
-		self._path = folder #simulation_dir + "/" + folder
-		self._ioutput = ioutput
-		self._snappath = os.path.join('%s/output_%05d/'%(self._path, ioutput))
-		self._simulation = simulation
+
+		#self._snapshot = yt.load(os.path.join('%s/output_%05d/info_%05d.txt'%(path, ioutput, ioutput)))
 		if "patch" in kwargs:
                         patch = kwargs.get("patch","default")
 			print patch
@@ -94,18 +86,16 @@ class YTSnapshot(Snapshot.Snapshot):
 			dark = False
 
 		if "patch" in kwargs:
-			self._snapshot = yt.mods.load(os.path.join('%s/output_%05d/info_%05d.txt'%(folder, ioutput, ioutput)), patch=patch)
+			self._snapshot = yt.mods.load(os.path.join('%s/output_%05d/info_%05d.txt'%(path, ioutput, ioutput)), patch=patch)
 		else:
-			self._snapshot = yt.mods.load(os.path.join('%s/output_%05d/info_%05d.txt'%(folder, ioutput, ioutput)))
+			self._snapshot = yt.mods.load(os.path.join('%s/output_%05d/info_%05d.txt'%(path, ioutput, ioutput)))
 
 ## snapshot filter methods ... for example, filtering out DM particles (creation time != 0)
 		if stars == True:
-			print "stars"
 			add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
 			self._snapshot.add_particle_filter("stars")
 
 		if dark == True:
-			print "dark"
 			add_particle_filter("dark", function=dark_filter, filtered_type="all", requires=["particle_age"])
 			self._snapshot.add_particle_filter("dark")
 	#		add_particle_filter("stars", function=Stars, filtered_type='all', requires=["particle_type"])
@@ -119,13 +109,13 @@ class YTSnapshot(Snapshot.Snapshot):
 		'''
 		return self._ioutput
 
-	def folder(self):
-		return self._folder
 
 	def path(self):
 		'''
-		Return the path to this simulation directory
+		Return the path to this snapshot
 		'''
+		#There was an inconsitency here - but changing could break other code
+		#return os.path.join(os.path.dirname(self._path), 'output_%05d/'%self._ioutput)
 		return self._path
 
 
@@ -135,6 +125,18 @@ class YTSnapshot(Snapshot.Snapshot):
 		'''
 		ds = self.raw_snapshot()
 		return ds.parameters['ncpu']
+
+	def ndim(self):
+		'''
+		Return number of dimensions
+		'''
+		return self.info()['ndim']
+
+	def boxlen(self):
+		'''
+		Return boxlen in code units
+		'''
+		return self.info()['boxlen']
 
 	def current_redshift(self):
 		'''
@@ -181,6 +183,11 @@ class YTSnapshot(Snapshot.Snapshot):
 		hop_dir = os.path.join('%s/'%self._path, 'hop_dir')
 		return hop_dir
 
+	def rockstar_path(self):
+		rockstar_dir = os.path.join('%s/'%self._path, cfg.rockstar_base)
+		return rockstar_dir
+
+
 	def raw_snapshot(self):
 		'''
 		Return the raw snapshot object
@@ -189,12 +196,67 @@ class YTSnapshot(Snapshot.Snapshot):
 
 	def raw_snapshot_all(self):
 		'''
-		Return all the raw snapshot object data
+		Return the raw snapshot object
 		'''
-		raw_snap = self.raw_snapshot()
-		raw_snap_all = raw_snap.all_data()
-		raw_snap_all.ds    # patch to get the pf functionality working nicely... bit of a hack
-		return raw_snap_all
+		return self._snapshot.all_data()
+
+	def halos(self, finder='rockstar', **kwargs):
+		from ramses_pp.analysis.halo_analysis import halos
+		if finder=='rockstar':
+			return halos.RockstarCatalogue(self)
+		elif finder=='AHF':
+			return halos.AHFCatalogue(self, **kwargs)
+		elif finder == 'hop':
+			return self.hop_halos()
+
+		elif finder == "halomaker_simple":
+			return halos.HaloMakerSimpleCatalogue(self)
+
+	def hop_halos()
+		ds = self._snapshot
+
+		#Check if HOP file exists (note we will adopt a naming convention here)
+		prefix = 'out_%05d_hop'%self._ioutput
+		hop_dir = self.hop_path()
+
+		#if not os.path.isdir(hop_dir): os.mkdir(hop_dir)
+
+		if (verbose): print 'Loading halos from directory: %s'%hop_dir
+
+		#Return the halos
+		if self.halo_cat_exists() is False:
+			dump_fname = '%s/%s'%(hop_dir, prefix)
+			print 'No hop catalogue found, running hop...'
+			print 'Will dump halos in: %s'%dump_fname
+			halos = HaloFinder(ds, threshold=200)
+			#Dump the halos for next time
+			halos.dump(dump_fname)
+ 		else:
+			halo_file = '%s/%s'%(hop_dir, prefix)
+			if (verbose): print 'Loading halo file: %s'%halo_file
+			halos = LoadHaloes(ds, halo_file)
+			if (verbose): print 'Loaded %d halos'%len(halos)
+
+		return halos
+
+	def halo_cat_exists(self):
+		#Check if HOP file exists (note we will adopt a naming convention here)
+		hop_dir = self.hop_path()
+
+		#if not os.path.isdir(hop_dir): os.mkdir(hop_dir)
+		if (verbose): print 'Loading halos from directory: %s'%hop_dir
+
+		#Check if out_%05d_hop.h5, .out and .txt exist
+		prefix = 'out_%05d_hop'%self._ioutput
+		extensions = ['h5', 'txt', 'out']
+		exists = False
+
+		for ext in extensions:
+			if os.path.isfile('%s/%s.%s'%(hop_dir, prefix, ext)):
+				exists = True
+				break
+
+		return exists
 
 	def shift_parent(self, pos):
 		domain=self._simulation._parent_domain
@@ -227,18 +289,6 @@ class YTSnapshot(Snapshot.Snapshot):
 			return None
 
 
-#	def raw_snapshot_rockstar(self):
-#
-#		ds = self.raw_snapshot_all()
-#		ds["particle_position_x"].convert_to_units("Mpc/h")
-#		ds["particle_position_y"].convert_to_units("Mpc/h")
-#		ds["particle_position_z"].convert_to_units("Mpc/h")
-#		ds["particle_mass"].convert_to_units("Msun/h")
-#		ds["particle_velocity_x"].convert_to_units("km/s")
-#		ds["particle_velocity_y"].convert_to_units("km/s")
-#		ds["particle_velocity_z"].convert_to_units("km/s")
-#		return ds
-
 	def field_list(self):
 		ds = self.raw_snapshot_all()
 		for field in ds.derived_field_list:
@@ -253,65 +303,6 @@ class YTSnapshot(Snapshot.Snapshot):
 		else:
 			print "invalid shape"
 			return None
-
-
-
-	#Return the HOP halo catalogue. Can override run_hop to force re-running
-	def halos(self, finder=ramses_pp_cfg.default_finder, run_finder=False, halo=None):
-		ds = self._snapshot
-		from ...analysis.halo_analysis import halos
-		#Check if HOP file exists (note we will adopt a naming convention here)
-		if finder == "hop":
-			hop_dir = self.hop_path()
-	
-			#if not os.path.isdir(hop_dir): os.mkdir(hop_dir)
-	
-			if (verbose): print 'Loading halos from directory: %s'%hop_dir
-	
-			#Check if out_%05d_hop.h5, .out and .txt exist
-			prefix = 'out_%05d_hop'%self._ioutput
-			extensions = ['h5', 'txt', 'out']
-	
-			if run_finder == False:
-				for ext in extensions:
-					if not os.path.isfile('%s/%s.%s'%(hop_dir, prefix, ext)):
-						run_finder = True
-						break
-
-			#Return the halos
-			if run_finder:
-				dump_fname = '%s/%s'%(hop_dir, prefix)
-				print 'No hop catalogue found, running hop...'
-				print 'Will dump halos in: %s'%dump_fname
-				halos = HaloFinder(ds, threshold=200)
-				#Dump the halos for next time
-				halos.dump(dump_fname)
-			else:
-				halo_file = '%s/%s'%(hop_dir, prefix)
-				if (verbose): print 'Loading halo file: %s'%halo_file
-				halos = LoadHaloes(ds, halo_file)
-				if (verbose): print 'Loaded %d halos'%len(halos)
-
-			return halos
-
-
-		elif finder == "AHF":
-			return halos.AHFCatalogue(self,halo=halo)
-
-		elif finder == "rockstar":
-			return halos.RockstarCatalogue(self)
-
-		elif finder == "halomaker_simple":
-			return halos.HaloMakerSimpleCatalogue(self)
-
-		else:
-			raise Exception("Unimplemented finder: %s" %finder)
-
-# YT with RAMSES has no way of determining whether particles are stars or dark matter.. for that, we need to make ammends.. for example, stars have a birth time, dark matter particles do not.
-
-
-		
-# standard cosmology
 
 	def _a_dot(self):
 		cos = self.cosmology()

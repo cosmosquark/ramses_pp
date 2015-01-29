@@ -10,38 +10,34 @@ from pynbody.units import Unit
 from .. import Snapshot
 import sys, os
 import numpy as np
-from ramses_pp import config
+from ... import config
 
 
 # multithreading
 pynbody.ramses.multiprocess_num = 16
 pynbody.config['number_of_threads'] = 16
 
-#Multithreading
-pynbody.ramses.multiprocess_num = 16
-pynbody.config['number_of_threads'] = 16
-
-def load(folder, simulation=None, ioutput=None, **kwargs):
-	return PynbodySnapshot(folder, simulation, ioutput, **kwargs)
+def load(folder, ioutput=None, **kwargs):
+	return PynbodySnapshot(path ioutput, **kwargs)
 
 
 class PynbodySnapshot(Snapshot.Snapshot):
-	def __init__(self, folder, simulation=None, ioutput=None, gas=False, **kwargs):
+	def __init__(self, path, ioutput, gas=True, **kwargs):
 		# gas is default to FALSE since pynbody does weird things with gas conversion to tipsy (pymses/yt is better for the gas data)
-		Snapshot.Snapshot.__init__(self, "Pynbody", **kwargs)
+		Snapshot.Snapshot.__init__(self, path, ioutput, "Pynbody", **kwargs)
 		'''
 		Load the snapshot using pymses.RamsesOutput
 		TODO Verify snapshot exists
+		Specify the halo arg to load only the required number of CPUs
 		'''
-		self._path = folder
-		self._ioutput = ioutput
-		self._simulation = simulation
-		if ioutput is not None:
-			self._snapshot = pynbody.load('%s/output_%05d'%(folder, ioutput),force_gas=False)
+		if kwargs.has_key('halo'):
+			halo = kwargs['halo']
+			cpus = self.cpu_list(halo.get_bounding_box())
+			self._snapshot = pynbody.load('%s/output_%05d'%(path, ioutput), cpus=cpus **kwargs)
 		else:
-			self._snapshot = pynbody.load(folder,force_gas=False)
+			self._snapshot = pynbody.load('%s/output_%05d'%(path, ioutput), **kwargs)
 
-	#Implement abstract methods from Snapshot.py
+ 	#Implement abstract methods from Snapshot.py
 
 	def output_number(self):
 		'''
@@ -166,14 +162,9 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		cmtokpc = constants.cmtokpc
 		G_u = constants.G_u
 
-		lenunit  = s._info['unit_l']*cmtokpc #/s.properties['a']*cmtokpc
+		lenunit  = s._info['unit_l']/s.properties['a']*cmtokpc
 		massunit = pynbody.analysis.cosmology.rho_crit(s, z=0, unit='Msol kpc^-3')*lenunit**3
 		timeunit = np.sqrt(1/G_u * lenunit**3/massunit)
-
-		print '****************************'
-		print lenunit, massunit, timeunit
-		print '****************************'
-
 		return lenunit, massunit, timeunit
 
 	def tipsy(self, convert=True, gas=False, rewrite=False):
@@ -251,7 +242,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 # see here for more doccumentation http://pynbody.github.io/pynbody/tutorials/halos.html
 
 
-	def halos(self, LgridDomain=128, LgridMax=1073741824, VescTune=1.5, Dvir=200, nmin_per_halo = 50,
+	def tipsy_halos(self, LgridDomain=128, LgridMax=1073741824, VescTune=1.5, Dvir=200, nmin_per_halo = 50,
 		 MaxGatherRad=3.0, num_threads=16, run_ahf=False, rewrite_tipsy=False, gas=False, configloc = True):
 		import glob
 		s = self.raw_snapshot()
@@ -302,7 +293,8 @@ class PynbodySnapshot(Snapshot.Snapshot):
 
 		 #   velunit = Unit('%f cm'%s._info['unit_l'])/Unit('%f s'%s._info['unit_t'])			
 
-			f.write('TIPSY_VUNIT   = %e\n'%v_unit.ratio('km s^-1', **s.conversion_context()))			
+			f.write('TIPSY_VUNIT   = %e\n'%v_unit.ratio('km s^-1 a', **s.conversion_context()))		
+		
 			# the thermal energy in K -> km^2/s^2		 
 			f.write('TIPSY_EUNIT   = %e\n'%((pynbody.units.k/pynbody.units.m_p).in_units('km^2 s^-2 K^-1')*5./3.))
 			f.close()			
@@ -328,6 +320,22 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		halos = s.halos()
 		print 'Loaded %d halos'%len(halos)
 		return halos
+
+	def halos(self, finder=config.default_finder, filename=None):
+		'''
+		Load a generic halo catalogue - default to rockstar if not overridden
+		Override the snapshot method, and force loading using yt for unit coherence
+		'''
+		simulation = self._attributes['simulation']
+		yt_snap = self.swap_modules(simulation, 'yt')
+		from ...analysis.halo_analysis import halos
+		if finder=='rockstar':
+			return halos.RockstarCatalogue(yt_snap)
+		elif finder=="AHF":
+			return halos.AHFCatalogue(yt_snap, filename=filename)
+		else:
+			raise Exception("Unimplemented finder: %s"%finder)
+
 
 	def halo_cat_exists(self):
 		import glob

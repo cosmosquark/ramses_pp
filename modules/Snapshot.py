@@ -5,9 +5,10 @@ Based on Snapshot.py from the Hamu project https://github.com/samgeen/Hamu
 '''
 
 import abc
-from ramses_pp import config
+from .. import config
 import numpy as np
 import os
+import glob
 
 #Abstract snapshot class for loading a ramses output
 
@@ -17,25 +18,29 @@ class Snapshot():
 	'''
 	__metaclass__ = abc.ABCMeta
 
-	def __init__(self, sim_type, **kwargs):
+	def __init__(self, path, ioutput, sim_type, **kwargs):
 		'''
 		Constructor
 		'''
+		self._path = path
 		self._type = sim_type
+		self._ioutput = ioutput
+		self._attributes = {}
+		self._info = None
+		for key in kwargs.keys()
+			self._attributes[key] = kwargs[key]
 
-	@abc.abstractmethod
 	def output_number(self):
 		'''
 		Return the output number for this snapshot
 		'''
-		return
+		return self._ioutput
 
-	@abc.abstractmethod
 	def path(self):
 		'''
 		Return the path to this snapshot
 		'''
-		return
+		return self._path
 
 
 	@abc.abstractmethod
@@ -44,6 +49,84 @@ class Snapshot():
 		Return the raw snapshot object
 		'''
 		return
+
+	def cube_positions(self, n):
+		'''
+		Return a list of cube positions for a cartesian
+		domain decomp
+		n - number of cubes per dimension
+		'''
+		ndim = self.ndim()
+		boxlen = self.boxlen() # code units
+		cubes = []
+		dx = float(boxlen)/float(n)
+		for i in range(0, n):
+			#x coordinate of the cube centre
+			cen_i = dx * (i + 0.5)
+			if ndim > 1:
+				for j in range(0, n):
+					#y coordinate of the cube centre
+					cen_j = dx * (j + 0.5)
+					if ndim > 2:
+						for k in range(0, n):
+							# z coordinate of the cube centre
+							cen_k = dx * (k + 0.5)
+							cubes.append([cen_i, cen_j, cen_k])
+					else:
+						cubes.append([cen_i, cen_j])
+			else:
+				cubes.append([cen_i])
+		return np.array(cubes), dx
+
+	def num_snapshots(self):
+		return len(glob.glob('%s/output_00*'%self._path))
+
+	def has_key(self, key):
+		'''
+		Shortcut to self._attributes.has_key
+		'''
+		return self._attributes.has_key(key)
+
+	def put(self, key, value):
+		'''
+		Add an item to the attributes dict
+		'''
+		self._attributes[key] = value
+
+	def get(self, key):
+		'''
+		Return the key-value pair from the attributes dict
+		'''
+		return self._attributes[key]
+
+	def info_path(self):
+		'''
+		Return the path to the info_000*.txt file
+		'''
+		return "%s/output_%05d/info_%05d.txt" % (self.path(), self.output_number(), self.output_number())
+
+	def info_dict(self):
+		'''
+		Load info object using pymses
+		'''
+		from ramses_pp.modules.pymses import Pymses
+		self._info = Pymses.info_dict(self)
+		return self._info
+
+	def cpu_list(self, bounding_box):
+		'''
+		Return the list of CPUs which cover the bounding box
+		- bounding box: (2, ndim) ndarray containing min/max bounding box
+		'''
+		from ramses_pp.modules.pymses import Pymses
+		dom_decomp = Pymses.hilbert_dom_decomp(self)
+		return dom_decomp.map_box(bounding_box)
+
+	def header_path(self):
+		'''
+		Return the path to the header_000*.txt file
+		'''
+		return "%s/output_%05d/header_%05d.txt" % (self.path(), self.output_number(), self.output_number())
 
 	@abc.abstractmethod
 	def ncpu(self):
@@ -74,36 +157,37 @@ class Snapshot():
 		return
 
 	def box_size(self):
-		cmtokpc = 3.24077929e-22
-		kpctompc = 0.001
-		ioutput = self.output_number()
-		info = ("%s/output_%05d/info_%05d.txt" % (self._path, ioutput, ioutput))
-		f = open(info, 'r')
-		nline = 1  # read the last info file
-		while nline <= 18:
-			line = f.readline()
-			if(nline == 11): h0 = np.float32(line.split("=")[1])
-			if(nline == 16): lunit = np.float32(line.split("=")[1])
-			nline += 1
-		f.close()
+		'''
+		Return comoving boxsize in Mpc/h
+		'''
+		from .utils import constants as C
+		with open(self.info_path(), 'r') as f:
+			nline = 1  # read the last info file
+			while nline <= 18:
+				line = f.readline()
+				if(nline == 11): h0 = np.float32(line.split("=")[1])
+				if(nline == 16): lunit = np.float32(line.split("=")[1])
+				nline += 1
+		#f.close()
 		h = h0 / 100
-		boxsize = lunit * cmtokpc * kpctompc * h
+		boxsize = lunit * C.cmtokpc * C.kpctompc * 
 		return boxsize
 
 	def particles(self):
-		ioutput = self.output_number()
-		header = ("%s/output_%05d/header_%05d.txt" % (self._path, ioutput, ioutput))
-		f = open(header, 'r')
-		nline = 1
-		while nline <= 8:
-			line = f.readline()
-			if (nline == 2): npart = int(line)
-			if (nline == 4): ndark = int(line)
-			if (nline == 6): nstar = int(line)
-			if (nline == 8): nsink = int(line)
-			nline += 1
+		'''
+		Return total particle counts
+		'''
+		with open(self.header_path(), 'r') as f:
+			nline = 1
+			while nline <= 8:
+				line = f.readline()
+				if (nline == 2): npart = int(line)
+				if (nline == 4): ndark = int(line)
+				if (nline == 6): nstar = int(line)
+				if (nline == 8): nsink = int(line)
+				nline += 1
 
-		f.close()
+		#f.close()
 		particles = {
 			"total":npart,
 			"dark":ndark,
@@ -114,25 +198,29 @@ class Snapshot():
 				
 
 	def grid(self):
-		ioutput = self.output_number()
-		info = ("%s/output_%05d/info_%05d.txt" % (self._path, ioutput, ioutput))
-		f = open(info, 'r')
-		nline = 1  # read the last info file
-		while nline <= 18:
-			line = f.readline()
-			if(nline == 3): min = np.float32(line.split("=")[1])
-			if(nline == 4): max = np.float32(line.split("=")[1])
-			nline += 1
+		'''
+		Return level_min and level_max
+		'''
+		with open(self.info_path(), 'r') as f:
+			nline = 1  # read the last info file
+			while nline <= 18:
+				line = f.readline()
+				if(nline == 3): min = np.float32(line.split("=")[1])
+				if(nline == 4): max = np.float32(line.split("=")[1])
+				nline += 1
 
-		grid = {
-			"min":min,
-			"max":max,
-		}
-		f.close()
+			grid = {
+				"min":min,
+				"max":max,
+			}
+#		f.close()
 		return grid
 
 	def is_zoom(self):
-		# a good proxy for a zoom run is the DM particle count, since the result of a cube root follow by a log of base 2 will *NOT* be an integer
+		'''
+		Determines if this is a zoom simulation or not:
+		A good proxy for a zoom run is the DM particle count, since the result of a cube root follow by a log of base 2 will *NOT* be an integer
+		'''
 
 		particles = self.particles()
 		dark = particles["dark"]
@@ -216,15 +304,12 @@ class Snapshot():
 
 		return self._lingrowthfac(return_norm=False)
 
-	
-
-
-
-#	def H(self):
-#		cosmology = self.cosmology()
-#		H = 100 * cosmology['h'] * 
 
 	def tform(self, tform, rt=False):
+		'''
+		Return the time since the big bang when this particle formed IN Gyr.
+		For lookback time, do simu.current_time - tform
+		'''
 
 		if hasattr(self, '_friedman') is False:
 			self.integrate_friedman(store=True)
@@ -269,7 +354,7 @@ class Snapshot():
 		return output
 
 	def integrate_friedman(self, aexp=None, store=False):
-		from ramses_pp.fortran import friedman as fm
+		from ..fortran import friedman as fm
 
 		cosmology = self.cosmology()
 		omega_m_0 = cosmology['omega_m_0']
@@ -311,29 +396,26 @@ class Snapshot():
 		return friedman
 
 	def halos(self, finder=config.default_finder,halo=None):
-
 		'''
-
 		Load a generic halo catalogue
-
 		'''
-
 		from ..analysis.halo_analysis import halos
-
 		if finder=='rockstar':
-
 			return halos.RockstarCatalogue(self)
-
 		elif finder=="AHF":
 			return halos.AHFCatalogue(self,halo=halo)
-
 		elif finder=="halomaker_simple":
 			return halos.HaloMakerSimpleCatalogue(self)
-
 		else:
-
 			raise Exception("Unimplemented finder: %s"%finder)
 
+
+	def swap_modules(self, simulation, module):
+		'''
+		Swap to another swap_module
+		'''
+		return simulation.snapshot(self._ioutput, module=module)
+		
 
 	def voids(self, finder=config.void_finder,particles=True, subsample=1.0, subvol="00", untrimmed=False, dataportion="central", parent=True):
 		'''
