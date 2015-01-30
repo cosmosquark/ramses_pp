@@ -18,7 +18,7 @@ from yt.utilities.physical_constants import \
 	boltzmann_constant_cgs, \
 	mass_hydrogen_cgs, \
 	mass_sun_cgs, \
-	mh \
+	mh, \
 	G
 
 from yt.data_objects.particle_filters import add_particle_filter
@@ -47,8 +47,8 @@ def _over_density(field, data):
 	#return data['Density'] / (omega_baryon_now * rho_crit_now * (data.pf.hubble_constant**2) * ((1+data.pf.current_redshift)**3))
 	return data['density'] / (omega_baryon_now * rho_crit_now(data) * ((1+data.ds.current_redshift)**3))
 
-def load(folder, simulation, ioutput, **kwargs):
-	return YTSnapshot(folder, simulation, ioutput, **kwargs)
+def load(path, ioutput, **kwargs):
+	return YTSnapshot(path, ioutput, **kwargs)
 
 def star_filter(pfilter,data):
 	filter = np.logical_and(data["particle_age"] != 0, data["particle_age"] != None)
@@ -212,7 +212,7 @@ class YTSnapshot(Snapshot.Snapshot):
 		elif finder == "halomaker_simple":
 			return halos.HaloMakerSimpleCatalogue(self)
 
-	def hop_halos()
+	def hop_halos():
 		ds = self._snapshot
 
 		#Check if HOP file exists (note we will adopt a naming convention here)

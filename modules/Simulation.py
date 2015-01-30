@@ -307,13 +307,13 @@ class Simulation():
 			kwargs["simulation"] = self
 		if (module == 'yt') and yt_loaded:
 			from .yt import YT
-			return YT.load(self._path, self, ioutput=ioutput, **kwargs)
+			return YT.load(self._path, ioutput, **kwargs)
 		elif (module == 'pymses') and pymses_loaded:
 			from .pymses import Pymses
-			return Pymses.load(self._path, self, ioutput, **kwargs)
+			return Pymses.load(self._path, ioutput, **kwargs)
 		elif (module == 'pynbody') and pynbody_loaded:
 			from .pynbody import Pynbody
-			return Pynbody.load(self._path, self, ioutput, **kwargs)
+			return Pynbody.load(self._path, ioutput, **kwargs)
 		else:
 			print 'yt loaded: ', yt_loaded
 			print 'pymses loaded: ', pymses_loaded

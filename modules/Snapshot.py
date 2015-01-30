@@ -27,7 +27,7 @@ class Snapshot():
 		self._ioutput = ioutput
 		self._attributes = {}
 		self._info = None
-		for key in kwargs.keys()
+		for key in kwargs.keys():
 			self._attributes[key] = kwargs[key]
 
 	def output_number(self):
@@ -170,7 +170,7 @@ class Snapshot():
 				nline += 1
 		#f.close()
 		h = h0 / 100
-		boxsize = lunit * C.cmtokpc * C.kpctompc * 
+		boxsize = lunit * C.cmtokpc * C.kpctompc * h
 		return boxsize
 
 	def particles(self):
