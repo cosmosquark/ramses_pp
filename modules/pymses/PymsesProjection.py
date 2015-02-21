@@ -7,9 +7,9 @@ from pymses.analysis.visualization import *
 #import os, binascii
 
 def camera(center=[0.5, 0.5, 0.5], region_size=[1., 1.], los_axis='x',
-		up_vector='z', log_sensitive=True):
+		up_vector='z', log_sensitive=True, **kwargs):
 	return Camera(center=center, line_of_sight_axis='x', up_vector='z',
-                                region_size=region_size, log_sensitive=True)
+                                region_size=region_size, log_sensitive=True, **kwargs)
 
 def scalar_operator(field, factor=1):
 	func = lambda dset: dset[field] * factor

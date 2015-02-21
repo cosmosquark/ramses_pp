@@ -81,7 +81,7 @@ class Simulation():
 		# This should never change
 		if oid is None: self._oid = str(uuid.uuid4())
 		else:
-			print oid 
+			#print oid 
 			self._oid = str(oid)
 
 # calculate box size
@@ -157,9 +157,6 @@ class Simulation():
 		h = h0 / 100
 		boxsize = lunit * cmtokpc * kpctompc * h
 		return boxsize
-		
-
-
 
 
 	def set_periodic(self, periodic):
@@ -247,6 +244,16 @@ class Simulation():
 	def num_snapshots(self):
 		return len(glob.glob('%s/output_*'%self._path))
 
+	def iterable(self, module=config.default_module, min_i=1, max_i=None):
+		'''
+		Return an iterable of snapshots
+		'''
+		if max_i is None: max_i = self.num_snapshots()
+		snaps = []
+		for i in range(min_i, max_i+1):
+			snaps.append(self.snapshot(i, module))
+		return np.array(snaps)	
+
 	def save_image(self, prefix, ioutput, plt, **kwargs):
 		'''
 		Save an image to the simulation directory
@@ -296,15 +303,17 @@ class Simulation():
 		'''
 		Return a snapshot from the simulation
 		'''
+		if not kwargs.has_key("simulation"):
+			kwargs["simulation"] = self
 		if (module == 'yt') and yt_loaded:
 			from .yt import YT
-			return YT.load(self._path, self, ioutput=ioutput, **kwargs)
+			return YT.load(self._path, ioutput, **kwargs)
 		elif (module == 'pymses') and pymses_loaded:
 			from .pymses import Pymses
-			return Pymses.load(self._path, self, ioutput, **kwargs)
+			return Pymses.load(self._path, ioutput, **kwargs)
 		elif (module == 'pynbody') and pynbody_loaded:
 			from .pynbody import Pynbody
-			return Pynbody.load(self._path, self, ioutput, **kwargs)
+			return Pynbody.load(self._path, ioutput, **kwargs)
 		else:
 			print 'yt loaded: ', yt_loaded
 			print 'pymses loaded: ', pymses_loaded
