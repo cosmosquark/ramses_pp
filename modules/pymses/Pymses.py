@@ -5,7 +5,8 @@ Based on Pymses.py from the Hamu project https://github.com/samgeen/Hamu
 '''
 
 import pymses
-from ... import Snapshot
+from .. import Snapshot
+from ... import config
 import sys, os
 import numpy as np
 
@@ -13,7 +14,7 @@ from pymses import RamsesOutput
 from pymses.sources.ramses import output
 RamsesOutput.amr_field_descrs_by_file = {"3D": {
 		# default
-		"hydro" : [ output.Scalar("rho", 0), output.Vector("vel", [1, 2, 3]), output.Scalar("P", 4), output.Scalar("metal", 5),
+		"hydro" : [ output.Scalar("rho", 0), output.Vector("vel", [1, 2, 3]), output.Scalar("P", 4), output.Scalar("metal", 5)],
 		# CH
 #		"hydro" : [ output.Scalar("rho", 0), output.Vector("vel", [1, 2, 3]), output.Scalar("P", 4), output.Scalar("metal", 5), 
 #					 output.Scalar("H", 6), output.Vector("O", 7), output.Scalar("Fe", 8),	
@@ -22,7 +23,7 @@ RamsesOutput.amr_field_descrs_by_file = {"3D": {
 # RT	"hydro" : [ output.Scalar("rho", 0), output.Vector("vel", [1, 2, 3]), output.Scalar("P", 4), 
 #			output.Scalar("metal", 5), output.Scalar("xHII", 6), output.Scalar("xHeII", 7), 
 #			output.Scalar("xHeIII", 7) ],
-	"grav"  : [ output.Vector("g", [0, 1, 2]) ]
+		"grav"  : [ output.Vector("g", [0, 1, 2]) ],
 	} }
 
 from pymses.filters import RegionFilter
@@ -60,7 +61,7 @@ def load(path, ioutput, **kwargs):
 	return PymsesSnapshot(path, ioutput, **kwargs)
 
 class PymsesSnapshot(Snapshot.Snapshot):
-	def __init__(self, folder, simulation, ioutput):
+	def __init__(self, path, ioutput, **kwargs):
 		Snapshot.Snapshot.__init__(self, path, ioutput, "pymses", **kwargs)
 		'''
 		Load the snapshot using pymses.RamsesOutput
@@ -76,6 +77,9 @@ class PymsesSnapshot(Snapshot.Snapshot):
 		flatten - Return a numpy array containing all points.
 		cpu - Return only the domain belonging to this CPU.
 		If flatten == False and cpu=None, return an iterable
+
+		possible items
+		
 		'''
 		#Check if AMR field
 		#info = self.info()

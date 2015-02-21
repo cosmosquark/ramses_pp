@@ -49,12 +49,12 @@ class Halo():
 
 	def __init__(self, halo_id, halo_catalogue, *args):
 		self.properties = {}
-		self._halo_catalogue = halo_catalogue()
+		self._halo_catalogue = halo_catalogue
 		self._halo_id = halo_id
 		self._descriptor = "halo_" + str(halo_id)
 
 	def __getitem__(self, item):
-		snap = self._halo_catalogue._base()
+		snap = self._halo_catalogue._base
 		ds = snap.raw_snapshot()
 		unit = self._halo_catalogue.units[item]
 		#return np.array([{item:self.properties[item]}, {'unit':unit}])
@@ -736,7 +736,7 @@ class RockstarCatalogue(HaloCatalogue):
 		self._base = snap
 		offset = self.get_offset()
 		print 'offset=', offset
-		if not self._can_load(snap, offset):
+#		if not self._can_load(snap, offset):
 		if not self._can_load(snap):
 			raise Exception("Cannot locate/load rockstar catalogue")
 
