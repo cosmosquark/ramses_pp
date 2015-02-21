@@ -64,7 +64,7 @@ def dark_filter(pfilter,data):
 	return filter
 
 def young_star_filter(pfilter,data):
-        filter = np.logical_and(data["particle_age"] != 0, data["particle_total_time"] <= YTArray("100","Myr"))
+        filter = np.logical_and(data["particle_age"] != 0, data["particle_total_time"] <= YTArray("150","Myr"))
         return filter
 
 

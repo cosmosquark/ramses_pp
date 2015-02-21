@@ -325,6 +325,7 @@ class Snapshot():
 			return halos.RockstarCatalogue(self)
 
 		elif finder=="AHF":
+			# if halo = an id, then track back the halo over time
 			return halos.AHFCatalogue(self,halo=halo)
 
 		elif finder=="halomaker_simple":

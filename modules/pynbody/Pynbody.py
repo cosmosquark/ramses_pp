@@ -26,7 +26,7 @@ def load(folder, simulation=None, ioutput=None, **kwargs):
 
 
 class PynbodySnapshot(Snapshot.Snapshot):
-	def __init__(self, folder, simulation=None, ioutput=None, gas=False, **kwargs):
+	def __init__(self, folder, simulation=None, ioutput=None, gas=False, patch=None, **kwargs):
 		# gas is default to FALSE since pynbody does weird things with gas conversion to tipsy (pymses/yt is better for the gas data)
 		Snapshot.Snapshot.__init__(self, "Pynbody", **kwargs)
 		'''
@@ -36,6 +36,11 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		self._path = folder
 		self._ioutput = ioutput
 		self._simulation = simulation
+		if patch:
+			self.patch = patch
+
+		if patch=="ch":
+			pynbody.config['number_of_threads']
 		if ioutput is not None:
 			self._snapshot = pynbody.load('%s/output_%05d'%(folder, ioutput),force_gas=False)
 		else:
@@ -176,7 +181,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 
 		return lenunit, massunit, timeunit
 
-	def tipsy(self, convert=True, gas=False, rewrite=False):
+	def tipsy(self, convert=True, gas=True, rewrite=False):
 		# note RAMSES-CH does not handle very well with the pynbody conversion... tbh gas converted to particles is bad news anyway
 		#Grab the tipsy output for this snapshot, if it exists
 		print "if you are using RAMSES-CH, this will probably break, unless you set has_gas = False in RamsesSnap__init__ within pynbody"
@@ -252,7 +257,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 
 
 	def halos(self, LgridDomain=128, LgridMax=1073741824, VescTune=1.5, Dvir=200, nmin_per_halo = 50,
-		 MaxGatherRad=3.0, num_threads=16, run_ahf=False, rewrite_tipsy=False, gas=False, configloc = True):
+		 MaxGatherRad=3.0, num_threads=16, run_ahf=False, rewrite_tipsy=False, gas=True, configloc = True):
 		import glob
 		s = self.raw_snapshot()
 		isRamses = (type(s) == pynbody.ramses.RamsesSnap)
