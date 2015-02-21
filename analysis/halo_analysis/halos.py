@@ -1468,7 +1468,7 @@ def cutgz(x):
 
 ## old vcirc code
 
-#<<<<<<< HEAD
+#<
 #			rad = min_r + (i * inc) # linear
 #			halo_sphere, radius = self.get_sphere(r_fact=rad,radius=None,units=None)
 #			try:
