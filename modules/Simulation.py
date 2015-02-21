@@ -90,7 +90,7 @@ class Simulation():
 
 		self._name = name
 		self._path = path
-		self._boxsize = self.box_size() #100   #100 #in Mpc h^-1
+#		self._boxsize = self.box_size() #100   #100 #in Mpc h^-1
 
 		# load more data
 		json_dir = config.json_dir
@@ -112,7 +112,7 @@ class Simulation():
 				if data["_parent_domain"] != None:
 					self._parent_domain = data["_parent_domain"]
 		else:
-			self.box_size()
+#			self.box_size()
 			self.set_periodic(True)
 			self.save()
 	# add new methods based on "what modules (pymses, pynbody) are working

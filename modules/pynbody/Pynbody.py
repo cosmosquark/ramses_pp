@@ -167,7 +167,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		timeunit = np.sqrt(1/G_u * lenunit**3/massunit)
 		return lenunit, massunit, timeunit
 
-	def tipsy(self, convert=True, gas=False, rewrite=False):
+	def tipsy(self, convert=True, gas=True, rewrite=False):
 		# note RAMSES-CH does not handle very well with the pynbody conversion... tbh gas converted to particles is bad news anyway
 		#Grab the tipsy output for this snapshot, if it exists
 		print "if you are using RAMSES-CH, this will probably break, unless you set has_gas = False in RamsesSnap__init__ within pynbody"

@@ -147,7 +147,6 @@ class Halo():
 
 
 
-
 	def T_vir(self, mu=0.59):
 		'''
 		Compute the virial temperature of this halo
@@ -174,7 +173,7 @@ class Halo():
 		
 
 
-	def projection_plot(self, r_fact=1.0,radius=None,axis="x",units="kpc/h",quantity="density", stars=True, dark=True):
+	def projection_plot(self, r_fact=1.0,radius=None,axis="x",units="kpccm/h",quantity="density", stars=True, dark=True):
 		'''
 		YT only function, produce and save a gas projection plot of the Halo of interest
 		Rvir_fact = multiply Rvir or fixed_length by a factor of something
@@ -204,8 +203,11 @@ class Halo():
 			plt = yt.ProjectionPlot(halo_sphere.ds,axis,quantity,center=self["pos"].in_units(units), width=(radius.in_units('code_length').value*r_fact), axes_unit=units, data_source=region, weight_field='density' )
 		if stars:
 			print "adding star particles"
-			add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
-			halo_sphere.ds.add_particle_filter("stars")
+			try:
+				halo_sphere["stars","particle_index"]
+			except:
+				add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
+				halo_sphere.ds.add_particle_filter("stars")
 			plt.annotate_particles((radius,units),ptype="stars",p_size=10.0,col="m",marker="*")
 
 		sim_name = os.path.split(self._halo_catalogue._base().path())[1] 
@@ -214,7 +216,12 @@ class Halo():
 		if dark:
 #			add_particle_filter("dark", function=dark_filter, filtered_type="io", requires=["particle_age"])
 #			halo_sphere.ds.add_particle_filter("dark") will fix later
-			plt_dm = yt.ProjectionPlot(halo_sphere.ds,axis,("deposit","io_cic"),center=self["pos"].in_units(units), width=(radius.in_units('code_length').value*r_fact), axes_unit=units, data_source=region )
+			try:
+				halo_sphere["dark","particle_index"]
+			except:
+				add_particle_filter("stars", function=dark_filter, filtered_type="all", requires=["particle_age"])
+				halo_sphere.ds.add_particle_filter("dark")
+			plt_dm = yt.ProjectionPlot(halo_sphere.ds,axis,("deposit","io_dark"),center=self["pos"].in_units(units), width=(radius.in_units('code_length').value*r_fact), axes_unit=units, data_source=region )
 			plt_dm.save(("Halo_dm_" + str(self["id"].value) + "_" + str(sim_name) + "_" +  str(self._halo_catalogue._base().output_number() ) ))
 
 	def dbscan(self, eps=0.4, min_samples=20):
@@ -226,7 +233,7 @@ class Halo():
 		sphere, change  = self.get_sphere()
 
 		#Now, identify only star particles
-		stars = sphere.particles.source['particle_age'] != 0
+		stars = sphere['particle_age'] != 0
 		#Make sure there are some stars to analyze
 		if not True in stars:
 			raise Exception("No star particles found in sphere")
@@ -342,12 +349,17 @@ class Halo():
 			print i
 			Rvir_fact = 1.0 - (i * 0.2) # shrink virial radius by 0.2 upon each run.. center on the new CoM
 			try:
-				sphere = ds.sphere(center, (Rvir*Rvir_fact))
+				radius_thing = ds.arr((Rvir*Rvir_fact),Rvir.units)
+				print radius_thing
+				
+				sphere = ds.sphere(center, radius_thing)
 			except yt.utilities.exceptions.YTSphereTooSmall:
 				break
 #			stars = None # potentially fixes a bug in YT
-			stars_part = sphere.particles.source['particle_age'] != 0
-			dark_part = sphere.particles.source['particle_age'] == 0
+#			print sphere, "testttttt!!!!"
+#			print sphere['particle_age'].max(), "MAX AGE"
+			stars_part = sphere['particle_age'] != 0
+			dark_part = sphere['particle_age'] == 0
 			print "stars ", len(stars_part)
 #			center = sphere[stars].quantities.center_of_mass(use_gas = gas) ## find the CoM of the stars
 #			print center
@@ -405,9 +417,10 @@ class Halo():
 			
 
 		print "centre found at ", center, " with stars " + str(stars) + " dark " + str(dark) + " gas " + str(gas)
+		
 		return center
 
-	def galaxy_disk(self,n_disks=5,disk_h=(10,"kpc/h"),disk_w=(50,"kpc/h"),center=None,cylinder_w=None,cylinder_h=None):
+	def galaxy_disk(self,n_disks=5,disk_h=None,disk_w=None,center=None,cylinder_w=None,cylinder_h=None,normal=None):
 		# n_disks need to be odd... you have 1 disk.. or 1 disk sandwiched inbetween 2 others (n_disk=3) etc
 
 		snapshot = self._halo_catalogue._base()
@@ -415,14 +428,20 @@ class Halo():
 			raise NotImplementedError("sphere only implemented for YT")
 		ds = snapshot.raw_snapshot()
 
+		if disk_h == None:
+			disk_h = ds.arr(5,"kpccm")
+
+		if disk_w == None:
+			disk_w = ds.arr(50,"kpccm")
+
 		if center == None:
 			center = self.iterative_com(stars=True, dark=False, gas=True)
 		if n_disks % 2 == 0: # check for even number
 			print "n_disks must be odd"
 			return
 
-		disk_h = ds.arr(disk_h[0],disk_h[1])
-		print disk_h
+#		disk_h = ds.arr(disk_h[0],disk_h[1])
+#		print disk_h
 		# get angular momentum
 		if cylinder_w == None:
 			cylinder_w = self['Rvir']
@@ -430,25 +449,35 @@ class Halo():
 			cylinger_h = self["Rvir"]
 			
 		Rvir = self["Rvir"]
-		for i in range(0,10):
-			Rvir_fact = 1.0 - (i * 0.1) # shrink virial radius by 0.1 upon each run.. center on the new CoM
-			try:
-				sphere = ds.sphere(center, (Rvir*Rvir_fact))
-			except yt.utilities.exceptions.YTSphereTooSmall:
-				break
-			L = sphere.quantities.angular_momentum_vector(use_gas=True,use_particles=False)
-			print L
+		if normal == None:
+			for i in range(0,10):
+				Rvir_fact = 1.0 - (i * 0.1) # shrink virial radius by 0.1 upon each run.. center on the new CoM
+				try:
+					sphere = ds.sphere(center, (Rvir*Rvir_fact))
+				except yt.utilities.exceptions.YTSphereTooSmall:
+					break
+				# just filter for the cold gas if we want to get the disk
+				print len(sphere["temperature"]), "test 1!"
+				sphere_cool = sphere.cut_region(["obj['temperature'] < 1e5"])
+				print len(sphere_cool["temperature"]), "test 2"
+				L = sphere_cool.quantities.angular_momentum_vector(use_gas=True,use_particles=False)
+				print L
 		# simple galaxy disk for height and width work
-	
 
-		L_mag = np.sqrt(L[0].value**2 + L[1].value**2 + L[2].value**2)
-		print L_mag
-		L_norm = np.zeros(3)
-		L_norm[0] = L[0].value/L_mag
-		L_norm[1] = L[1].value/L_mag
-		L_norm[2] = L[2].value/L_mag
-		print L_norm
-
+			L_mag = np.sqrt(np.power(L[0],2.0) + np.power(L[1],2.0) + np.power(L[2],2.0))
+#			print L_mag
+			L_norm = np.zeros(3)
+			L_norm[0] = L[0].value/L_mag
+			L_norm[1] = L[1].value/L_mag
+			L_norm[2] = L[2].value/L_mag
+			print L_norm
+		else:
+			L = normal
+			L_mag = np.sqrt(np.power(L[0],2.0) + np.power(L[1],2.0) + np.power(L[2],2.0))
+			L_norm = np.zeros(3)
+			L_norm[0] = L[0]/L_mag
+			L_norm[1] = L[1]/L_mag
+			L_norm[2] = L[2]/L_mag
 		# bin of data disks
 
 		# how small can we get the height
@@ -457,14 +486,14 @@ class Halo():
 		stacks = (n_disks + 1)/2
 
 	#	print center[0].convert_to_units("kpc/h")
-		center = [center[0].convert_to_units("kpc/h"),center[1].convert_to_units("kpc/h"),center[2].convert_to_units("kpc/h")]
+#		center = [center[0].convert_to_units("kpccm/h"),center[1].convert_to_units("kpccm/h"),center[2].convert_to_units("kpccm/h")]
 
 		print center	
 		print disk_h	
 		for i in range(0,stacks):
 			if i == 0: # central region first
 				cent = center
-				h_bin = ds.arr(0, "kpc/h")
+				h_bin = ds.arr(0, "kpccm/h")
 				d_obj = ds.disk(center,L,disk_w,disk_h)
 				disks.insert(0,[h_bin,cent,d_obj])
 			else:
@@ -1435,3 +1464,64 @@ def cutgz(x):
 		return x[:-3]
 	else:
 		return x
+
+
+## old vcirc code
+
+#<
+#			rad = min_r + (i * inc) # linear
+#			halo_sphere, radius = self.get_sphere(r_fact=rad,radius=None,units=None)
+#			try:
+#				halo_sphere["stars","particle_index"]	
+#			except:
+#				add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
+#				halo_sphere.ds.add_particle_filter("stars")
+#			try:
+#				halo_sphere["dark","particle_index"]
+#			except:
+#				add_particle_filter("dark", function=dark_filter, filtered_type="all", requires=["particle_age"])
+#				halo_sphere.ds.add_particle_filter("dark")
+#
+#			dark_mass = halo_sphere["dark","particle_mass"].sum()
+#			# calculate mass
+#			if stars:
+#				try:
+#					halo_sphere["stars","particle_index"]	
+#				except:
+#					add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
+#					halo_sphere.ds.add_particle_filter("stars")
+##				star_mass = halo_sphere["stars","particle_mass"].sum()
+#			else:
+#				star_mass = 0
+##			if gas:
+#				gas_mass = halo_sphere["gas","cell_mass"].sum()
+#			else:
+#				gas_mass = 0
+#			total_mass = dark_mass + star_mass + gas_mass
+#			print dark_mass.in_units("Msun"), star_mass.in_units("Msun")	
+#			rad_units = rad * self["Rvir"]
+##			print i, rad_units.in_units("kpc"), dark_mass.in_units("Msun")
+##			r_vir[i+1] = rad_units.in_units("kpc").value
+#			V_circ_dm[i+1] = (np.sqrt(G * dark_mass / rad_units)).in_units("km/s").value
+##			print i, rad_units.in_units("kpc"), dark_mass.in_units("Msun"), V_circ_dm[i+1].in_units("km/s")
+##
+#			if stars:
+#				V_circ_stars[i+1] = np.sqrt(G * star_mass / rad_units).in_units("km/s").value
+#			if gas:
+##				V_circ_gas[i+1] = np.sqrt(G * gas_mass / rad_units).in_units("km/s").value
+#			V_circ_tot[i + 1] = np.sqrt(G * total_mass / rad_units).in_units("km/s").value
+##	
+#		# make the plot
+##	#	pp.rc('text', usetex=True)
+#		plt.rc('font', family='serif')
+#	#	pp.plot(r_vir,V_circ_dm,'ro')
+##		plt.plot(r_vir,V_circ_dm,'r--')
+#
+##	#	pp.plot(r_vir,V_circ_stars,'bo')
+#		plt.plot(r_vir,V_circ_stars,'b--')
+#	
+##	#	pp.plot(r_vir,V_circ_gas,'go')
+#		plt.plot(r_vir,V_circ_gas,'g--')
+##=======
+#
+####

@@ -219,7 +219,8 @@ class Snapshot():
 	def is_zoom(self):
 		'''
 		Determines if this is a zoom simulation or not:
-		A good proxy for a zoom run is the DM particle count, since the result of a cube root follow by a log of base 2 will *NOT* be an integer
+		A good proxy for a zoom run is the DM particle count, 
+		since the result of a cube root follow by a log of base 2 will *NOT* be an integer
 		'''
 
 		particles = self.particles()
@@ -403,6 +404,7 @@ class Snapshot():
 		if finder=='rockstar':
 			return halos.RockstarCatalogue(self)
 		elif finder=="AHF":
+			# if halo = an id, then track back the halo over time
 			return halos.AHFCatalogue(self,halo=halo)
 		elif finder=="halomaker_simple":
 			return halos.HaloMakerSimpleCatalogue(self)
