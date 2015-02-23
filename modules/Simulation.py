@@ -142,6 +142,15 @@ class Simulation():
 	def set_path(self, path):
 		self._path = path
 
+	def last_snap(self):
+		"""
+		returns the highest snapshot number
+		"""
+		filelist = glob.glob('%s/output_*'%self._path)
+		last_snap = int(filelist[-1].split("/")[-1].split("_")[1])
+		return last_snap
+
+
 	def box_size(self):
 		cmtokpc = 3.24077929e-22
 		kpctompc = 0.001
