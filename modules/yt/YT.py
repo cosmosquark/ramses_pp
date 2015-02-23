@@ -59,8 +59,8 @@ def dark_filter(pfilter,data):
 	return filter
 
 def young_star_filter(pfilter,data):
-        filter = np.logical_and(data["particle_age"] != 0, data["particle_birth_epoch"].in_units("Gyr") <= data["particle_birth_epoch"].in_units("Gyr") + data.ds.arr("200","Myr"))
-        return filter
+	filter = np.logical_and(data["particle_age"] != 0, data["particle_birth_epoch"].in_units("Gyr") <= data["particle_birth_epoch"].in_units("Gyr").min() + data.ds.arr("1000","Myr"))
+	return filter
 
 
 class YTSnapshot(Snapshot.Snapshot):

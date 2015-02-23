@@ -293,3 +293,46 @@ def plot_sfr(sphere, plot_name="selene", n_bins=50):
 		plt.close()
 
 	return time, sfr
+
+
+def flatten_line(x,y,extra_x=None,no_nan=True,append_max=True, double_zero = True):
+	"""
+	This will flatten a curve to 0.0 as of when needed.
+	It will also append an extra x value if needed.
+	in which the corresponding y value for this will be zero.
+	Mainly used to make plots look a bit more pretty
+	"""
+
+	if no_nan:
+		# this kills any curve from the first NaN, inf etc
+		idx = np.argmax(y, axis=None)
+		y[idx:] = 0.0
+	else:
+		idx = len(y) - 1
+
+	# lets set the next bin element to be zero
+	bin_width = (x[1] - x[0]) / 2.0
+	if append_max:
+		new_element = x.max() + bin_width
+		x = np.append(x,new_element)
+		y = np.append(y,0.0)
+
+	if extra_x != None:
+		x = np.append(x,extra_x)
+		y = np.append(y,0.0)
+
+	if double_zero == True:
+		# check if the first element is (0,0)
+		if x[0] != 0 and y[0] != 0:
+			x = np.insert(x,0,0.0)
+			y = np.insert(y,0,0.0)
+		# maybe the length of X is greater than Y.. 
+		# if so, then we already have the extra value in X, so just append Y
+		if x[0] == 0.0 and len(x) == len(y) + 1:
+			y = np.insert(y,0,0.0)
+
+
+		
+	return x, y
+	
+

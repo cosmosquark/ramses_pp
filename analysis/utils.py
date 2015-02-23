@@ -446,6 +446,14 @@ def gradient(x,y,col="r",facecolor="blue",label="Fit Line",filename="name",signi
 		plt.savefig(filename)
         return slope, intercept, r_value, p_value, std_err
 
+#def flatten_curve(x,y,extra_x=None):
+#	"""
+#	This will flatten a curve to 0.0 as of when needed.
+##	It will also append an extra x value if needed.
+#	in which the corresponding y value for this will be zero
+#	"""
+
+	
 
 
 
