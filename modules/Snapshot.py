@@ -401,6 +401,7 @@ class Snapshot():
 		Load a generic halo catalogue
 		'''
 		from ..analysis.halo_analysis import halos
+		print finder
 		if finder=='rockstar':
 			return halos.RockstarCatalogue(self)
 		elif finder=="AHF":

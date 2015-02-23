@@ -59,7 +59,7 @@ def dark_filter(pfilter,data):
 	return filter
 
 def young_star_filter(pfilter,data):
-        filter = np.logical_and(data["particle_age"] != 0, data["particle_age"] <= data.ds.arr("150","Myr"))
+        filter = np.logical_and(data["particle_age"] != 0, data["particle_birth_epoch"].in_units("Gyr") <= data["particle_birth_epoch"].in_units("Gyr") + data.ds.arr("200","Myr"))
         return filter
 
 
@@ -200,7 +200,7 @@ class YTSnapshot(Snapshot.Snapshot):
 		'''
 		return self._snapshot.all_data()
 
-	def halos(self, finder='rockstar', **kwargs):
+	def halos(self, finder=cfg.default_finder, **kwargs):
 		from ramses_pp.analysis.halo_analysis import halos
 		if finder=='rockstar':
 			return halos.RockstarCatalogue(self)

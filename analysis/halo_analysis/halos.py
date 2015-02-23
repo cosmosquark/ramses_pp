@@ -49,12 +49,12 @@ class Halo():
 
 	def __init__(self, halo_id, halo_catalogue, *args):
 		self.properties = {}
-		self._halo_catalogue = halo_catalogue()
+		self._halo_catalogue = halo_catalogue
 		self._halo_id = halo_id
 		self._descriptor = "halo_" + str(halo_id)
 
 	def __getitem__(self, item):
-		snap = self._halo_catalogue._base()
+		snap = self._halo_catalogue._base
 		ds = snap.raw_snapshot()
 		unit = self._halo_catalogue.units[item]
 		#return np.array([{item:self.properties[item]}, {'unit':unit}])
@@ -766,7 +766,6 @@ class RockstarCatalogue(HaloCatalogue):
 		offset = self.get_offset()
 		print 'offset=', offset
 		if not self._can_load(snap, offset):
-		if not self._can_load(snap):
 			raise Exception("Cannot locate/load rockstar catalogue")
 
 		self._base = weakref.ref(snap)
@@ -808,6 +807,18 @@ class RockstarCatalogue(HaloCatalogue):
 
 	def __str__(self):
 		return 'HaloCatalogue - Snapshot %s'%self._base()
+
+	def get_offset(self):
+		'''
+		Assume last .list file corresponds to the final snapshot
+		'''
+		snapshot = self._base
+		num_snapshots = snapshot.num_snapshots()
+
+		files = glob.glob('%s/%s/out_*.list'%(snapshot.path(), pp_cfg.rockstar_base))
+		print num_snapshots, len(files)
+		return num_snapshots - len(files) + 1
+
 
 	def make_grp(self):
 		'''
@@ -1081,6 +1092,7 @@ class AHFCatalogue(HaloCatalogue):
 			if len(glob.glob('%s*.AHF_particles'%tipsy_dir)) == 0:
 				print "AHF not run on this snapshot.. aborting"
 				raise Exception("AHF not run, run AHF plz")
+		
 			if halo == None:	
 				fname = glob.glob('%s*.AHF_halos'%tipsy_dir)[0]
 				self._halo = None
@@ -1212,7 +1224,7 @@ class AHFCatalogue(HaloCatalogue):
 		# sort by number of particles to make compatible with AHF
 		self._num_p_rank = np.flipud(self._haloprops[:]['num_p'].argsort(axis=0))
 
-		if self._halo == None:
+		if self._halo == None: # i.e not a tracker file
 			for h in xrange(self._nhalos): # self._nhalos + 1?
 				# AHF halos index start from 0... python start from 0.. lets be consitant :P
 				hn = np.where(self._num_p_rank==h)[0][0]
