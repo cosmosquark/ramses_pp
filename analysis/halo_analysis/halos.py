@@ -99,7 +99,7 @@ class Halo():
 	
 		centre = self['pos']
 		if radius != None and units != None:
-			radius = self._halo_catalogue._base().raw_snapshot().arr(radius, units) # user defined radius in the context of the simulation
+			radius = self._halo_catalogue._base.raw_snapshot().arr(radius, units) # user defined radius in the context of the simulation
 
 		else:   # shall we just use the virial radius of the Halo?
 			print "using halo virial radius"
@@ -132,7 +132,7 @@ class Halo():
 		"""
 		from ramses_pp.modules.utils import cosmo
 		import yt.utilities.physical_constants as C
-		snapshot = self._halo_catalogue._base()
+		snapshot = self._halo_catalogue._base
 		if not snap._type == "yt":
 			raise NotImplementedError("sphere only implemented for YT")
 
@@ -151,7 +151,7 @@ class Halo():
 		'''
 		Compute the virial temperature of this halo
 		'''
-		snapshot = self._halo_catalogue._base()
+		snapshot = self._halo_catalogue._base
 
 		if not snap._type == "yt":
 			raise NotImplementedError("sphere only implemented for YT")
@@ -185,7 +185,7 @@ class Halo():
 		if radius == None:
 			radius = self["Rvir"]
 		else:
-			ds = self._halo_catalogue._base().raw_snapshot()
+			ds = self._halo_catalogue._base.raw_snapshot()
 			radius = ds.arr(radius, units)
 		print radius
 		print radius.value
@@ -210,8 +210,8 @@ class Halo():
 				halo_sphere.ds.add_particle_filter("stars")
 			plt.annotate_particles((radius,units),ptype="stars",p_size=10.0,col="m",marker="*")
 
-		sim_name = os.path.split(self._halo_catalogue._base().path())[1] 
-		plt.save(("Halo_gas_" + str(self["id"].value) + "_" + str(sim_name) + "_" + str(self._halo_catalogue._base().output_number() ) ) )
+		sim_name = os.path.split(self._halo_catalogue._base.path())[1] 
+		plt.save(("Halo_gas_" + str(self["id"].value) + "_" + str(sim_name) + "_" + str(self._halo_catalogue._base.output_number() ) ) )
 
 		if dark:
 #			add_particle_filter("dark", function=dark_filter, filtered_type="io", requires=["particle_age"])
@@ -222,7 +222,7 @@ class Halo():
 				add_particle_filter("stars", function=dark_filter, filtered_type="all", requires=["particle_age"])
 				halo_sphere.ds.add_particle_filter("dark")
 			plt_dm = yt.ProjectionPlot(halo_sphere.ds,axis,("deposit","io_dark"),center=self["pos"].in_units(units), width=(radius.in_units('code_length').value*r_fact), axes_unit=units, data_source=region )
-			plt_dm.save(("Halo_dm_" + str(self["id"].value) + "_" + str(sim_name) + "_" +  str(self._halo_catalogue._base().output_number() ) ))
+			plt_dm.save(("Halo_dm_" + str(self["id"].value) + "_" + str(sim_name) + "_" +  str(self._halo_catalogue._base.output_number() ) ))
 
 	def dbscan(self, eps=0.4, min_samples=20):
 		'''
@@ -324,7 +324,7 @@ class Halo():
 
 		center = self['pos']
 		Rvir = self['Rvir']
-		snapshot = self._halo_catalogue._base()
+		snapshot = self._halo_catalogue._base
 		if not (str(type(snapshot)) == "<class 'ramses_pp.modules.yt.YT.YTSnapshot'>"):
 			raise NotImplementedError("sphere only implemented for YT")
 		ds = snapshot.raw_snapshot()
@@ -420,10 +420,10 @@ class Halo():
 		
 		return center
 
-	def galaxy_disk(self,n_disks=5,disk_h=None,disk_w=None,center=None,cylinder_w=None,cylinder_h=None,normal=None):
+	def galaxy_disk(self,n_disks=5,disk_h=None,disk_w=None,center=None,cylinder_w=None,cylinder_h=None,normal=None, bulk_vel = True):
 		# n_disks need to be odd... you have 1 disk.. or 1 disk sandwiched inbetween 2 others (n_disk=3) etc
 
-		snapshot = self._halo_catalogue._base()
+		snapshot = self._halo_catalogue._base
 		if not (str(type(snapshot)) == "<class 'ramses_pp.modules.yt.YT.YTSnapshot'>"):
 			raise NotImplementedError("sphere only implemented for YT")
 		ds = snapshot.raw_snapshot()
@@ -457,9 +457,7 @@ class Halo():
 				except yt.utilities.exceptions.YTSphereTooSmall:
 					break
 				# just filter for the cold gas if we want to get the disk
-				print len(sphere["temperature"]), "test 1!"
 				sphere_cool = sphere.cut_region(["obj['temperature'] < 1e5"])
-				print len(sphere_cool["temperature"]), "test 2"
 				L = sphere_cool.quantities.angular_momentum_vector(use_gas=True,use_particles=False)
 				print L
 		# simple galaxy disk for height and width work
@@ -490,11 +488,19 @@ class Halo():
 
 		print center	
 		print disk_h	
+
+		cylinder = ds.disk(center,L,cylinder_w,cylinder_h)
+		if bulk_vel:
+			bv = cylinder.quantities.bulk_velocity(use_gas=True, use_particles=True)
+			cylinder.set_field_parameter("bulk_velocity", bv)
+
 		for i in range(0,stacks):
 			if i == 0: # central region first
 				cent = center
 				h_bin = ds.arr(0, "kpccm/h")
 				d_obj = ds.disk(center,L,disk_w,disk_h)
+				if bulk_vel:
+					d_obj.set_field_parameter("bulk_velocity", bv)
 				disks.insert(0,[h_bin,cent,d_obj])
 			else:
 				cent_up = [center[0] + ((L_norm[0] * i * disk_h)), center[1] + ((L_norm[1]* i * disk_h)) , center[2] + ((L_norm[2] * i * disk_h))]
@@ -503,6 +509,9 @@ class Halo():
 				h_bin_down = i *(-disk_h)
 				d_obj_up = ds.disk(cent_up,L,disk_w,disk_h)
 				d_obj_down = ds.disk(cent_down,L,disk_w,disk_h)
+				if bulk_vel:
+					d_obj_up.set_field_parameter("bulk_velocity", bv)
+					d_obj_down.set_field_parameter("bulk_velocity", bv)
 				disks.insert(0,[h_bin_up,cent_up,d_obj_up])
 				disks.append([h_bin_down,cent_down,d_obj_down])
 
@@ -806,7 +815,7 @@ class RockstarCatalogue(HaloCatalogue):
 			self.make_grp()
 
 	def __str__(self):
-		return 'HaloCatalogue - Snapshot %s'%self._base()
+		return 'HaloCatalogue - Snapshot %s'%self._base
 
 	def get_offset(self):
 		'''
