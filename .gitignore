@@ -31,3 +31,6 @@ ahf_track_infile
 zfile
 ben
 ben/*
+
+config.py
+config_home.py

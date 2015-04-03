@@ -335,4 +335,25 @@ def flatten_line(x,y,extra_x=None,no_nan=True,append_max=True, double_zero = Tru
 		
 	return x, y
 	
+def plot_pdf(x, plotname, x_lab, y_lab="PDF", x_min=-1.0, x_max=1.5, nbins=100):
+	"""
+	This function plots the PDF of a distribution x
+	"""
 
+	# filter x between the min and max values
+
+	filter = np.logical_and(x >= x_min, x <= x_max)
+	x = x[filter]
+	weights = np.ones_like(x)/len(x)
+	plt.hist(ratio,bins=nbins,weights=weights, histtype="step")
+	hist, bins = np.histogram(ratio,bins=nbins,weights=weights)
+
+	from scipy.interpolate import UnivariateSpline
+	x_vals = bins[:-1] + ((bins[1] - bins[0]) / 2.0 )
+	f = UnivariateSpline(x_vals, hist, s=nbins)
+	plt.plot(x_vals,f(x_vals))
+	plt.xlabel(x_lab)
+	plt.ylabel(y_lab)
+	plt.axis([x_min, x_max,0.0,(max(hist) + (max(hist) * 0.1))])
+	plt.savefig(plotname)
+	plt.close()

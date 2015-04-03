@@ -335,8 +335,14 @@ def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_ma
 
 	if plot != None:
 
-		plt.hist(ratio,bins=300,normed=1, histtype="step")
-#		hist, bin_edges = np.histogram(ratio,bins=300,density=True)
+		weights = np.ones_like(ratio)/len(ratio)
+		plt.hist(ratio,bins=100,weights=weights, histtype="step")
+
+#		hist, bins = np.histogram(ratio, bins=100, density=True)
+#		widths = np.diff(bins)
+#		plt.bar(bins[:-1], hist, widths)
+		hist, bins = np.histogram(ratio,bins=100,weights=weights)
+#		plt.bar(bins[:-1],hist)
 #	
 #
 #		real_bins_temp = np.resize(bin_edges,len(bin_edges)-1)
@@ -347,11 +353,36 @@ def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_ma
 #			y[i] = hist[i].astype(float)
 #
 #		l = plt.plot(bins,y,"r",linewidth=1, marker="o")
+
+		from scipy.interpolate import UnivariateSpline
+		x_vals = bins[:-1] + ((bins[1] - bins[0]) / 2.0 )
+		f = UnivariateSpline(x_vals, hist, s=100)
+		plt.plot(x_vals,f(x_vals),"r-")
 		plt.xlabel('jz/jcirc')
 		plt.ylabel('Distribution')
-		plt.axis([-1.0, 1.5,0.0,1.5])
-		plt.savefig(plot + "jzjcirc_dist.png")
+		plt.axis([-1.0, 1.5,0.0,(max(hist) + (max(hist) * 0.1))])
+		plt.savefig(plot + "_jzjcirc_dist.png")
 		plt.close()
+
+		# attempt 2
+		#from scipy.stats import rv_continuous
+
+		
+
+	#	x_plot = np.linspace(-1.0,1.5,1000)
+#		fig = plt.figure()
+#		ax = fig.add_subplot(1,1,1)
+#		ax.hist(ratio, bins=100, normed=True)
+#		ax.plot(x_plot, rv_continuous.pdf(ratio), "r-", label="pdf")
+#		ax.legend(loc="best")
+#		
+#		plt.xlabel('jz/jcirc')
+##		plt.ylabel('Distribution')
+#		plt.axis([-1.0, 1.5,0.0,0.1])
+#		plt.savefig(plot + "_jzjcirc_dist2.png")
+#		plt.close()
+
+
 	
 #		hist, bin_edges = np.histogram(ratio,bins=300)
 #
