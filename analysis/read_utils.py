@@ -10,7 +10,12 @@ from yt.utilities.physical_constants import G
 import shelve
 from ramses_pp import config
 
+
 object_storage = config.yt_object_dir
+
+
+
+	
 
 def load_disk_data(snap, sim_name, sim_patch, halo_id = 0, snapno = None, n_disks=1, disk_h=None, disk_w=None, cylinder_w=None, cylinder_h=None,extra=None,overwrite=False,save=True, center = None, normal = None):
 	"""
@@ -72,3 +77,42 @@ def load_disk_data(snap, sim_name, sim_patch, halo_id = 0, snapno = None, n_disk
 #			disks.append(disk)
 		ds, cylinder = data_file[(str(halo_id) + "_cylinder")]
 		return cylinder, disks
+
+
+def lazy_load_galaxy(sim_name,sim_patch="normal",snap_no=None,halo_id=None,return_snap=True,return_halos=True,filter_stars=True,filter_dark=True,disk_h=10,disk_w=50,disk_units="kpccm"):
+	"""
+	reads in the simulation and returns the galaxy, halo_sphere the ytsnapshot and the snap object
+	since you find yourself doing this a lot, I figured it would make sense as a function in it'w own right
+	"""
+	sim = Simulation.load(sim_name)
+
+	# super lazy mode activated
+	if snap_no == None:
+		snap = sim.snapshot(sim.num_snapshots(),module="yt",patch=sim_patch)
+	else:
+		snap = sim.snapshot(snap_no,module="yt",patch=patch)
+	if halo_id == None:
+		halo_id = 0
+
+
+	ytsnap = snap.raw_snapshot()
+	halos = snap.halos()
+	galaxy_halo = halos[halo_id]
+	halo_sphere = ytsnap.sphere(galaxy_halo["pos"],galaxy_halo["Rvir"])
+	add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
+	halo_sphere.ds.add_particle_filter("stars")
+	add_particle_filter("dark", function=dark_filter, filtered_type="all", requires=["particle_age"])
+	halo_sphere.ds.add_particle_filter("dark")
+	disk_height = ytsnap.arr(disk_h,disk_units)
+	disk_width = ytsnap.arr(disk_w,disk_units)
+	
+	cylinder, disks = load_disk_data(snap, sim_name, sim_patch, halo_id = halo_id, snapno = None, n_disks=1, disk_h=disk_height, disk_w=disk_width, cylinder_w=disk_width, cylinder_h=disk_height,extra=None,overwrite=True,save=False, center = None, normal = None)
+
+
+	add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
+	cylinder.ds.add_particle_filter("stars")
+
+	add_particle_filter("dark", function=dark_filter, filtered_type="all", requires=["particle_age"])
+	cylinder.ds.add_particle_filter("dark")
+
+	return cylinder, halo_sphere, ytsnap, snap

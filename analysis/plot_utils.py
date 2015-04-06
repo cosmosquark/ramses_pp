@@ -13,7 +13,7 @@ from ramses_pp import config
 
 # ramses_pp modules
 
-from ramses_pp.analysis import read_utils, utils
+from ramses_pp.analysis import read_utils
 from ramses_pp.modules import Simulation
 
 
@@ -335,7 +335,7 @@ def flatten_line(x,y,extra_x=None,no_nan=True,append_max=True, double_zero = Tru
 		
 	return x, y
 	
-def plot_pdf(x, plotname, x_lab, y_lab="PDF", x_min=-1.0, x_max=1.5, nbins=100):
+def plot_pdf(x, plotname, x_lab, y_lab="PDF", x_min=-1.0, x_max=1.5, nbins=100, spline=False):
 	"""
 	This function plots the PDF of a distribution x
 	"""
@@ -345,15 +345,129 @@ def plot_pdf(x, plotname, x_lab, y_lab="PDF", x_min=-1.0, x_max=1.5, nbins=100):
 	filter = np.logical_and(x >= x_min, x <= x_max)
 	x = x[filter]
 	weights = np.ones_like(x)/len(x)
-	plt.hist(ratio,bins=nbins,weights=weights, histtype="step")
-	hist, bins = np.histogram(ratio,bins=nbins,weights=weights)
+	plt.hist(x,bins=nbins,weights=weights, histtype="step")
+	hist, bins = np.histogram(x,bins=nbins,weights=weights)
 
-	from scipy.interpolate import UnivariateSpline
-	x_vals = bins[:-1] + ((bins[1] - bins[0]) / 2.0 )
-	f = UnivariateSpline(x_vals, hist, s=nbins)
-	plt.plot(x_vals,f(x_vals))
+	if spline:
+		from scipy.interpolate import UnivariateSpline
+		x_vals = bins[:-1] + ((bins[1] - bins[0]) / 2.0 )
+		f = UnivariateSpline(x_vals, hist, s=nbins)
+		plt.plot(x_vals,f(x_vals))
 	plt.xlabel(x_lab)
 	plt.ylabel(y_lab)
 	plt.axis([x_min, x_max,0.0,(max(hist) + (max(hist) * 0.1))])
 	plt.savefig(plotname)
+	plt.close()
+
+
+def plot_standard_vcirc(sphere,snap,galaxy_name,r_min=None,r_max=None,dr_factor=2,vrot=True):
+	"""
+	Your bog standard Vcirc plot, with the option to append rotation velocities to the plot.
+	Requires stars, dark matter to be pre-filtered first
+	"""
+
+	from ramses_pp.analysis import utils, filter_utils
+
+	# 1) get radial values
+	r_indices, r_bins, r_filter, r_truths = utils.radial_indices('particle_position_spherical_radius',sphere,r_min=None,r_max=None,dr_factor=2)
+
+
+	ytsnap = snap.raw_snapshot()
+	n_bins = len(r_bins)
+	r_bins = ytsnap.arr(r_bins,"cmcm")
+	m_bins_all = utils.mass_enclosed_bins(sphere,snap,r_bins,shape="sphere",type="all")
+	m_bins_dark = utils.mass_enclosed_bins(sphere,snap,r_bins,shape="sphere",type="dark")
+	m_bins_star = utils.mass_enclosed_bins(sphere,snap,r_bins,shape="sphere",type="stars")
+	m_bins_gas = utils.mass_enclosed_bins(sphere,snap,r_bins,shape="sphere",type="gas")
+
+	vcirc_all = utils.vcirc(r_bins,m_bins_all,sphere)
+	vcirc_dark = utils.vcirc(r_bins,m_bins_dark,sphere)
+	vcirc_star = utils.vcirc(r_bins,m_bins_star,sphere)
+	vcirc_gas = utils.vcirc(r_bins,m_bins_gas,sphere)
+
+	plt.plot(r_bins.in_units("kpc"),vcirc_all.in_units("km/s"),label="vcirc all")
+	plt.plot(r_bins.in_units("kpc"),vcirc_dark.in_units("km/s"),label="vcirc dark")
+	plt.plot(r_bins.in_units("kpc"),vcirc_star.in_units("km/s"),label="vcirc stars")
+	plt.plot(r_bins.in_units("kpc"),vcirc_gas.in_units("km/s"),label="vcirc gas")
+
+	plt.xlabel("Radius [kpc]")
+	plt.ylabel("V")
+
+
+	if vrot:
+		print "doing stuff with vrot"
+		cold_sphere = sphere.cut_region(["obj['temperature'] < 1e4"])
+		
+		L = sphere.quantities.angular_momentum_vector(use_gas=True,use_particles=False)
+		bv = sphere.get_field_parameter("bulk_velocity")
+		L_mag = np.sqrt(np.power(L[0],2.0) + np.power(L[1],2.0) + np.power(L[2],2.0))
+		L_norm = np.zeros(3)
+		L_norm[0] = L[0].value/L_mag
+		L_norm[1] = L[1].value/L_mag
+		L_norm[2] = L[2].value/L_mag
+		
+		sphere.set_field_parameter("bulk_velocity",bv)
+		sphere.set_field_parameter("normal",sphere.ds.arr(L_norm,"code_length"))
+
+		cold_sphere.set_field_parameter("bulk_velocity",bv)
+		cold_sphere.set_field_parameter("normal",sphere.ds.arr(L_norm,"code_length"))
+		
+
+		add_particle_filter("young_stars", function=young_star_filter, filtered_type="all", requires=["particle_age"])
+		sphere.ds.add_particle_filter("young_stars")
+
+		min_z = sphere.ds.arr(-3.0,"kpc")
+		max_z = sphere.ds.arr(3.0,"kpc")
+
+		# cold gas
+		
+		print "filtering spatially"
+		spatial_filter_tot = filter_utils.min_max_filter(sphere,"particle_position_relative_z",min_z,max_z)
+		spatial_filter_dark = filter_utils.min_max_filter(sphere,('dark','particle_position_relative_z'),min_z,max_z)
+		spatial_filter_stars = filter_utils.min_max_filter(sphere,('stars','particle_position_relative_z'),min_z,max_z)
+		spatial_filter_young_stars = filter_utils.min_max_filter(sphere,('young_stars','particle_position_relative_z'),min_z,max_z)
+
+		r_tot = np.sqrt(np.power(sphere["particle_position_relative_x"][spatial_filter_tot],2) + np.power(sphere["particle_position_relative_y"][spatial_filter_tot],2))
+		r_stars = np.sqrt(np.power(sphere["stars","particle_position_relative_x"][spatial_filter_stars],2) +  np.power(sphere["stars","particle_position_relative_y"][spatial_filter_stars],2))
+		r_young_stars = np.sqrt(np.power(sphere["young_stars","particle_position_relative_x"][spatial_filter_young_stars],2) +  np.power(sphere["young_stars","particle_position_relative_y"][spatial_filter_young_stars],2))
+		r_dark = np.sqrt(np.power(sphere["dark","particle_position_relative_x"][spatial_filter_dark],2) + np.power(sphere["dark","particle_position_relative_y"][spatial_filter_dark],2))
+		
+		r_gas = sphere["cylindrical_r"]
+		r_cold_gas = cold_sphere["cylindrical_r"]
+
+		print "computing vrots"
+		vrot_tot = utils.manual_vrot(sphere,type="all",r_filter = spatial_filter_tot)
+		vrot_stars = utils.manual_vrot(sphere,type="stars",r_filter = spatial_filter_stars)
+		vrot_young_stars = utils.manual_vrot(sphere,type="young_stars",r_filter = spatial_filter_young_stars)
+		vrot_dark = utils.manual_vrot(sphere,type="dark",r_filter = spatial_filter_dark)
+		vrot_gas = yt.ProfilePlot(sphere,'cylindrical_r',["velocity_cylindrical_theta"],n_bins=n_bins,x_log=False,y_log={"velocity_cylindrical_theta":False})
+		vrot_gas = np.abs(vrot_gas.profiles[0]["velocity_cylindrical_theta"])
+		vrot_cold_gas = yt.ProfilePlot(cold_sphere,'cylindrical_r',["velocity_cylindrical_theta"],n_bins=n_bins,x_log=False,y_log={"velocity_cylindrical_theta":False})
+		vrot_cold_gas = np.abs(vrot_cold_gas.profiles[0]["velocity_cylindrical_theta"])
+
+		# bin the particle data
+		print "binning the data"
+		r_tot_binned, vrot_tot_binned = plot_manual_profile(r_tot,vrot_tot,units=["kpc","km/s"],filter=None,bins=30,abs=True,weight_profile="ones")
+		r_stars_binned, vrot_stars_binned = plot_manual_profile(r_stars,vrot_stars,units=["kpc","km/s"],filter=None,bins=30,abs=True,weight_profile="ones")
+		r_dark_binned, vrot_dark_binned = plot_manual_profile(r_dark,vrot_dark,units=["kpc","km/s"],filter=None,bins=30,abs=True,weight_profile="ones")
+		r_young_stars_binned, vrot_young_stars_binned = plot_manual_profile(r_young_stars,vrot_young_stars,units=["kpc","km/s"],filter=None,bins=30,abs=True,weight_profile="ones")
+
+		# make the plots look a little more pretty
+		r_gas, vrot_gas = flatten_line(r_gas.in_units("kpc").value,vrot_gas.in_units("km/s").value,no_nan=False,extra_x=r_bins.in_units("kpc").max())
+		# make the plots look a little more pretty
+		r_cold_gas, vrot_cold_gas = flatten_line(r_cold_gas.in_units("kpc").value,vrot_cold_gas.in_units("km/s").value,no_nan=False,extra_x=r_bins.in_units("kpc").max())
+		
+		r_stars_binned, vrot_stars_binned = flatten_line(r_stars_binned,vrot_stars_binned,no_nan=True,append_max=True,double_zero=True,extra_x = r_bins.in_units("kpc").max())
+		r_young_stars_binned, vrot_young_stars_binned = flatten_line(r_young_stars_binned,vrot_young_stars_binned,no_nan=True,append_max=True,double_zero=True,extra_x = r_bins.in_units("kpc").max())
+		
+		# finally do the plots
+		print "plotting the data"
+		plt.plot(r_dark,vrot_dark,label="vrot dark")
+		plt.plot(r_stars_binned,vrot_stars_binned,label="vrot stars")
+		plt.plot(r_young_stars_binned,vrot_young_stars_binned,label="vrot young stars")
+		plt.plot(r_gas, vrot_gas, label="vrot gas")
+		plt.plot(r_cold_gas, vrot_cold_gas, label="vrot cold gas")
+
+	plt.legend()
+	plt.savefig(("%s_rot_circ.png" % galaxy_name))
 	plt.close()

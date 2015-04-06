@@ -17,7 +17,7 @@ import numpy as np
 from matplotlib import pyplot as plt
 from yt.utilities.physical_constants import G
 import shelve
-from ramses_pp.analysis import read_utils, filter_utils
+from ramses_pp.analysis import read_utils, filter_utils, plot_utils
 import scipy as sp
 
 
@@ -49,11 +49,6 @@ def compute_star_met(object, ref=None):
 
 	return data
 	
-
-#def radial_indices_simple(field,data,r_min=None,r_max=None,n_bins):
-#	"
-#	"""
-
 def radial_indices(field,data,r_min=None,r_max=None,dr_factor=1):
 	"""
 	use this function to create radial bins of particles based on the smallest possible cell size
@@ -69,8 +64,6 @@ def radial_indices(field,data,r_min=None,r_max=None,dr_factor=1):
 	"""
 
 
-#	correction=data.ds.index.get_smallest_dx().in_units("code_length") * 0.1
-	# computes how many bins will be needed depending on the size of the object
 
 	if r_min == None:
 		if data[field].min() > data.ds.index.get_smallest_dx():
@@ -114,7 +107,6 @@ def radial_indices(field,data,r_min=None,r_max=None,dr_factor=1):
 	r_bins = data.ds.arr(np.zeros(int(r_indices.max() + 1)),"code_length")
 	for i in range(0,len(r_bins)):
 		r_bins[i] = ( (i * dr_factor) + 1) * r_min.in_units("code_length")
-#	r_bins[0] += correction
 	r_bins = r_bins.in_units("cmcm")
 	return r_indices, r_bins, r_filter, r_truths
 
@@ -136,10 +128,7 @@ def mass_enclosed_bins(object,snap,r_bins,shape="sphere",type="all"):
 	print r_bins
 	print r_bins[0].in_units("code_length")
 	for i in range(0,len(r_bins)):
-#		print snap.raw_snapshot().sphere(object.center,object.ds.arr(r_bins[i],"cmcm")), snap.current_redshift()
 		if type == "all":
-		#	print snap.raw_snapshot().sphere(object.center,object.ds.arr(r_bins[i],"cmcm")).quantities.total_quantity(["particle_mass"])
-#			print snap.raw_snapshot().sphere(object.center,object.ds.arr(r_bins[i],"cmcm")).quantities.total_quantity(["cell_mass"])
 			try:
 				m_bins[i] = snap.raw_snapshot().sphere(object.center,object.ds.arr(r_bins[i],"cmcm")).quantities.total_quantity(["particle_mass"]) + snap.raw_snapshot().sphere(object.center,object.ds.arr(r_bins[i],"cmcm")).quantities.total_quantity(["cell_mass"])
 			except:
@@ -155,14 +144,12 @@ def mass_enclosed_bins(object,snap,r_bins,shape="sphere",type="all"):
 				print i
 				print "fuckkkkk", temp['stars','particle_mass']
 				m_bins[i] = object.ds.arr(0.0,"g")
-#			m_bins[i] = snap.raw_snapshot().sphere(object.center,object.ds.arr(r_bins[i],"cmcm")).quantities.total_quantity([('stars','particle_mass')])
 		elif type == "dark":
 			try:
 				temp = snap.raw_snapshot().sphere(object.center,object.ds.arr(r_bins[i],"cmcm"))
 				m_bins[i] = temp['dark','particle_mass'].sum()
 			except:
 				m_bins[i] = object.ds.arr(0.0,"g")
-#			m_bins[i] = snap.raw_snapshot().sphere(object.center,object.ds.arr(r_bins[i],"cmcm")).quantities.total_quantity([('dark','particle_mass')])
 		else:
 			print "invalid type"
 			invalid = True
@@ -180,9 +167,6 @@ def vcirc(r_bins,m_bins,data):
 
 	vcirc = data.ds.arr(np.zeros(len(m_bins)))
 	vcirc = (np.sqrt(G * (m_bins) / r_bins))
-#	for i in range(0,len(m_bins)):
-#		vcirc[i] = (np.sqrt(G * m_bins[i] / r_bins[i]))
-#	print vcirc, "v"
 	return vcirc
 
 def jcirc_bins(r_bins,v_circ,m_bins,data):
@@ -197,8 +181,6 @@ def jcirc(data, r_indices,v_circ,r_filter,type="all"):
 	star_count = len(data['particle_age'] != 0)
 	j_circ = (data[type, "particle_position_spherical_radius"][r_filter] * (v_circ[r_indices].astype(int)))
 	# j_circ is of the length of data[field][filter]
-	print j_circ, "j"
-	#j_circ = data["stars", "particle_position_spherical_radius"]) * np.sqrt(G * m_bins[r_indices.astype(int)] / data["stars", "particle_position_spherical_radius"])
 	return j_circ
 
 
@@ -288,7 +270,7 @@ def manual_jz(data,type="all",r_filter = None):
 	return jz
 
 
-def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_max=None):
+def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_max=None,spline=False):
 	"""
 	At the moment, this technique can only filter for disk stars
 	This is computed by calculating the ratio of Jz/Jcirc
@@ -335,34 +317,17 @@ def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_ma
 
 	if plot != None:
 
-		weights = np.ones_like(ratio)/len(ratio)
-		plt.hist(ratio,bins=100,weights=weights, histtype="step")
-
-#		hist, bins = np.histogram(ratio, bins=100, density=True)
-#		widths = np.diff(bins)
-#		plt.bar(bins[:-1], hist, widths)
-		hist, bins = np.histogram(ratio,bins=100,weights=weights)
-#		plt.bar(bins[:-1],hist)
-#	
-#
-#		real_bins_temp = np.resize(bin_edges,len(bin_edges)-1)
-#		bins = real_bins_temp + 0.5 * np.diff(bin_edges)
-#		y = np.zeros(len(hist))
- #               inverse_density_function = sp.interpolate.interp1d(
-#		for i in range(0,len(y)):
-#			y[i] = hist[i].astype(float)
-#
-#		l = plt.plot(bins,y,"r",linewidth=1, marker="o")
-
-		from scipy.interpolate import UnivariateSpline
-		x_vals = bins[:-1] + ((bins[1] - bins[0]) / 2.0 )
-		f = UnivariateSpline(x_vals, hist, s=100)
-		plt.plot(x_vals,f(x_vals),"r-")
-		plt.xlabel('jz/jcirc')
-		plt.ylabel('Distribution')
-		plt.axis([-1.0, 1.5,0.0,(max(hist) + (max(hist) * 0.1))])
-		plt.savefig(plot + "_jzjcirc_dist.png")
-		plt.close()
+		plot_utils.plot_pdf(ratio,(plot + "_jzjcirc_dist.png"), "jz/jcirc","PDF",x_min=-1.0,x_max=1.5,nbins=100,spline=spline)
+#		weights = np.ones_like(ratio)/len(ratio)
+#		from scipy.interpolate import UnivariateSpline
+#		x_vals = bins[:-1] + ((bins[1] - bins[0]) / 2.0 )
+#		f = UnivariateSpline(x_vals, hist, s=100)
+#		plt.plot(x_vals,f(x_vals),"r-")
+#		plt.xlabel('jz/jcirc')
+#		plt.ylabel('Distribution')
+#		plt.axis([-1.0, 1.5,0.0,(max(hist) + (max(hist) * 0.1))])
+#		plt.savefig(plot + "_jzjcirc_dist.png")
+#		plt.close()
 
 		# attempt 2
 		#from scipy.stats import rv_continuous
@@ -476,15 +441,6 @@ def gradient(x,y,col="r",facecolor="blue",label="Fit Line",filename="name",signi
 	if filename:
 		plt.savefig(filename)
         return slope, intercept, r_value, p_value, std_err
-
-#def flatten_curve(x,y,extra_x=None):
-#	"""
-#	This will flatten a curve to 0.0 as of when needed.
-##	It will also append an extra x value if needed.
-#	in which the corresponding y value for this will be zero
-#	"""
-
-	
 
 
 
