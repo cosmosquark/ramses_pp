@@ -360,7 +360,7 @@ def plot_pdf(x, plotname, x_lab, y_lab="PDF", x_min=-1.0, x_max=1.5, nbins=100, 
 	plt.close()
 
 
-def plot_standard_vcirc(sphere,snap,galaxy_name,r_min=None,r_max=None,dr_factor=2,vrot=True):
+def plot_standard_vcirc(sphere,cylinder,snap,galaxy_name,r_min=None,r_max=None,dr_factor=2,vrot=True):
 	"""
 	Your bog standard Vcirc plot, with the option to append rotation velocities to the plot.
 	Requires stars, dark matter to be pre-filtered first
@@ -368,8 +368,15 @@ def plot_standard_vcirc(sphere,snap,galaxy_name,r_min=None,r_max=None,dr_factor=
 
 	from ramses_pp.analysis import utils, filter_utils
 
+	if r_max == None:
+		r_max = sphere["particle_positions_cylindrical_radius"].max().in_units("kpc")
+#		r_max = sphere.ds.arr(50,"kpc")
+
+	if r_min == None:
+		r_min = sphere.ds.arr(0,"kpc")
+
 	# 1) get radial values
-	r_indices, r_bins, r_filter, r_truths = utils.radial_indices('particle_position_spherical_radius',sphere,r_min=None,r_max=None,dr_factor=2)
+	r_indices, r_bins, r_filter, r_truths = utils.radial_indices('particle_position_spherical_radius',sphere,r_min=None,r_max=r_max,dr_factor=2)
 
 
 	ytsnap = snap.raw_snapshot()
@@ -395,54 +402,64 @@ def plot_standard_vcirc(sphere,snap,galaxy_name,r_min=None,r_max=None,dr_factor=
 
 
 	if vrot:
+		# THE DISK SHOULD ALREADY BE FILTERED SPATIALLY KINDA
 		print "doing stuff with vrot"
-		cold_sphere = sphere.cut_region(["obj['temperature'] < 1e4"])
+		min_z = sphere.ds.arr(-3.0,"kpc")
+		max_z = sphere.ds.arr(3.0,"kpc")
+	
+		cold_disk = cylinder.cut_region(["obj['temperature'] < 1e4"])
 		
-		L = sphere.quantities.angular_momentum_vector(use_gas=True,use_particles=False)
-		bv = sphere.get_field_parameter("bulk_velocity")
-		L_mag = np.sqrt(np.power(L[0],2.0) + np.power(L[1],2.0) + np.power(L[2],2.0))
-		L_norm = np.zeros(3)
-		L_norm[0] = L[0].value/L_mag
-		L_norm[1] = L[1].value/L_mag
-		L_norm[2] = L[2].value/L_mag
+#		L = sphere.quantities.angular_momentum_vector(use_gas=True,use_particles=False)
+#		bv = sphere.get_field_parameter("bulk_velocity")
+#		L_mag = np.sqrt(np.power(L[0],2.0) + np.power(L[1],2.0) + np.power(L[2],2.0))
+#		L_norm = np.zeros(3)
+#		L_norm[0] = L[0].value/L_mag
+#		L_norm[1] = L[1].value/L_mag
+#		L_norm[2] = L[2].value/L_mag
 		
-		sphere.set_field_parameter("bulk_velocity",bv)
-		sphere.set_field_parameter("normal",sphere.ds.arr(L_norm,"code_length"))
+#		sphere.set_field_parameter("bulk_velocity",bv)
+#		sphere.set_field_parameter("normal",sphere.ds.arr(L_norm,"code_length"))
 
-		cold_sphere.set_field_parameter("bulk_velocity",bv)
-		cold_sphere.set_field_parameter("normal",sphere.ds.arr(L_norm,"code_length"))
+#		cold_sphere.set_field_parameter("bulk_velocity",bv)
+#		cold_sphere.set_field_parameter("normal",sphere.ds.arr(L_norm,"code_length"))
 		
 
 		add_particle_filter("young_stars", function=young_star_filter, filtered_type="all", requires=["particle_age"])
 		sphere.ds.add_particle_filter("young_stars")
 
-		min_z = sphere.ds.arr(-3.0,"kpc")
-		max_z = sphere.ds.arr(3.0,"kpc")
 
 		# cold gas
 		
 		print "filtering spatially"
-		spatial_filter_tot = filter_utils.min_max_filter(sphere,"particle_position_relative_z",min_z,max_z)
-		spatial_filter_dark = filter_utils.min_max_filter(sphere,('dark','particle_position_relative_z'),min_z,max_z)
-		spatial_filter_stars = filter_utils.min_max_filter(sphere,('stars','particle_position_relative_z'),min_z,max_z)
-		spatial_filter_young_stars = filter_utils.min_max_filter(sphere,('young_stars','particle_position_relative_z'),min_z,max_z)
+		spatial_filter_tot = filter_utils.min_max_filter(cylinder,"particle_position_relative_z",min_z,max_z)
+		spatial_filter_dark = filter_utils.min_max_filter(cylinder,('dark','particle_position_relative_z'),min_z,max_z)
+		spatial_filter_stars = filter_utils.min_max_filter(cylinder,('stars','particle_position_relative_z'),min_z,max_z)
+		spatial_filter_young_stars = filter_utils.min_max_filter(cylinder,('young_stars','particle_position_relative_z'),min_z,max_z)
 
-		r_tot = np.sqrt(np.power(sphere["particle_position_relative_x"][spatial_filter_tot],2) + np.power(sphere["particle_position_relative_y"][spatial_filter_tot],2))
-		r_stars = np.sqrt(np.power(sphere["stars","particle_position_relative_x"][spatial_filter_stars],2) +  np.power(sphere["stars","particle_position_relative_y"][spatial_filter_stars],2))
-		r_young_stars = np.sqrt(np.power(sphere["young_stars","particle_position_relative_x"][spatial_filter_young_stars],2) +  np.power(sphere["young_stars","particle_position_relative_y"][spatial_filter_young_stars],2))
-		r_dark = np.sqrt(np.power(sphere["dark","particle_position_relative_x"][spatial_filter_dark],2) + np.power(sphere["dark","particle_position_relative_y"][spatial_filter_dark],2))
+		r_tot = np.sqrt(np.power(cylinder["particle_position_relative_x"][spatial_filter_tot],2) + np.power(cylinder["particle_position_relative_y"][spatial_filter_tot],2))
+		r_stars = np.sqrt(np.power(cylinder["stars","particle_position_relative_x"][spatial_filter_stars],2) +  np.power(cylinder["stars","particle_position_relative_y"][spatial_filter_stars],2))
+		r_young_stars = np.sqrt(np.power(cylinder["young_stars","particle_position_relative_x"][spatial_filter_young_stars],2) +  np.power(cylinder["young_stars","particle_position_relative_y"][spatial_filter_young_stars],2))
+		r_dark = np.sqrt(np.power(cylinder["dark","particle_position_relative_x"][spatial_filter_dark],2) + np.power(cylinder["dark","particle_position_relative_y"][spatial_filter_dark],2))
 		
-		r_gas = sphere["cylindrical_r"]
-		r_cold_gas = cold_sphere["cylindrical_r"]
+#		r_gas = sphere["cylindrical_r"]
+#		r_cold_gas = cold_sphere["cylindrical_r"]
 
 		print "computing vrots"
-		vrot_tot = utils.manual_vrot(sphere,type="all",r_filter = spatial_filter_tot)
-		vrot_stars = utils.manual_vrot(sphere,type="stars",r_filter = spatial_filter_stars)
-		vrot_young_stars = utils.manual_vrot(sphere,type="young_stars",r_filter = spatial_filter_young_stars)
-		vrot_dark = utils.manual_vrot(sphere,type="dark",r_filter = spatial_filter_dark)
-		vrot_gas = yt.ProfilePlot(sphere,'cylindrical_r',["velocity_cylindrical_theta"],n_bins=n_bins,x_log=False,y_log={"velocity_cylindrical_theta":False})
-		vrot_gas = np.abs(vrot_gas.profiles[0]["velocity_cylindrical_theta"])
-		vrot_cold_gas = yt.ProfilePlot(cold_sphere,'cylindrical_r',["velocity_cylindrical_theta"],n_bins=n_bins,x_log=False,y_log={"velocity_cylindrical_theta":False})
+		vrot_tot = utils.manual_vrot(cylinder,type="all",r_filter = spatial_filter_tot)
+		vrot_stars = utils.manual_vrot(cylinder,type="stars",r_filter = spatial_filter_stars)
+		vrot_young_stars = utils.manual_vrot(cylinder,type="young_stars",r_filter = spatial_filter_young_stars)
+		vrot_dark = utils.manual_vrot(cylinder,type="dark",r_filter = spatial_filter_dark)
+
+
+		# this is not filtering in height yet
+
+		vrot_gas = yt.ProfilePlot(cylinder,'cylindrical_r',["velocity_cylindrical_theta"],n_bins=n_bins,x_log=False,y_log={"velocity_cylindrical_theta":False})
+		r_gas = vrot_gas.profiles[0].x
+		vrot_gas = np.abs(vrot_gas.profiles[0]["velocity_cylindrical_theta"]) # this overwrites the yt plot object
+
+
+		vrot_cold_gas = yt.ProfilePlot(cold_disk,'cylindrical_r',["velocity_cylindrical_theta"],n_bins=n_bins,x_log=False,y_log={"velocity_cylindrical_theta":False})
+		r_cold_gas = vrot_cold_gas.profiles[0].x
 		vrot_cold_gas = np.abs(vrot_cold_gas.profiles[0]["velocity_cylindrical_theta"])
 
 		# bin the particle data
@@ -462,7 +479,7 @@ def plot_standard_vcirc(sphere,snap,galaxy_name,r_min=None,r_max=None,dr_factor=
 		
 		# finally do the plots
 		print "plotting the data"
-		plt.plot(r_dark,vrot_dark,label="vrot dark")
+#		plt.plot(r_dark,vrot_dark,label="vrot dark")
 		plt.plot(r_stars_binned,vrot_stars_binned,label="vrot stars")
 		plt.plot(r_young_stars_binned,vrot_young_stars_binned,label="vrot young stars")
 		plt.plot(r_gas, vrot_gas, label="vrot gas")
