@@ -17,6 +17,11 @@ from ramses_pp.analysis import read_utils
 from ramses_pp.modules import Simulation
 
 
+plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+## for Palatino and other serif fonts use:
+#rc('font',**{'family':'serif','serif':['Palatino']})
+plt.rc('text', usetex=True)
+
 """
 this code simply takes an input x/y/z field, andd plots things
 """
@@ -334,10 +339,30 @@ def flatten_line(x,y,extra_x=None,no_nan=True,append_max=True, double_zero = Tru
 
 		
 	return x, y
+
+def kill_first_nan(x,y):
+	"""
+	This will delete array values from and beyond the first NaN found
+	"""
+
+	# TODO have this cancel the loop and just delete from the minimum value found
+	# instead of looping over each individual element.
+	delete = False
+	for i in range(0,len(x)):
+		if delete == True:
+			np.delete(x,i)
+			np.delete(y,i)
+
+		if x[i] == np.nan:
+			np.delete(x,i)
+			np.delete(y,i)
+			delete = True
+			
+	return x, y
 	
 def plot_pdf(x, plotname, x_lab, y_lab="PDF", x_min=-1.0, x_max=1.5, nbins=100, spline=False):
 	"""
-	This function plots the PDF of a distribution x
+	This function plots the PDF of a distribution x, usually for Jz/Jcirc cuts
 	"""
 
 	# filter x between the min and max values
@@ -398,7 +423,7 @@ def plot_standard_vcirc(sphere,cylinder,snap,galaxy_name,r_min=None,r_max=None,d
 	plt.plot(r_bins.in_units("kpc"),vcirc_gas.in_units("km/s"),label="vcirc gas")
 
 	plt.xlabel("Radius [kpc]")
-	plt.ylabel("V")
+	plt.ylabel("V [km/s]")
 
 
 	if vrot:
@@ -488,3 +513,42 @@ def plot_standard_vcirc(sphere,cylinder,snap,galaxy_name,r_min=None,r_max=None,d
 	plt.legend()
 	plt.savefig(("%s_rot_circ.png" % galaxy_name))
 	plt.close()
+
+def plot_xy(x,y,x_lab,y_lab,filename,type="line",x_min=None,x_max=None,y_min=None,y_max=None,label=None,y_err=None):
+	"""
+	Use this function to plot x vs y super lazily
+	"""
+
+	#TODO make it so this function accepts a list of x and y 
+	#TODO get min and max working nicely
+	
+
+	if type == "line":
+		plt.plot(x,y)
+	elif type == "bar":
+		plt.bar(x,y)
+	elif type == "step":
+		plt.step(x,y,where="mid")
+
+	plt.xlabel(x_lab)
+	plt.ylabel(y_lab)
+
+	if y_err != None:
+		plt.errorbar(x,y,yerr=y_err)
+
+	if x_min != None and x_max != None:
+		plt.xlim([x_min,x_max])
+
+	if y_min != None and y_max != None:
+		plt.ylim([y_min,y_max]) 
+
+	print filename
+	plt.savefig(("%s.png" % filename))
+	plt.close()
+	
+
+
+	return
+
+
+

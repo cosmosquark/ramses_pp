@@ -436,12 +436,180 @@ def gradient(x,y,col="r",facecolor="blue",label="Fit Line",filename="name",signi
 
                 # finally plot
 
+
 		plt.fill_between(x_sorted, yl, yu, alpha=0.3, facecolor='blue',edgecolor='none')
 
 	if filename:
 		plt.savefig(filename)
         return slope, intercept, r_value, p_value, std_err
 
+
+def sig_uvw(cylinder,galaxy_name,snap,solar=True,disk=True,cold=True):
+	"""
+	Calculates the sigma_uvw for the galaxy and distributes it by age
+	"""
+
+	# gas is really simple
+	
+	print "###################"
+	print "sig_U, sig_V, sig_W"
+	if cold == True:
+		cold_cylinder = cylinder.cut_region(["obj['temperature'] < 1.5e4"])
+		u = cold_cylinder["velocity_cylindrical_radius"]
+		v = cold_cylinder["velocity_cylindrical_theta"]
+		w = cold_cylinder["velocity_cylindrical_z"]
+
+		sig_u = np.std(u.in_units("km/s").value)
+		sig_v = np.std(v.in_units("km/s").value)
+		sig_w = np.std(w.in_units("km/s").value)
+
+		print "cold gas sigma"
+		print sig_u, sig_v, sig_w
+
+	print "stars"
+
+	# gather all the indices
+	filter = np.arange(0,len(cylinder["stars","particle_velocity_cylindrical_radius"]))
+	plot_name = galaxy_name + "_uvw"
+
+	if disk == True:
+		disk_star_indices, disk_star, ratio, filter = decomp_stars(cylinder,snap,disk_min=0.7, disk_max=1.1,plot=None,r_min=cylinder.ds.arr(2.0,"kpccm"))
+		plot_name = plot_name + "_disk"
+
+	if solar == True:
+
+		r_min = cylinder.ds.arr(6.0,"kpc")
+		r_max = cylinder.ds.arr(10.0,"kpc")
+		z_min = cylinder.ds.arr(-3.0,"kpc")
+		z_max = cylinder.ds.arr(3.0,"kpc")
+
+		print filter, len(filter)
+
+		theta_min = cylinder.ds.arr(0.0,"dimensionless")
+		theta_max = cylinder.ds.arr(np.radians(359.90),"dimensionless")	
+
+		new_filter = filter_utils.triple_filter_function(cylinder,filter_r="particle_position_cylindrical_radius",filter_z="particle_position_cylindrical_z",
+		filter_theta="particle_position_cylindrical_theta",r_min = r_min, r_max = r_max, z_min = z_min, z_max = z_max,
+		theta_min = theta_min, theta_max = theta_max, type="stars",extra_filter = filter )
+		
+		if disk == True:
+			filter = new_filter
+		else:
+			filter = np.where(new_filter == 1)[0]
+
+		print filter, len(filter)
+		plot_name = plot_name + "_solar"
+
+	# just consider all the stars
+	u = cylinder["stars","particle_velocity_cylindrical_radius"][filter]
+	v = cylinder["stars","particle_velocity_cylindrical_theta"][filter]
+	w = cylinder["stars","particle_velocity_cylindrical_z"][filter]
+
+	sig_u = np.std(u.in_units("km/s").value)
+	sig_v = np.std(v.in_units("km/s").value)
+	sig_w = np.std(w.in_units("km/s").value)
+
+	print sig_u, sig_v, sig_w
+
+		# sort out the age distribution
+	age = -cylinder["stars","particle_birth_epoch"][filter].in_units("Gyr").value
+		# histogram ages
+
+	bin_things = np.linspace(0.0,14.5,30)
+	hist, bin_edges = np.histogram(age,bins=bin_things) # gets the distribution
+	inds = np.digitize(age, bins=bin_edges) # put the ages into the right bins
+	inds = inds - 1.0
+
+	bin_edges = np.delete(bin_edges,len(bin_edges)-1) # deletes the last bin edge elemtn
+
+	# really now we want to shift the bin edges up by the bin width (0.25) for it to be symetric around the bin widths.
+
+	sig_u_age = np.zeros(29)
+	sig_v_age = np.zeros(29)
+	sig_w_age = np.zeros(29)
+
+	for i in range(0,len(sig_u_age)):
+		ages_inds = np.where(inds == i) # find the index locations of stars of this gage
+		sig_u_age[i] = np.std(u[ages_inds[0]].in_units("km/s").value)
+		sig_v_age[i] = np.std(v[ages_inds[0]].in_units("km/s").value)
+		sig_w_age[i] = np.std(w[ages_inds[0]].in_units("km/s").value)
+
+
+
+#	temp_age = age
+	sig_age_temp = sig_u_age
+	age_bins, sig_u_age = plot_utils.kill_first_nan(bin_edges,sig_u_age)
+	age_bins, sig_v_age = plot_utils.kill_first_nan(bin_edges,sig_v_age)
+	age_bins, sig_w_age = plot_utils.kill_first_nan(bin_edges,sig_w_age)
+
+
+#	freq_hist, dud = plot_utils.kill_first_nan(hist, sig_age_temp)
+	freq_hist = hist
+
+	# errors
+
+	sig_u_age_err = sig_u_age / np.sqrt(freq_hist)
+	sig_v_age_err = sig_v_age / np.sqrt(freq_hist)
+	sig_w_age_err = sig_w_age / np.sqrt(freq_hist)
+
+
+	# so inds[id] will return the hist bin for that star.. essentially giving you a filtered distribution
+	# and any filter numpy things can filter by value
+
+#	for i in range(0, len(bin_edges)):
+	
+
+	# TODO Latex this part
+
+	plot_utils.plot_xy(age_bins,sig_u_age,"Age [Gyr]",r'$\sigma_{U}$ [km/s]',(plot_name + "_u"),type="line",x_min=0.0,x_max=12.5,y_err = sig_u_age_err)
+	plot_utils.plot_xy(age_bins,sig_v_age,"Age [Gyr]",r'$\sigma_{V}$ [km/s]',(plot_name + "_v"),type="line", x_min=0.0,x_max=12.5,y_err = sig_v_age_err)
+	plot_utils.plot_xy(age_bins,sig_w_age,"Age [Gyr]",r'$\sigma_{W}$ [km/s]',(plot_name + "_w"),type="line", x_min=0.0,x_max=12.5,y_err = sig_w_age_err)
+	
+
+	vel_dispersion = np.sqrt(np.power(sig_u_age,2) + np.power(sig_v_age,2) + np.power(sig_w_age,2))
+
+	# power errors
+	# http://www.rit.edu/cos/uphysics/uncertainties/Uncertaintiespart2.html
+	u_err_power = (sig_u_age_err * sig_u_age * 2.0) 
+	v_err_power = (sig_v_age_err * sig_v_age * 2.0)
+	w_err_power = (sig_w_age_err * sig_w_age * 2.0)
+
+	uvw_err_sq = np.sqrt(np.power(sig_u_age_err,2) + np.power(sig_v_age_err,2) + np.power(sig_w_age,2))
+	vel_disp_err = (uvw_err_sq * (0.5)) / vel_dispersion
+
+	# add the errors
+
+	
+
+
+
+
+	vel_disp_err = vel_dispersion / np.sqrt(freq_hist)
+
+	plot_utils.plot_xy(age_bins,vel_dispersion,"Age [Gyr]","Velocity Dispersion [km/s]",(plot_name + "_vel_disp"),type="line", x_min=0.0,x_max=12.5,y_err = vel_disp_err)
+	
+	
+	return	
+
+		
+
+
+def mstar_mhalo(sphere):
+	"""
+	Returns the result of the mass ratio of the DM to the stellar matter and the corresponding x value
+	"""
+	dm_mass = sphere["dark","particle_mass"].sum().in_units("Msun")
+	stellar_mass = sphere["stars","particle_mass"].sum().in_units("Msun")
+
+	mass_ratio = stellar_mass / dm_mass
+	mass_log = np.log10(mass_ratio)
+
+	print mass_ratio, "mass_ratio"
+	print mass_log, "mass_log"
+	print np.log10(dm_mass.value), "dm mass log"
+
+	x = np.log10(dm_mass.value)
+	return x, mass_log
 
 
 if __name__ == "__main__":
