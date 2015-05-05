@@ -306,7 +306,7 @@ class YTSnapshot(Snapshot.Snapshot):
 
 
 	#Return the HOP halo catalogue. Can override run_hop to force re-running
-	def halos(self, finder=config.default_finder, run_finder=False):
+	def halos(self, finder=cfg.default_finder, run_finder=False):
 		ds = self._snapshot
 		from ...analysis.halo_analysis import halos
 		#Check if HOP file exists (note we will adopt a naming convention here)

@@ -15,7 +15,7 @@ pynbody_loaded = config.pynbody_enabled
 yt_loaded = config.yt_enabled
 import numpy as np
 import json, os, glob, uuid
-
+import re
 
 def load(name):
 	'''
@@ -38,7 +38,17 @@ def init(name,path=None):
 		path = os.getcwd()
 	return create(name, path)
 
-def create(name, path):
+def new(name,rename=None):
+        '''
+        Create a simulation from the Simulation Directory
+        '''
+        path = config.simulation_dir + '/' + name
+        if rename != None:
+                name = rename # if you wish to call your simulation in the database by a different name
+        return create(name, path)
+
+
+def create(name,path):
 	'''
 	Create a Simulation object and write it to disk
 	'''
@@ -236,8 +246,20 @@ class Simulation():
 			raise Exception("No simulation with the name: %s"%name)
 			return
 
-	def num_snapshots(self):
-		return len(glob.glob('%s/output_*'%self._path))
+	def num_snapshots(self, count=False):
+		"""
+		This is commonly used as a way to grab the last available snapshot
+		If the number of directories is less than the maximum number of snapshots
+		It will simply grab the last snapshot
+		Which is what a lot of routines are commonly doing
+		"""
+		snapshot_number = len(glob.glob('%s/output_*'%self._path))
+		if count == False:
+			# lets instead find the ioutput with the maximum value
+			output_numbers = self.output_numbers()
+			snapshot_number = max(output_numbers)
+		
+		return snapshot_number
 
 	def iterable(self, module=config.default_module, min_i=1, max_i=None):
 		'''
@@ -315,15 +337,6 @@ class Simulation():
 			print 'pynbody loaded: ', pynbody_loaded
 			raise Exception("Unknown module: %s or not loaded"%module)
 
-	def merger_tree(self, finder='rockstar'):
-		'''
-		Load a generic merger tree - default to rockstar if not overridden
-		'''
-		from ..analysis.halo_analysis import trees
-		if finder == 'rockstar':
-			return trees.RockstarMergerTree(self)
-		else:
-			raise Exception("Unimplemented finder: %s"%finder)
 
 	def merger_tree(self, finder=config.default_finder):
 		'''
@@ -416,6 +429,18 @@ class Simulation():
  		outputs.sort(key=string_utils.natural_keys)
  		return outputs
 
+	def output_numbers(self):
+		"""
+		Return a list of output numbers in integers
+		"""
+
+		outputs = self.ordered_outputs()
+		split_outputs = []
+		for i in range(0,len(outputs)):
+			split_outputs.append(int(outputs[i].split("/")[-1].split("_")[1]))
+		print split_outputs
+		return split_outputs
+
 
 	def pos_to_codepos(self,val):
 		''' simple dirty code to convert a position in Mpc/h into code units'''
@@ -482,7 +507,7 @@ class Simulation():
 		'''
 		List all snapshots with some basic info
 		'''
-		num = self.num_snapshots()
+		num = self.num_snapshots(count=True)
 
 		print "## Output        aexp           z        unit_l        unit_d        unit_t"
 		for ioutput in range(1, num+1):

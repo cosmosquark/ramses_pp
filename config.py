@@ -13,23 +13,24 @@ quick_import = True
 
 default_module = 'yt'
 
-ramses_f90_dir='/gpfs/home/bthompson1/ramses_pp/ramses_pp/ramses_f90'
-json_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/data'
-simulation_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/simulations'
-applications_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/applications'
-ramses_pp_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/'
-vide_catalogue_root = '/starpulse/pool/cosmic/bthompson/voids'
-root_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/'
-yt_object_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/data'
-
-#ramses_f90_dir='/home/ben/python/ramses_pp/ramses_pp/ramses_f90'
-#json_dir = '/home/ben/python/ramses_pp/ramses_pp/data'
-#simulation_dir = '/home/ben/python/ramses_pp/ramses_pp/simulations'
-#applications_dir = '/home/ben/python/ramses_pp/ramses_pp/applications'
-#ramses_pp_dir = '/home/ben/python/ramses_pp/ramses_pp/'
+#ramses_f90_dir='/gpfs/home/bthompson1/ramses_pp/ramses_pp/ramses_f90'
+#json_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/data'
+#simulation_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/simulations'
+#applications_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/applications'
+#ramses_pp_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/'
 #vide_catalogue_root = '/starpulse/pool/cosmic/bthompson/voids'
-#root_dir = '/home/ben/python/ramses_pp/ramses_pp/'
-#yt_object_dir = '/home/ben/python/ramses_pp/ramses_pp/daa'
+#root_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/'
+#yt_object_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/data'
+
+ramses_f90_dir='/home/ben/phd/ramses_pp/ramses_pp/ramses_f90'
+json_dir = '/home/ben/phd/ramses_pp/ramses_pp/data'
+simulation_dir = '/home/ben/phd/ramses_pp/ramses_pp/simulations'
+applications_dir = '/home/ben/phd/ramses_pp/ramses_pp/applications'
+ramses_pp_dir = '/home/ben/phd/ramses_pp/ramses_pp/'
+vide_catalogue_root = '/starpulse/pool/cosmic/bthompson/voids'
+root_dir = '/home/ben/phd/ramses_pp/ramses_pp/'
+yt_object_dir = '/home/ben/phd/ramses_pp/ramses_pp/data'
+
 
 
 
