@@ -3,7 +3,8 @@ import sys
 import numpy as np
 import matplotlib.pyplot as plt
 
-def mass_function(snap, finder, boxsize, ax):
+
+def mass_function(snap,finder,boxsize,ax):
 	halos = snap.halos(finder=finder)
 	print 'Got %d halos'%len(halos)
 	print 'boxsize= ', boxsize
@@ -12,29 +13,30 @@ def mass_function(snap, finder, boxsize, ax):
 
 if __name__ == "__main__":
 
-	kern='REEDU'
+	kern="REEDU"
+	if kern == "REEDU":
+		kernlabel = "Reed et al 2007"
 
 	sim = Simulation.load(sys.argv[1])
-	snap = sim.snapshot(sim.redshift(float(sys.argv[2])), module='yt')
+	snap = sim.snapshot(sim.redshift(float(sys.argv[2])), module='yt') # input redshift
 	ds = snap.raw_snapshot()
 	snap_pynbody = sim.snapshot(sim.num_snapshots(), module='pynbody')
 	M, sigma, N = snap_pynbody.analytical_mass_function(kern=kern)
 
 	boxsize = ds.arr(ds.parameters['unit_l'], 'cm').in_units('Mpccm/h')
-	#print 'boxsize= ', boxsize
+#	print 'boxsize= ', boxsize
 
 	#Plot the mass function	
 	fig = plt.figure(1)
 	ax = fig.add_subplot(111)
-	#ax.semilogy(np.log10(M*(ds.parameters['H0']/100)),N,label="Reed et al 2007")
-	ax.semilogy(np.log10(M*(ds.parameters['H0']/100)), N, label=kern)
-	mass_function(snap, 'rockstar', boxsize, ax)
+
+	#ax.semilogy(np.log10(M),N,label="Reed et al 2007")
+	ax.semilogy(np.log10(M*(ds.parameters['H0']/100)), N, label=kernlabel)
 	mass_function(snap, 'AHF', boxsize, ax)
+	mass_function(snap, 'halomaker_simple', boxsize, ax)
 	
 	plt.xlabel(r'log$_{10}$(M) [M$_{\odot}$/h]')
 	plt.ylabel('dN / dlog$_{10}$(M) [Mpc$^{-3}$ h$^{3}$]')
 	plt.legend(loc='lower left')
 	plt.title(sys.argv[1])
-	#plt.xlim(6, 12)
-	#plt.ylim(1e-2, 1e3)
 	fig.savefig('hmf_test_' + str(sys.argv[1]) + "_" + str(sys.argv[2]) + '_.png')

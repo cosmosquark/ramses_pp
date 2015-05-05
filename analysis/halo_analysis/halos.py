@@ -19,11 +19,21 @@ import weakref, copy
 import re, uuid
 from ramses_pp import config as pp_cfg
 import abc
+
+from yt.data_objects.particle_filters import add_particle_filter
+from ...modules.yt.YT import star_filter, dark_filter
+from yt.utilities.physical_constants import G
+
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MultipleLocator, FormatStrFormatter
+
+
 #from yt.units.yt_array import YTArray
 #import logging
 
 #Should adopt this throughout
 #logger = logging.getLogger('ramses_pp.halo')
+
 
 class DummyHalo(object):
 
@@ -44,7 +54,7 @@ class Halo():
 		self._descriptor = "halo_" + str(halo_id)
 
 	def __getitem__(self, item):
-		snap = self._halo_catalogue._base()
+		snap = self._halo_catalogue._base
 		ds = snap.raw_snapshot()
 		unit = self._halo_catalogue.units[item]
 		#return np.array([{item:self.properties[item]}, {'unit':unit}])
@@ -62,27 +72,108 @@ class Halo():
 
 		return self._halo_catalogue.is_subhalo(self._halo_id, otherhalo._halo_id)
 
-	def get_sphere(self, Rvir_fact=1.0):
+
+	def get_bounding_box(self, units='code_length'):
 		'''
-		YT only function. Currently, there is a bug with ds.sphere which ignores / h units.
-		So for the time being this function will take care of that
+		Return the min/max of the bounding box containing this halo
 		'''
+		pos = self['pos'].in_units(units).v
+		r = self['Rvir'].in_units(units).v
+		box = [[pos[0]-r, pos[1]-r, pos[2]-r],\
+				[pos[0]+r, pos[1]+r, pos[2]+r]]
+		return box
+
+
+	def get_sphere(self, r_fact=1.0,radius=None,units=None):
+		'''
+		YT only function. Return a sphere centred on this halo (self)
+		snapshot - Pass a snapshot with a different type to get a sphere for this dataset
+
+		- r_fact: return a sphere a factor of r_fact * Rvir
+		- radius: overrides r_fact and allows you to return a sphere of any size
+		- units: define the units of your radius.. Default = None (or code length)
+		'''
+		if (radius == None and units != None) or (radius != None and units == None):
+			print "Either radius or units are None.. both need to be filled in"
+			return None
+	
 		centre = self['pos']
-		Rvir = self['Rvir']
-		snapshot = self._halo_catalogue._base()
-		if not (str(type(snapshot)) == "<class 'ramses_pp.modules.yt.YT.YTSnapshot'>"):
+		if radius != None and units != None:
+			radius = self._halo_catalogue._base.raw_snapshot().arr(radius, units) # user defined radius in the context of the simulation
+
+		else:   # shall we just use the virial radius of the Halo?
+			print "using halo virial radius"
+			radius = self['Rvir']
+
+		snap = self._halo_catalogue._base
+
+		if snap._type == "yt":
+			ds = snap.raw_snapshot()
+		else:
 			raise NotImplementedError("sphere only implemented for YT")
+
+		try:
+			sphere = ds.sphere(centre, (radius* r_fact))
+			return sphere, None
+		except yt.utilities.exceptions.YTSphereTooSmall:  # well yeah, we want the smallest possible dx in radius really
+			print "sphere too small, correcting to smallest dx (although this might be too small in some respects for what you may or may not care about... who am I kidding, have a YT sphere"
+			if units != None:
+				radius = ds.index.get_smallest_dx().in_units(units)
+			else:
+				radius = ds.index.get_smallest_dx().in_units("code_length")
+			print "radius is now ", radius
+			sphere = ds.sphere(centre, radius)
+			return sphere, radius
+			
+
+	def Rvir_theory(self):
+		"""
+		Compute the expected virial radius from theory
+		"""
+		from ramses_pp.modules.utils import cosmo
+		import yt.utilities.physical_constants as C
+		snapshot = self._halo_catalogue._base
+		if not snap._type == "yt":
+			raise NotImplementedError("sphere only implemented for YT")
+
 		ds = snapshot.raw_snapshot()
-	#	print Rvir
+		H0 = ds.arr(cosmology['h']*100, 'km/s/Mpc').in_units('1/s')
+		z = snapshot.current_redshift()
+		omega_m0 = cosmology['omega_m_0']
 
-#		if(centre.uq == YTArray(1.0, 'Mpc/h') or (Rvir.uq == YTArray(1.0, 'kpc/h'))):
-#			if super_verbose:
-#				print "Warning: YT ds.sphere() but does not recognise /h units. Correcting, but double check!"
-#			return ds.sphere(centre/ds.hubble_constant, Rvir/ds.hubble_constant)
+		rho_c = ds.arr((3 * H0**2) / (8 * np.pi * C.G) * (1. + z)**3, 'kg/m**3')
+		del_c_z = cosmo.del_c(z, omega_m0)
+		return ((3 * self['Mvir'].in_units('kg'))/ (4 * np.pi * del_c_z * rho_c))**(1./3.)
 
-		return ds.sphere(centre, (Rvir* Rvir_fact))
 
-	def projection_plot(self, Rvir_fact=1.0,fixed_length=None,stars=False,axis="x",units="kpc/h",quantity="density"):
+
+	def T_vir(self, mu=0.59):
+		'''
+		Compute the virial temperature of this halo
+		'''
+		snapshot = self._halo_catalogue._base
+
+		if not snap._type == "yt":
+			raise NotImplementedError("sphere only implemented for YT")
+
+		from ramses_pp.modules.utils import cosmo
+		import yt.utilities.physical_constants as C
+		ds = snapshot.raw_snapshot()
+		z = snapshot.current_redshift()
+		cosmology = snapshot.cosmology()
+		omega_m0 = cosmology['omega_m_0']
+		h = cosmology['h']
+		H0 = ds.arr(100*h, 'km/s/Mpc')
+		G = C.G.in_mks()
+		mp = C.mp.in_mks()
+		kb = C.kb.in_mks()
+		M = self['Mvir'].in_units('kg')
+		del_c_z = cosmo.del_c(z, omega_m0)
+		return 0.5*((mu * mp)/kb) * ((del_c_z * omega_m0)/2.)**(1./3.) * (1. + z) * (G * M * H0.in_units('1/s'))**(2./3.)
+		
+
+
+	def projection_plot(self, r_fact=1.0,radius=None,axis="x",units="kpccm/h",quantity="density", stars=True, dark=True):
 		'''
 		YT only function, produce and save a gas projection plot of the Halo of interest
 		Rvir_fact = multiply Rvir or fixed_length by a factor of something
@@ -91,13 +182,51 @@ class Halo():
 		units = projection axis units
 		quantity = whatever you feel like plotting
 		'''
-		halo_sphere = self.get_sphere(Rvir_fact=Rvir_fact)
-		if fixed_length == None:
-			fixed_length = self["Rvir"]
-		region = halo_sphere.ds.region(center=self["pos"],left_edge=[(i.in_units('code_length').value - (self["Rvir"].in_units('code_length').value * Rvir_fact ) ) for i in self["pos"] ], right_edge=[(i.in_units('code_length').value + (self["Rvir"].in_units('code_length').value * Rvir_fact ) ) for i in self["pos"] ])
-		
-		plt = yt.ProjectionPlot(halo_sphere.ds,axis,quantity,center=self["pos"].in_units(units), width=(fixed_length.in_units('code_length').value*Rvir_fact), axes_unit=units, data_source=region )
-		plt.save(("Halo_" + str(self["id"].value)) )
+		if radius == None:
+			radius = self["Rvir"]
+		else:
+			ds = self._halo_catalogue._base.raw_snapshot()
+			radius = ds.arr(radius, units)
+		print radius
+		print radius.value
+		halo_sphere, radius_check  = self.get_sphere(radius=radius.value,units=units)
+
+		if radius_check != None:
+			radius = radius_check
+
+
+		region = halo_sphere.ds.region(center=self["pos"],left_edge=[(i.in_units('code_length').value - (radius.in_units('code_length').value * r_fact ) ) for i in self["pos"] ], right_edge=[(i.in_units('code_length').value + (radius.in_units('code_length').value * r_fact ) ) for i in self["pos"] ])
+		if quantity=="density":
+			plt = yt.ProjectionPlot(halo_sphere.ds,axis,quantity,center=self["pos"].in_units(units), width=(radius.in_units('code_length').value*r_fact), axes_unit=units, data_source=region )
+		else:
+			print quantity, " is being plotted"
+			plt = yt.ProjectionPlot(halo_sphere.ds,axis,quantity,center=self["pos"].in_units(units), width=(radius.in_units('code_length').value*r_fact), axes_unit=units, data_source=region, weight_field='density' )
+		if stars:
+			print "adding star particles"
+			try:
+				halo_sphere["stars","particle_index"]
+			except:
+				add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
+				halo_sphere.ds.add_particle_filter("stars")
+			plt.annotate_particles((radius,units),ptype="stars",p_size=10.0,col="m",marker="*")
+
+		sim_name = os.path.split(self._halo_catalogue._base.path())[1] 
+		plt.save(("Halo_gas_" + str(self["id"].value) + "_" + str(sim_name) + "_" + str(self._halo_catalogue._base.output_number() ) ) )
+
+		if dark:
+#			add_particle_filter("dark", function=dark_filter, filtered_type="io", requires=["particle_age"])
+#			halo_sphere.ds.add_particle_filter("dark") will fix later
+			try:
+				halo_sphere["dark","particle_index"]
+			except:
+				add_particle_filter("stars", function=dark_filter, filtered_type="all", requires=["particle_age"])
+				halo_sphere.ds.add_particle_filter("dark")
+			plt_dm = yt.ProjectionPlot(halo_sphere.ds,axis,("deposit","io_dark"),center=self["pos"].in_units(units), width=(radius.in_units('code_length').value*r_fact), axes_unit=units, data_source=region )
+			plt_dm.save(("Halo_dm_" + str(self["id"].value) + "_" + str(sim_name) + "_" +  str(self._halo_catalogue._base.output_number() ) ))
+
+
+	def galaxy_projection_plot():
+		return None
 
 	def dbscan(self, eps=0.4, min_samples=20):
 		'''
@@ -105,10 +234,10 @@ class Halo():
 		eps defines the linking length to use, min_samples defines the minimum number of stars to define a galaxyTODO - normalise positions AND eps by the virial radius of the halo
 		'''
 		#First, we will need a sphere
-		sphere = self.get_sphere()
+		sphere, change  = self.get_sphere()
 
 		#Now, identify only star particles
-		stars = sphere.particles.source['particle_age'] != 0
+		stars = sphere['particle_age'] != 0
 		#Make sure there are some stars to analyze
 		if not True in stars:
 			raise Exception("No star particles found in sphere")
@@ -122,10 +251,17 @@ class Halo():
 						sphere['particle_position_y'][stars].value, \
 						sphere['particle_position_z'][stars].value, \
 						sphere['particle_index'][stars].value
+		print x, y, z
+		# lets have a sensible cut off .. no point running dbscan if there are < 5 stars
+		if len(x) < 5:
+			raise Exception("too few star particles found within the region (need >= 5 stars)")
 
 		#Normalise these based on the virial radius
 		pos = self['pos'].convert_to_units('code_length').value
-		Rvir = self['Rvir'].convert_to_units('code_length').value
+		if change == None:
+			Rvir = self['Rvir'].convert_to_units('code_length').value
+		else:
+			Rvir = change.convert_to_units('code_length').value
 
 		min_x, max_x = pos[0] - Rvir, pos[0] + Rvir
 		min_y, max_y = pos[1] - Rvir, pos[1] + Rvir
@@ -134,15 +270,11 @@ class Halo():
 		x_norm = (x - min_x)/(max_x - min_x)
 		y_norm = (y - min_y)/(max_y - min_y)
 		z_norm = (z - min_z)/(max_z - min_z)
-		#x_norm = x
-		#y_norm = y
-		#z_norm = z
 
-		print min(x_norm), max(x_norm)
-		print min(y_norm), max(y_norm)
-		print min(z_norm), max(z_norm)
 
 		X = np.dstack([x_norm, y_norm, z_norm])[0]
+		print "X:"
+		print X
 		if super_verbose:
 			print 'Got positions'
 			t1 = time.time()
@@ -196,7 +328,7 @@ class Halo():
 
 		center = self['pos']
 		Rvir = self['Rvir']
-		snapshot = self._halo_catalogue._base()
+		snapshot = self._halo_catalogue._base
 		if not (str(type(snapshot)) == "<class 'ramses_pp.modules.yt.YT.YTSnapshot'>"):
 			raise NotImplementedError("sphere only implemented for YT")
 		ds = snapshot.raw_snapshot()
@@ -221,12 +353,17 @@ class Halo():
 			print i
 			Rvir_fact = 1.0 - (i * 0.2) # shrink virial radius by 0.2 upon each run.. center on the new CoM
 			try:
-				sphere = ds.sphere(center, (Rvir*Rvir_fact))
+				radius_thing = ds.arr((Rvir*Rvir_fact),Rvir.units)
+				print radius_thing
+				
+				sphere = ds.sphere(center, radius_thing)
 			except yt.utilities.exceptions.YTSphereTooSmall:
 				break
 #			stars = None # potentially fixes a bug in YT
-			stars_part = sphere.particles.source['particle_age'] != 0
-			dark_part = sphere.particles.source['particle_age'] == 0
+#			print sphere, "testttttt!!!!"
+#			print sphere['particle_age'].max(), "MAX AGE"
+			stars_part = sphere['particle_age'] != 0
+			dark_part = sphere['particle_age'] == 0
 			print "stars ", len(stars_part)
 #			center = sphere[stars].quantities.center_of_mass(use_gas = gas) ## find the CoM of the stars
 #			print center
@@ -281,52 +418,68 @@ class Halo():
 			# case 7 All COM
 			else:
 				center = sphere.quantities.center_of_mass(use_gas=True, use_particles=True)
-
-			print center
 			
 
 		print "centre found at ", center, " with stars " + str(stars) + " dark " + str(dark) + " gas " + str(gas)
+		
 		return center
 
-	def galaxy_disk(self,n_disks=5,disk_h=(10,"kpc/h"),disk_w=(50,"kpc/h"),center=None):
+	def galaxy_disk(self,n_disks=5,disk_h=None,disk_w=None,center=None,cylinder_w=None,cylinder_h=None,normal=None, bulk_vel = True):
 		# n_disks need to be odd... you have 1 disk.. or 1 disk sandwiched inbetween 2 others (n_disk=3) etc
+
+		snapshot = self._halo_catalogue._base
+		if not (str(type(snapshot)) == "<class 'ramses_pp.modules.yt.YT.YTSnapshot'>"):
+			raise NotImplementedError("sphere only implemented for YT")
+		ds = snapshot.raw_snapshot()
+
+		if disk_h == None:
+			disk_h = ds.arr(5,"kpccm")
+
+		if disk_w == None:
+			disk_w = ds.arr(50,"kpccm")
+
 		if center == None:
 			center = self.iterative_com(stars=True, dark=False, gas=True)
 		if n_disks % 2 == 0: # check for even number
 			print "n_disks must be odd"
 			return
 
-		from yt.units.yt_array import YTArray
-
-		print disk_h[0], disk_h[1]
-		disk_h = YTArray(disk_h[0],disk_h[1])
-		print disk_h
+#		disk_h = ds.arr(disk_h[0],disk_h[1])
+#		print disk_h
 		# get angular momentum
-		Rvir = self['Rvir']
-		snapshot = self._halo_catalogue._base()
-		if not (str(type(snapshot)) == "<class 'ramses_pp.modules.yt.YT.YTSnapshot'>"):
-			raise NotImplementedError("sphere only implemented for YT")
-		ds = snapshot.raw_snapshot()
-
-		for i in range(0,10):
-			Rvir_fact = 1.0 - (i * 0.1) # shrink virial radius by 0.1 upon each run.. center on the new CoM
-			try:
-				sphere = ds.sphere(center, (Rvir*Rvir_fact))
-			except yt.utilities.exceptions.YTSphereTooSmall:
-				break
-			L = sphere.quantities.angular_momentum_vector(use_gas=True,use_particles=False)
-			print L
+		if cylinder_w == None:
+			cylinder_w = self['Rvir']
+		if cylinder_h == None:
+			cylinger_h = self["Rvir"]
+			
+		Rvir = self["Rvir"]
+		if normal == None:
+			for i in range(0,10):
+				Rvir_fact = 1.0 - (i * 0.1) # shrink virial radius by 0.1 upon each run.. center on the new CoM
+				try:
+					sphere = ds.sphere(center, (Rvir*Rvir_fact))
+				except yt.utilities.exceptions.YTSphereTooSmall:
+					break
+				# just filter for the cold gas if we want to get the disk
+				sphere_cool = sphere.cut_region(["obj['temperature'] < 1e4"])
+				L = sphere_cool.quantities.angular_momentum_vector(use_gas=True,use_particles=False)
+				print L
 		# simple galaxy disk for height and width work
-	
 
-		L_mag = np.sqrt(L[0].value**2 + L[1].value**2 + L[2].value**2)
-		print L_mag
-		L_norm = np.zeros(3)
-		L_norm[0] = L[0].value/L_mag
-		L_norm[1] = L[1].value/L_mag
-		L_norm[2] = L[2].value/L_mag
-		print L_norm
-
+			L_mag = np.sqrt(np.power(L[0],2.0) + np.power(L[1],2.0) + np.power(L[2],2.0))
+#			print L_mag
+			L_norm = np.zeros(3)
+			L_norm[0] = L[0].value/L_mag
+			L_norm[1] = L[1].value/L_mag
+			L_norm[2] = L[2].value/L_mag
+			print L_norm
+		else:
+			L = normal
+			L_mag = np.sqrt(np.power(L[0],2.0) + np.power(L[1],2.0) + np.power(L[2],2.0))
+			L_norm = np.zeros(3)
+			L_norm[0] = L[0]/L_mag
+			L_norm[1] = L[1]/L_mag
+			L_norm[2] = L[2]/L_mag
 		# bin of data disks
 
 		# how small can we get the height
@@ -335,35 +488,40 @@ class Halo():
 		stacks = (n_disks + 1)/2
 
 	#	print center[0].convert_to_units("kpc/h")
-		center = [center[0].convert_to_units("kpc/h"),center[1].convert_to_units("kpc/h"),center[2].convert_to_units("kpc/h")]
+#		center = [center[0].convert_to_units("kpccm/h"),center[1].convert_to_units("kpccm/h"),center[2].convert_to_units("kpccm/h")]
 
 		print center	
 		print disk_h	
+
+		cylinder = ds.disk(center,L,cylinder_w,cylinder_h)
+		if bulk_vel:
+			bv = cylinder.quantities.bulk_velocity(use_gas=True, use_particles=True)
+			cylinder.set_field_parameter("bulk_velocity", bv)
+
 		for i in range(0,stacks):
 			if i == 0: # central region first
 				cent = center
-				h_bin = YTArray(0,"kpc/h")
-				d_obj = ds.disk(center,L,Rvir,disk_h)
+				h_bin = ds.arr(0, "kpccm/h")
+				d_obj = ds.disk(center,L,disk_w,disk_h)
+				if bulk_vel:
+					d_obj.set_field_parameter("bulk_velocity", bv)
 				disks.insert(0,[h_bin,cent,d_obj])
 			else:
 				cent_up = [center[0] + ((L_norm[0] * i * disk_h)), center[1] + ((L_norm[1]* i * disk_h)) , center[2] + ((L_norm[2] * i * disk_h))]
 				cent_down = [center[0] - ((L_norm[0] * i * disk_h)), center[1] - ((L_norm[1]* i * disk_h)) , center[2] - ((L_norm[2] * i * disk_h))]
 				h_bin_up = i * disk_h
 				h_bin_down = i *(-disk_h)
-				d_obj_up = ds.disk(cent_up,L,Rvir,disk_h)
-				d_obj_down = ds.disk(cent_down,L,Rvir,disk_h)
+				d_obj_up = ds.disk(cent_up,L,disk_w,disk_h)
+				d_obj_down = ds.disk(cent_down,L,disk_w,disk_h)
+				if bulk_vel:
+					d_obj_up.set_field_parameter("bulk_velocity", bv)
+					d_obj_down.set_field_parameter("bulk_velocity", bv)
 				disks.insert(0,[h_bin_up,cent_up,d_obj_up])
 				disks.append([h_bin_down,cent_down,d_obj_down])
 
 		print disks
-		cylinder = ds.disk(center,L,disk_w,Rvir)
+		cylinder = ds.disk(center,L,cylinder_w,cylinder_h)
 		return disks, cylinder
-
-		
-		
-		
-
-
 
 	def stellar_center(self):
 		print "not functioning yet, will do something with dbscan results"
@@ -374,7 +532,7 @@ class HaloCatalogue(object):
 	Generic halo catalogue bases on pynbody, but with non-essential functionality
 	stripped out
 	'''
-	def __init__(self,finder,path,ioutput):
+	def __init__(self, finder, path, ioutput):
 		self._halos = {}
 		self._finder = finder
 		self._simpath = path
@@ -458,6 +616,77 @@ class HaloCatalogue(object):
 		
 		return mbinmps, mhist, mbinsize
 
+	def dbscan(self, eps=0.4, min_samples=20):
+		'''
+		DBSCAN halo catalogue to identify clusters
+		'''
+		#Get the positions in code units
+		if super_verbose:
+			import time
+			t0 = time.time()
+			print 'Loading positions...'
+		pos = np.array([h['pos'].in_units('code_length') for h in self])
+		ind = np.array([h['id'] for h in self])
+
+		if super_verbose:
+			print 'Got positions'
+			t1 = time.time()
+			print 'Took %f s'%(t1 - t0)
+
+		#We have the data to run dbscan
+		from scipy.spatial import distance
+		#from sklearn.preprocessing import StandardScaler
+		from sklearn.cluster import DBSCAN
+		#from sklearn import metrics
+		# Compute similarities
+		if super_verbose:
+			print 'Computing similarities'
+			t0 = time.time()
+		D = distance.squareform(distance.pdist(pos))
+		S = np.max(D) - D
+		#print pos
+		#print S
+		if super_verbose:
+			print 'Got similarities'
+			t1 = time.time()
+			print 'Took %f s'%(t1 - t0)
+
+		if super_verbose:
+			print 'Starting DBSCAN'
+			t0 = time.time()
+		#db = DBSCAN(eps=eps, min_samples=min_samples).fit(pos)
+		db = DBSCAN(eps=eps * np.max(D), min_samples=10).fit(S)
+		if super_verbose:
+			print 'Finished DBSCAN'
+			t1 = time.time()
+			print 'Took %f s'%(t1 - t0)
+		del(D)
+		del(S)
+		#core_samples = db.core_sample_indices_
+		labels = db.labels_
+
+		# add the particle indices to the origional array
+		Y = np.insert(pos,3,ind,axis=1)
+
+		# Number of clusters in labels, ignoring noise if present.
+		n_clusters_ = len(set(labels)) - (1 if -1 in labels else 0)
+		print 'Found %d groups'%(n_clusters_)
+		return db, Y
+
+
+	def dump(self, fname):
+		'''
+		Dump positions and mass for splotting
+		'''
+		with open(fname, 'w') as f:
+			for i in range(len(self)):
+				halo = self[i]
+				pos = halo['pos'].in_units('Mpccm/h')
+				f.write('%f  %f  %f  %e'%(pos[0], pos[1], pos[2], halo['Mvir'].in_units('Msun')))
+				if i < len(self): f.write('\n')
+
+
+
 	def vide_input(self,halo_min_masses = ["none"], finder=None, gen_inputs=True):
 		'''
 		generates an input for VIDE ... don't do this with a sub catalogue or weird things may happen
@@ -489,6 +718,8 @@ class HaloCatalogue(object):
 #		if gen_inputs:
 #			self._snap.vide_input(halo_min_masses=halo_min_masses,finder=finder)
 		return
+
+
 
 
 #Rockstar
@@ -537,7 +768,12 @@ class RockstarCatalogue(HaloCatalogue):
 
 	def __init__(self, snap, filename=None, make_grp=None):
 		# TODO - Read/store header
-		if not self._can_load(snap):
+		print 'RockstarCatalogue - ', snap
+		#self._base weakref.ref(snap)
+		self._base = snap
+		offset = self.get_offset()
+		print 'offset=', offset
+		if not self._can_load(snap, offset):
 			raise Exception("Cannot locate/load rockstar catalogue")
 
 		self._base = weakref.ref(snap)
@@ -578,7 +814,19 @@ class RockstarCatalogue(HaloCatalogue):
 			self.make_grp()
 
 	def __str__(self):
-		return 'HaloCatalogue - Snapshot %s'%self._base()
+		return 'HaloCatalogue - Snapshot %s'%self._base
+
+	def get_offset(self):
+		'''
+		Assume last .list file corresponds to the final snapshot
+		'''
+		snapshot = self._base
+		num_snapshots = snapshot.num_snapshots()
+
+		files = glob.glob('%s/%s/out_*.list'%(snapshot.path(), pp_cfg.rockstar_base))
+		print num_snapshots, len(files)
+		return num_snapshots - len(files) + 1
+
 
 	def make_grp(self):
 		'''
@@ -631,7 +879,7 @@ class RockstarCatalogue(HaloCatalogue):
 
 	@property
 	def base(self):
-		return self._base()
+		return self._base
 
 	def _load_rs_halos(self, f, snap):
 		haloprops = np.loadtxt(f, dtype=self.halo_type, comments='#')
@@ -658,8 +906,8 @@ class RockstarCatalogue(HaloCatalogue):
 		NotImplementedError("Only halo loading implemented")
 
 	@staticmethod
-	def _can_load(snap, **kwargs):
-		fname = '%s/%s/out_%d.list'%(snap.path(), pp_cfg.rockstar_base, snap.output_number()-1)
+	def _can_load(snap, offset, **kwargs):
+		fname = '%s/%s/out_%d.list'%(snap.path(), pp_cfg.rockstar_base, snap.output_number()-offset)
 		print fname
 		for file in glob.glob(fname):
 			if os.path.exists(file):
@@ -692,7 +940,8 @@ class AHFCatalogue(HaloCatalogue):
 					  ('Ea_star','f',3),('Eb_star','f',3),('Ec_star','f',3,),
 					  ('Ekin_star','f'),('Epot_star','f')])
 
-	units = {'id':'dimensionless',
+	units = {'z':'dimensionless',
+			'id':'dimensionless',
 			'hostHalo':'dimensionless',
 			'numSubStruct':'dimensionless',
 			'Mvir':'Msun / h',
@@ -749,41 +998,101 @@ class AHFCatalogue(HaloCatalogue):
 			'Epot_star': 'Msun / h (km / sec)**2',
 		}
 
-#	halo_type = np.dtype([('id',np.int64),('hostHalo',np.int64),('Mvir','f'),
-#					  ('v_max','f'),('v_rms','f'),('Rvir','f'),
-#					  ('Rs','f'),('num_p',np.int64),
-#					  ('pos','f',3),('vel','f',3),
-#					  ('J','f',3),('spin','f'),('klypin_rs','f'),
-#					  ('Mvir_all','f'),
-#					  ('M200b','f'),('M200c','f'),('M500c','f'),
-#					  ('Xoff','f'),('Voff','f'),
-#					  ('bullock_spin','f'),('b_to_a','f'),('c_to_a','f'),
-#					  ('A','f',3),('T/|U|','f')])
+	halo_type_tracked =  np.dtype([('z','f'),('id',np.int64),('hostHalo',np.int64),('numSubStruct',np.int64),('Mvir','f'),
+					  ('num_p',np.int64),('pos','f',3),('vel','f',3),
+					  ('Rvir','f'),('Rmax','f'),('r2','f'),('mpb_offset','f'),
+					  ('com_offset','f'),('v_max','f'),('v_esc','f'),('sigV','f'),
+					  ('bullock_spin','f'),('spin','f'),('L','f',3),('b','f'),('c','f'),
+					  ('Ea','f',3),('Eb','f',3),('Ec','f',3),('ovdens','f'),
+					  ('nbins',np.int64),('fMhires','f'),('Ekin','f'),
+					  ('Epot','f'),('SurfP','f'),('PhiO','f'),('cNFW','f'),('n_gas',np.int64),
+					  ('M_gas','f'),('bullock_spin_gas','f'),('spin_gas','f'),
+					  ('L_gas','f',3),('b_gas','f'),('c_gas','f'),
+					  ('Ea_gas','f',3),('Eb_gas','f',3),('Ec_gas','f',3,),
+					  ('Ekin_gas','f'),('Epot_gas','f'),('n_star',np.int64),
+					  ('M_star','f'),('bullock_spin_star','f'),('spin_star','f'),
+					  ('L_star','f',3),('b_star','f'),('c_star','f'),
+					  ('Ea_star','f',3),('Eb_star','f',3),('Ec_star','f',3,),
+					  ('Ekin_star','f'),('Epot_star','f')])
 
-#	units = {'id':'dimensionless','hostHalo':'dimensionless','Mvir':'Msun / h',
-#					  'v_max':'km / s','v_rms':'km / s','Rvir':'kpc / h',
-#					  'Rs':'kpc / h','num_p':'dimensionless',
-#					  'pos':'Mpc / h','vel':'km / s',
-#					  'J':'(Msun/h)**2 / (km/s)','spin':'dimensionless','klypin_rs':'dimensionless',
-#					  'Mvir_all':'Msun / h',
-#					  'M200b':'Msun / h','M200c':'Msun / h','M500c':'Msun / h',
-#					  'Xoff':'kpc / h','Voff':'km / s',
-#					  'bullock_spin':'dimensionless','b_to_a':'kpc / h','c_to_a':'kpc / h',
-#					  'A':'?','T/|U|':'K(?)'}
 
-	def __init__(self, snap, filename=None, make_grp=None):
+	units_tracked = {'z':'dimensionless',
+			'id':'dimensionless',
+			'hostHalo':'dimensionless',
+			'numSubStruct':'dimensionless',
+			'Mvir':'Msun / h',
+			'num_p':'dimensionless',
+			'pos':'kpccm / h',
+			'vel':'km / s',
+			'Rvir':'kpccm / h',
+			'Rmax':'kpccm, / h',
+			'r2':'kpccm / h',
+			'mpb_offset': 'kpccm / h',
+			'com_offset': 'kpccm / h',
+			'v_max':'km / s',
+			'v_esc':'km / s',
+			'sigV': 'km / s',
+			'bullock_spin': 'dimensionless',
+			'spin': 'dimensionless',
+			'L':'dimensionless',
+			'b_to_a':'kpccm / h',
+			'c_to_a':'kpccm / h',
+			'Ea':'dimensionless',
+			'Eb':'dimensionless',
+			'Ec':'dimensionless',
+			'ovdens':'dimensionless',
+			'nbins':'dimensionless',
+			'fMhires':'dimensionless',
+			'Ekin': 'Msun / h (km / sec)**2',
+			'Epot': 'Msun / h (km / sec)**2',
+			'SurfP': 'Msun / h (km / sec)**2',
+			'PhiO': '(km / sec)**2',
+			'cNFW': 'dimensionless',
+			'M_gas': 'Msun / h',
+			'bullock_spin_gas': 'dimensionless',
+			'spin_gas': 'dimensionless',
+			'L_gas':'dimensionless',
+			'b_to_a_gas':'kpccm / h',
+			'c_to_a_gas':'kpccm / h',
+			'Ea_gas':'dimensionless',
+			'Eb_gas':'dimensionless',
+			'Ec_gas':'dimensionless',
+			'n_gas':'dimensionless',
+			'Ekin_gas': 'Msun / h (km / sec)**2',
+			'Epot_gas': 'Msun / h (km / sec)**2',
+			'M_star': 'Msun / h',
+			'bullock_spin_star': 'dimensionless',
+			'spin_star': 'dimensionless',
+			'L_star':'dimensionless',
+			'b_to_a_star':'kpccm / h',
+			'c_to_a_star':'kpccm / h',
+			'Ea_star':'dimensionless',
+			'Eb_star':'dimensionless',
+			'Ec_star':'dimensionless',
+			'n_star':'dimensionless',
+			'Ekin_star': 'Msun / h (km / sec)**2',
+			'Epot_star': 'Msun / h (km / sec)**2',
+		}
+
+
+
+
+	def __init__(self, snap, filename=None, make_grp=None, halo=None):
+
 		# TODO - Read/store header
-		if not self._can_load(snap):
-			try:
-				self._run(snap)
-			except Exception:
-				raise Exception("Cannot locate/load AHF catalogue")
-
-		self._base = weakref.ref(snap)
+		self._base = snap
 		HaloCatalogue.__init__(self,"AHF",snap.path(),snap.output_number())
 		if filename is not None: self._AHFFilename = filename
 		else:
+
+			if not self._can_load(snap):
+				try:
+					self._run(snap)
+				except Exception:
+					raise Exception("Cannot locate/load AHF catalogue")
+
 			# get the file name
+
 			tipsy_dir = str("%s/output_%05d/output_%05d_tipsy/" % (snap.path(), snap.output_number(), snap.output_number()))
 			if not os.path.isdir(tipsy_dir):
 				print "AHF not run on this snapshot.. aborting"
@@ -792,9 +1101,16 @@ class AHFCatalogue(HaloCatalogue):
 			if len(glob.glob('%s*.AHF_particles'%tipsy_dir)) == 0:
 				print "AHF not run on this snapshot.. aborting"
 				raise Exception("AHF not run, run AHF plz")
-				
-			fname = glob.glob('%s*.AHF_halos'%tipsy_dir)[0]
+		
+			if halo == None:	
+				fname = glob.glob('%s*.AHF_halos'%tipsy_dir)[0]
+				self._halo = None
+			else:
+				fname=("%s/ahf_halo_track/halo_%07d.dat" % (tipsy_dir,halo))
+				self._halo = halo
+				print "tracking halo ", halo, "from snapshot ", snap.output_number()
 			self._AHFFilename = fname
+			print fname
 			print 'Loading from %s'%fname
 
 		#Try and open the files
@@ -816,7 +1132,8 @@ class AHFCatalogue(HaloCatalogue):
 		self._load_ahf_halos(self._AHFFilename, snap)
 		f.close()
 
-		self._setup_children()
+		if halo == None:
+			self._setup_children()
 
 #		if make_grp is None:
 #			make_grp = pp_cfg.rockstar_autogrp
@@ -825,24 +1142,34 @@ class AHFCatalogue(HaloCatalogue):
 			print "make grp not implemented yet"
 #			self.make_grp()
 
-	def mass_function(self, units='Msun/h', nbins=100):
+
+	def mass_function(self, units='Msun/h', nbins=100, total = True):
 		'''
 		Compute the halo mass function for the given catalogue
 		'''
-		print 'HERE'
-		masses =[]
-		for halo in self:
-			Mvir = halo['Mvir'].in_units(units) - halo['M_gas'].in_units(units) - halo['M_star'].in_units(units)
-			masses.append(Mvir)
+
+		if total:
+			masses = [halo['Mvir'].in_units(units) for halo in self]
+		else:
+			masses =[]
+			for halo in self:
+			#	print halo["Mvir"], halo["M_gas"], halo["M_star"]
+				Mvir = halo['Mvir'].in_units(units).value - halo['M_gas'].in_units(units).value - halo['M_star'].in_units(units).value
+				if Mvir <= 1.0:
+					print "WARNING", halo["id"],  halo["Mvir"], halo["M_gas"], halo["M_star"], halo["pos"], halo["Rvir"], "has no dark matter"
+				else:
+					masses.append(Mvir)
+
 
 		mhist, mbin_edges = np.histogram(np.log10(masses),bins=nbins)
 		mbinmps = np.zeros(len(mhist))
 		mbinsize = np.zeros(len(mhist))
+
 		for i in np.arange(len(mhist)):
 			mbinmps[i] = np.mean([mbin_edges[i],mbin_edges[i+1]])
 			mbinsize[i] = mbin_edges[i+1] - mbin_edges[i]
-		
 		return mbinmps, mhist, mbinsize
+
 
 	def make_grp(self):
 		'''
@@ -895,24 +1222,33 @@ class AHFCatalogue(HaloCatalogue):
 
 	@property
 	def base(self):
-		return self._base()
+		return self._base
 
 
 	def _load_ahf_halos(self, f, snap):
-		haloprops = np.loadtxt(f, dtype=self.halo_type, comments='#')
+		if self._halo == None:
+			haloprops = np.loadtxt(f, dtype=self.halo_type, comments='#')
+		else:
+			haloprops = np.loadtxt(f, dtype=self.halo_type_tracked, comments='#')
 		self._nhalos = len(haloprops)
 		self._haloprops = np.array(haloprops)
 		# sort by number of particles to make compatible with AHF
 		self._num_p_rank = np.flipud(self._haloprops[:]['num_p'].argsort(axis=0))
 
-		for h in xrange(self._nhalos): # self._nhalos + 1?
-			# AHF halos index start from 0... python start from 0.. lets be consitant :P
-			hn = np.where(self._num_p_rank==h)[0][0]
+		if self._halo == None: # i.e not a tracker file
+			for h in xrange(self._nhalos): # self._nhalos + 1?
+				# AHF halos index start from 0... python start from 0.. lets be consitant :P
+				hn = np.where(self._num_p_rank==h)[0][0]
 
-			#Is this really memory inefficient?
-			self._halos[hn] = Halo(self._haloprops[h]['id'], self)
-			# properties are in Msun / h, Mpc / h
-			self._halos[hn].properties = self._haloprops[h]
+				#Is this really memory inefficient?
+				self._halos[hn] = Halo(self._haloprops[h]['id'], self)
+				# properties are in Msun / h, Mpc / h
+				self._halos[hn].properties = self._haloprops[h]
+		else:
+			for i in range(0,len(haloprops)):
+				self._halos[i] = Halo(self._haloprops[i]['z'], self)
+				self._halos[i].properties = self._haloprops[i]
+
 
 	def load_copy(self, i):
 		'''
@@ -937,15 +1273,201 @@ class AHFCatalogue(HaloCatalogue):
 			return True
 		return False
 
+
 	@staticmethod
 	def _run(snap, **kwargs):
-		#Need to run from pynbody
+		# need to run from pynbody
 		if type(snap) == 'ramses_pp.modules.pynbody.Pynbody.PynbodySnapshot':
 			snap.halos()
 		else:
 			from ramses_pp.modules.pynbody import Pynbody
-			pyn = Pynbody.load(snap.path(), snap.output_number())
+			pyn = Pynbody.load(snap.path(), snap._simulation, snap.output_number())
 			pyn.halos()
+
+
+class HaloMakerSimpleCatalogue(HaloCatalogue):
+	'''
+	Class to handle catalogues produced by HaloMaker.
+	'''	
+	halo_type =  np.dtype([('id',np.int64),('haloLevel',np.int64),('hostHalo',np.int64),('hostSubHalo',np.int64),
+					  ('numSubStruct',np.int64),('nextSub',np.int64),
+					  ('Etot','f'),('Mvir','f'),('Rvir','f'),('Rmax','f'),
+					  ('num_p',np.int64),('Mmax','f'),('pos','f',3)])
+# need to check the non_code units stuff
+	units = {'id':'dimensionless',
+			'haloLevel':'dimensionless',
+			'hostHalo':'dimensionless',
+			'hostSubHalo':'dimensionless',
+			'numSubStruct':'dimensionless',
+			'nextSub':'dimensionless',
+			'Etot':'dimensionless', ### not sure about this one as such
+			'Mvir':'Msun/h', 
+			'Rvir':'code_length',
+			'Rmax':'code_length',
+			'num_p':'dimensionless',
+			'Mmax':'Msun',
+			'pos':'code_length',
+		}
+
+
+	def __init__(self, snap, filename=None, make_grp=None):
+		# TODO - Read/store header
+		if not self._can_load(snap):
+			raise Exception("Cannot locate/load HaloMaker simple catalogue (does it exist? can it exist?)")
+
+		self._base = weakref.ref(snap)
+		HaloCatalogue.__init__(self,"HaloMakerSimple",snap.path(),snap.output_number())
+		if filename is not None: self._AHFFilename = filename
+		else:
+			# get the file name
+			halo_dir = str("%s/HaloMaker/%s/" % (snap.path(), snap.output_number()))
+			if not os.path.isdir(halo_dir):
+				print "HaloMaker not run, or no halos exist"
+				raise Exception("HaloMaker not run, or no halos exist")
+
+			if len(glob.glob('%shalomaker_%05d.nod'% (halo_dir, snap.output_number()) )) == 0:
+				print "HaloMaker has been run, but no halos exist here"
+				raise Exception("No Halos exist here")
+				
+			fname = glob.glob('%shalomaker_%05d.nod'% (halo_dir, snap.output_number() ))[0]
+			self._HaloMakerfilename = fname
+			print 'Loading HaloMaker simple from %s'%fname
+
+		#Try and open the files
+		try:
+			f = open_(self._HaloMakerfilename)
+		except IOError:
+			raise IOError("Halo Simple catalogue not found -- check the file name of catalogue data or try specifying a catalogue using the filename keyword")
+
+		#self._head = np.fromstring(f.read(self.head_type.itemsize),
+		#	dtype=self.head_type)
+		#unused = f.read(256 - self._head.itemsize)
+
+		#self._nhalos = self._head['num_halos'][0]
+
+		if super_verbose == True:
+			print "HaloMaker simple catalogue: loading halos...",
+			sys.stdout.flush()
+
+		self._load_halos(self._HaloMakerfilename, snap)
+		f.close()
+
+		self._setup_children()
+
+		# Mvir is in units of 1e11!!!
+#		for halo in self:
+#			halo['Mtot'] = halo['Mtot'] * 1.0e11
+#			halo['Mvir'] = halo['Mvir'] * 1.0e11
+
+#		if make_grp is None:
+#			make_grp = pp_cfg.rockstar_autogrp
+
+		if make_grp:
+			print "make grp not implemented yet"
+#			self.make_grp()
+
+	def make_grp(self):
+		'''
+		Creates a 'grp' array which labels each particle according to
+		its parent halo.
+		'''
+		#try:
+		#	self.base['grp']
+		#except:
+		#	self.base['grp'] = np.zeros(len(self.base),dtype='i')
+
+		#for halo in self._halos.values():
+		#	halo[name][:] = halo._halo_id
+
+		#if config['verbose']:  print "writing %s"%(self._base().filename+'.grp')
+		#self._base().write_array('grp',overwrite=True,binary=False)
+		raise NotImplementedError("Requires pynbody functionality")
+
+	def _setup_children(self):
+		'''
+		Creates a 'children' array inside each halo's 'properties'
+		listing the halo IDs of its children. Used in case the reading
+		of substructure data from the AHF-supplied _substructure file
+		fails for some reason.
+		'''
+		for i in xrange(self._nhalos):
+			self._halos[i]._children = []
+
+		for i in xrange(self._nhalos):
+			host = self._halos[i].properties['hostHalo']
+			if host > -1:
+				try:
+					self._halos[host]._children.append(i)
+				except KeyError:
+					pass
+
+	def _get_halo(self, i):
+		if self.base is None:
+			raise RuntimeError("Parent snapshot has been deleted")
+
+		return self._halos[i]
+
+	def _get_by_id(self, halo_id):
+		#Nasty! But, allows lookup by id only (do we need this?)
+		idx = np.where(self._haloprops[:]['id'] == halo_id)[0][0]
+		hn = np.where(self._num_p_rank==idx)[0][0]
+		#print 'hn=', hn
+		halo = self._halos[hn]
+		return halo
+
+	@property
+	def base(self):
+		return self._base
+
+
+	def _load_halos(self, f, snap):
+		haloprops = np.loadtxt(f, dtype=self.halo_type, comments='#')
+		self._nhalos = len(haloprops)
+		self._haloprops = np.array(haloprops)
+		# sort by number of particles to make compatible with AHF
+		self._num_p_rank = np.flipud(self._haloprops[:]['num_p'].argsort(axis=0))
+
+		for h in xrange(self._nhalos): # self._nhalos + 1?
+			# Mvir is in units of 1e11!!!
+#			self._haloprops[h]['Mmax'] = self._haloprops[h]['Mmax'] * 1.0e11
+#			self._haloprops[h]['Mvir'] = self._haloprops[h]['Mvir'] * 1.0e11		
+
+
+			# AHF halos index start from 0... python start from 0.. lets be consitant :P
+			hn = np.where(self._num_p_rank==(h))[0][0]
+
+			#Is this really memory inefficient?
+			self._halos[hn] = Halo(self._haloprops[h]['id']-1, self)
+	
+			# properties are in Msun / h, Mpc / h
+			self._halos[hn].properties = self._haloprops[h]
+
+	def load_copy(self, i):
+		'''
+		Load a fresh SimSnap with only the particle in halo i
+		'''
+		raise NotImplementedError("Requires pynbody functionality")
+
+	def _load_particles(self, f, snap):
+		NotImplementedError("Only halo loading implemented")
+
+
+	@staticmethod
+	def _can_load(snap, **kwargs):
+
+		halo_dir = str("%s/HaloMaker/%s/" % (snap.path(), snap.output_number()))
+		if not os.path.isdir(halo_dir):
+			return False
+
+		if len(glob.glob('%shalomaker_%05d.nod'% (halo_dir, snap.output_number()) )) == 0:
+			return False
+				
+		fname = glob.glob('%shalomaker_%05d.nod'%(halo_dir, snap.output_number()) )[0]
+		if os.path.exists(fname):
+			return True
+		return False
+
+
 
 
 def open_(filename, *args):
@@ -966,3 +1488,64 @@ def cutgz(x):
 		return x[:-3]
 	else:
 		return x
+
+
+## old vcirc code
+
+#<
+#			rad = min_r + (i * inc) # linear
+#			halo_sphere, radius = self.get_sphere(r_fact=rad,radius=None,units=None)
+#			try:
+#				halo_sphere["stars","particle_index"]	
+#			except:
+#				add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
+#				halo_sphere.ds.add_particle_filter("stars")
+#			try:
+#				halo_sphere["dark","particle_index"]
+#			except:
+#				add_particle_filter("dark", function=dark_filter, filtered_type="all", requires=["particle_age"])
+#				halo_sphere.ds.add_particle_filter("dark")
+#
+#			dark_mass = halo_sphere["dark","particle_mass"].sum()
+#			# calculate mass
+#			if stars:
+#				try:
+#					halo_sphere["stars","particle_index"]	
+#				except:
+#					add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
+#					halo_sphere.ds.add_particle_filter("stars")
+##				star_mass = halo_sphere["stars","particle_mass"].sum()
+#			else:
+#				star_mass = 0
+##			if gas:
+#				gas_mass = halo_sphere["gas","cell_mass"].sum()
+#			else:
+#				gas_mass = 0
+#			total_mass = dark_mass + star_mass + gas_mass
+#			print dark_mass.in_units("Msun"), star_mass.in_units("Msun")	
+#			rad_units = rad * self["Rvir"]
+##			print i, rad_units.in_units("kpc"), dark_mass.in_units("Msun")
+##			r_vir[i+1] = rad_units.in_units("kpc").value
+#			V_circ_dm[i+1] = (np.sqrt(G * dark_mass / rad_units)).in_units("km/s").value
+##			print i, rad_units.in_units("kpc"), dark_mass.in_units("Msun"), V_circ_dm[i+1].in_units("km/s")
+##
+#			if stars:
+#				V_circ_stars[i+1] = np.sqrt(G * star_mass / rad_units).in_units("km/s").value
+#			if gas:
+##				V_circ_gas[i+1] = np.sqrt(G * gas_mass / rad_units).in_units("km/s").value
+#			V_circ_tot[i + 1] = np.sqrt(G * total_mass / rad_units).in_units("km/s").value
+##	
+#		# make the plot
+##	#	pp.rc('text', usetex=True)
+#		plt.rc('font', family='serif')
+#	#	pp.plot(r_vir,V_circ_dm,'ro')
+##		plt.plot(r_vir,V_circ_dm,'r--')
+#
+##	#	pp.plot(r_vir,V_circ_stars,'bo')
+#		plt.plot(r_vir,V_circ_stars,'b--')
+#	
+##	#	pp.plot(r_vir,V_circ_gas,'go')
+#		plt.plot(r_vir,V_circ_gas,'g--')
+##=======
+#
+####

@@ -16,9 +16,7 @@ config.py
 python/yt/yt*
 simulations/*
 data/*
-applications/AHF*
 config.py
-pythin/*
 python/pynbody/*
 python/pymses_4.0.0/*
 python/Python-2.7.8/*
@@ -26,9 +24,6 @@ python/scipy/*
 python/Cython/*
 python/mpi4py/*
 movie/*
-movie_selene_nochemo*
-movie_selene_nochemo/*
-ramses_pp/config.py
 tipsy.info
 AHF.in
 ahf_mtree_infile
@@ -37,3 +32,6 @@ ahf_track_infile
 zfile
 ben
 ben/*
+
+config.py
+config_home.py

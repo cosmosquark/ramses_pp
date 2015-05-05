@@ -8,13 +8,14 @@ TODO: Add features similar to Hamu i.e Automatic generation of axis labels for p
 
 @author: dsullivan, bthompson
 '''
+from __future__ import division
 from .. import config
-
 pymses_loaded = config.pymses_enabled
 pynbody_loaded = config.pynbody_enabled
 yt_loaded = config.yt_enabled
 import numpy as np
 import json, os, glob, uuid
+
 
 def load(name):
 	'''
@@ -29,11 +30,12 @@ def load(name):
 	else:
 		raise Exception("No simulation with the name: %s"%name)
 
-def init(name):
+def init(name,path=None):
 	'''
 	Create a simulation from the current directory
 	'''
-	path = os.getcwd()
+	if path == None and config_path==False:
+		path = os.getcwd()
 	return create(name, path)
 
 def create(name, path):
@@ -67,17 +69,101 @@ class Simulation():
 		# This should never change
 		if oid is None: self._oid = str(uuid.uuid4())
 		else:
-			print oid 
+			#print oid 
 			self._oid = str(oid)
 
 		self._name = name
 		self._path = path
+
+#		self._boxsize = self.box_size() #100   #100 #in Mpc h^-1
+
+		# load more data
+		json_dir = config.json_dir
+		filename = '%s/%s.json'%(json_dir, name)
+		if os.path.isfile(filename):
+			with open(filename, 'rb') as fp:
+				data = json.load(fp)
+			self._periodic = True
+			if "_periodic" in data:
+				if data["_periodic"] is not None:
+					self._periodic = data["_periodic"]
+			self._parent = None # assign a parent simulation
+			if "_parent" in data:
+				if data["_parent"] is not None:
+					self._periodic = data["_parent"]
+
+			self._parent_domain = [0.50,0.50,0.50] #coordinate in parent simulation which is this simulations centre in code units 
+			if "_parent_domain" in data:
+				if data["_parent_domain"] != None:
+					self._parent_domain = data["_parent_domain"]
+		else:
+#			self.box_size()
+			self.set_periodic(True)
+			self.save()
+	# add new methods based on "what modules (pymses, pynbody) are working
+
+		if pynbody_loaded:
+			from ramses_pp.analysis.halo_analysis.ahf import AHF
+			for f in dir(AHF):
+				if f[0] != "_": # ignore hidden functions
+					self.func = self.call(getattr(AHF,f))  # loads any arbitary function
+			self.run_ahf = self.call(getattr(AHF,dir(AHF)[2]))
+			self.run_ahf_merger = self.call(getattr(AHF,dir(AHF)[3]))
+			self.run_ahf_tracker = self.call(getattr(AHF,dir(AHF)[4]))
+
+					
+	# 
+	def func(self,a):
+		print("Not Defined")
+
+	def call(self,func,*args,**kwargs):
+		return lambda *args, **kwargs : func(self, *args, **kwargs)
+
+	# end custom method calling
 
 	def set_name(self, name):
 		self._name = name
 
 	def set_path(self, path):
 		self._path = path
+
+
+	def last_snap(self):
+		"""
+		returns the highest snapshot number
+		"""
+		filelist = glob.glob('%s/output_*'%self._path)
+		last_snap = int(filelist[-1].split("/")[-1].split("_")[1])
+		return last_snap
+
+
+	def box_size(self):
+		cmtokpc = 3.24077929e-22
+		kpctompc = 0.001
+		last_snap = self.num_snapshots()
+		info = ("%s/output_%05d/info_%05d.txt" % (self._path, last_snap, last_snap))
+		f = open(info, 'r')
+		nline = 1  # read the last info file
+		while nline <= 18:
+			line = f.readline()
+			if(nline == 11): h0 = np.float32(line.split("=")[1])
+			if(nline == 16): lunit = np.float32(line.split("=")[1])
+			nline += 1
+		h = h0 / 100
+		boxsize = lunit * cmtokpc * kpctompc * h
+		return boxsize
+
+
+	def set_periodic(self, periodic):
+		if isinstance(periodic, bool):
+			self._periodic = periodic
+		else:
+			print "Invalid input, True or False"
+			return
+
+	def is_periodic(self):
+		return self._periodic
+		
 
 	def jdefault(self, o):
 		if isinstance(o, set):
@@ -118,8 +204,50 @@ class Simulation():
 		else:
 			return glob.glob('%s/*'%self.data_dir())
 
+
+
+	def assign_parent_domain(self,domain):
+		if len(domain) == 3 and sum(domain) <= 3.0:
+			self._parent_domain = domain
+			self.save()
+			return
+		# else
+		print "invalid domain"
+		return
+
+
+	def assign_parent(self, name, domain):
+		'''
+		for most zoom runs, you will have based a simulation off it's parent. Usually it is a unigrid simulation
+		this function will store
+		domain = 3 vector describing the position shift
+		name = name of parent simulation
+		'''
+		# check if it exists first
+		json_dir = config.json_dir
+		filename = '%s/%s.json'%(json_dir, name)
+		if os.path.isfile(filename):
+			self._parent = name
+			self.assign_parent_domain(domain)
+			print name, domain
+			self.save()
+			return	
+		else:
+			raise Exception("No simulation with the name: %s"%name)
+			return
+
 	def num_snapshots(self):
-		return len(glob.glob('%s/output_00*'%self._path))
+		return len(glob.glob('%s/output_*'%self._path))
+
+	def iterable(self, module=config.default_module, min_i=1, max_i=None):
+		'''
+		Return an iterable of snapshots
+		'''
+		if max_i is None: max_i = self.num_snapshots()
+		snaps = []
+		for i in range(min_i, max_i+1):
+			snaps.append(self.snapshot(i, module))
+		return np.array(snaps)	
 
 	def save_image(self, prefix, ioutput, plt, **kwargs):
 		'''
@@ -170,6 +298,8 @@ class Simulation():
 		'''
 		Return a snapshot from the simulation
 		'''
+		if not kwargs.has_key("simulation"):
+			kwargs["simulation"] = self
 		if (module == 'yt') and yt_loaded:
 			from .yt import YT
 			return YT.load(self._path, ioutput, **kwargs)
@@ -194,6 +324,18 @@ class Simulation():
 			return trees.RockstarMergerTree(self)
 		else:
 			raise Exception("Unimplemented finder: %s"%finder)
+
+	def merger_tree(self, finder=config.default_finder):
+		'''
+		Load a generic mergertree. Default is set in config if not overwritten
+		'''
+
+		from ..analysis.halo_analysis import trees
+		if finder == 'rockstar':
+			return trees.RockstarMergerTree(self)
+		else:
+			raise Exception("Unimplemented finder: %s" % finder)
+
 
 	def redshift(self, z):
 		'''
@@ -259,10 +401,38 @@ class Simulation():
 			redshift = 1.0/aexp -1.0
 			if (redshift >= zmin) and (redshift < zmax):
 				redshifts.append(float(redshift))
+			f.close()
 
 		return np.array(redshifts)
 
-	def ordered_outputs(self):
+
+ 	def ordered_outputs(self):
+ 		'''
+ 		Return an ordered list of outputs
+ 		'''
+
+		from .utils import string_utils
+ 		outputs = glob.glob('%s/output_0*'%self.path())
+ 		outputs.sort(key=string_utils.natural_keys)
+ 		return outputs
+
+
+	def pos_to_codepos(self,val):
+		''' simple dirty code to convert a position in Mpc/h into code units'''
+		if val > self.box_size():
+			print "value is larger than the box size"
+			print "the boxsize is " + str(self.box_size())
+			return
+		else:
+			new_val = val / self.box_size()
+			print str(val) + " Mpc/h in code units is " + str(new_val)
+			return new_val
+
+
+
+### halomaker stuff
+
+	def load_halomaker(self, subvol=False, ncpu=1):
 		'''
 		Return an ordered list of outputs
 		'''
@@ -270,6 +440,43 @@ class Simulation():
 		outputs = glob.glob('%s/output_00*'%self.path())
 		outputs.sort(key=string_utils.natural_keys)
 		return outputs
+
+	def info_snap(self,ioutput):
+		'''
+		return the basic infomation of an individual snapshot without loading it
+		'''
+		num = self.num_snapshots()
+		if ioutput > num or ioutput < 1:
+			print "Snapshot needs to be in range of 1 and " + str(self.num_snapshots())
+			raise e
+			return
+
+		infopath = ("%s/output_%05d" % (self._path, ioutput))
+		if not os.path.isdir(infopath):
+			print "Snapshot does not exist"
+			raise e
+			return
+		
+		info = infopath + ("/info_%05d.txt" % (ioutput))
+		f = open(info,'r')
+		nline = 1
+		while nline <= 18:
+			line = f.readline()
+			if(nline == 10): aexp = np.float32(line.split("=")[1])
+			if(nline == 16): lunit = np.float32(line.split("=")[1])
+			if(nline == 17): dunit = np.float32(line.split("=")[1])
+			if(nline == 18): tunit = np.float32(line.split("=")[1])
+			nline += 1
+		z = (1.0/aexp) - 1.0
+
+		f.close()
+		infodata = {
+			'aexp': aexp,
+			'lunit': lunit,
+			'dunit': dunit,
+			'z':z,
+			}
+		return infodata
 
 	def info(self):
 		'''

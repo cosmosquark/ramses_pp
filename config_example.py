@@ -5,13 +5,13 @@ Module config object to store app wide settings
 # TODO - Rewrite this entirely (nice to have a system like pynbody where you can
 #	do config_parser.getboolean('Rockstar', "some_prop"))
 
-#Enable/disable modules
+#enable/disable modules
 yt_enabled = True
 pymses_enabled = True
 pynbody_enabled = True
 quick_import = True
 
-default_module = 'yt'
+default_module='yt'
 
 ramses_f90_dir='/gpfs/home/bthompson1/ramses_pp/ramses_pp/ramses_f90'
 json_dir = '/gpfs/home/bthompson1/ramses_pp/ramses_pp/data'
@@ -40,6 +40,10 @@ rockstar_base="rockstar/rockstar_halos"
 rockstar_autogrp=False
 rockstar_load_ctree=False
 default_finder="AHF"
+
+
+override = True
+verbose = True
 
 #Methods
 
