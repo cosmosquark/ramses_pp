@@ -224,6 +224,10 @@ class Halo():
 			plt_dm = yt.ProjectionPlot(halo_sphere.ds,axis,("deposit","io_dark"),center=self["pos"].in_units(units), width=(radius.in_units('code_length').value*r_fact), axes_unit=units, data_source=region )
 			plt_dm.save(("Halo_dm_" + str(self["id"].value) + "_" + str(sim_name) + "_" +  str(self._halo_catalogue._base.output_number() ) ))
 
+
+	def galaxy_projection_plot():
+		return None
+
 	def dbscan(self, eps=0.4, min_samples=20):
 		'''
 		Define a sphere centred on the halo, and identify groups of stars using DBSCAN (i.e to find galaxies)
@@ -457,7 +461,7 @@ class Halo():
 				except yt.utilities.exceptions.YTSphereTooSmall:
 					break
 				# just filter for the cold gas if we want to get the disk
-				sphere_cool = sphere.cut_region(["obj['temperature'] < 1e5"])
+				sphere_cool = sphere.cut_region(["obj['temperature'] < 1e4"])
 				L = sphere_cool.quantities.angular_momentum_vector(use_gas=True,use_particles=False)
 				print L
 		# simple galaxy disk for height and width work
