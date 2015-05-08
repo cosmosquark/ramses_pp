@@ -461,7 +461,10 @@ class Halo():
 				except yt.utilities.exceptions.YTSphereTooSmall:
 					break
 				# just filter for the cold gas if we want to get the disk
-				sphere_cool = sphere.cut_region(["obj['temperature'] < 1e4"])
+#				sphere_cool = sphere
+#				L = sphere_cool.quantities.angular_momentum_vector(use_gas=True,use_particles=True)
+
+				sphere_cool = sphere.cut_region(["obj['temperature'] < 1e5"])
 				L = sphere_cool.quantities.angular_momentum_vector(use_gas=True,use_particles=False)
 				print L
 		# simple galaxy disk for height and width work

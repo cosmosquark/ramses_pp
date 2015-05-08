@@ -90,7 +90,7 @@ def lazy_load_galaxy(sim_name,sim_patch="normal",snap_no=None,halo_id=None,retur
 	if snap_no == None:
 		snap = sim.snapshot(sim.num_snapshots(),module="yt",patch=sim_patch)
 	else:
-		snap = sim.snapshot(snap_no,module="yt",patch=patch)
+		snap = sim.snapshot(snap_no,module="yt",patch=sim_patch)
 	if halo_id == None:
 		halo_id = 0
 

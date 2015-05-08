@@ -1,0 +1,310 @@
+import yt
+from yt import derived_field
+from ramses_pp.modules import Simulation
+from yt.data_objects.particle_filters import add_particle_filter
+from ramses_pp.modules.yt.YT import star_filter, dark_filter, young_star_filter
+from yt.units.yt_array import YTArray
+import numpy as np
+import scipy as sp
+from matplotlib import pyplot as plt
+from yt.utilities.physical_constants import G
+import shelve
+from ramses_pp import config
+from yt.utilities.math_utils import ortho_find
+
+width_thing = YTArray(100,"kpc")
+depth_thing = YTArray(10,"kpc")
+
+
+def gen_data_source(axis,container,ytsnap,width,depth,axis_unit):
+
+	if axis==0:
+		x = container.center[0].in_units("code_length").value - ytsnap.arr(depth[0],axis_unit).in_units("code_length").value
+		y = container.center[1].in_units("code_length").value - ytsnap.arr(width[0][0],axis_unit).in_units("code_length").value
+		z = container.center[2].in_units("code_length").value - ytsnap.arr(width[1][0],axis_unit).in_units("code_length").value
+		left = [x,y,z]
+
+		x = container.center[0].in_units("code_length").value + ytsnap.arr(depth[0],axis_unit).in_units("code_length").value
+		y = container.center[1].in_units("code_length").value + ytsnap.arr(width[0][0],axis_unit).in_units("code_length").value
+		z = container.center[2].in_units("code_length").value + ytsnap.arr(width[1][0],axis_unit).in_units("code_length").value
+		right = [x,y,z]
+
+	if axis==1:
+	
+		x = container.center[0].in_units("code_length").value - ytsnap.arr(width[1][0],axis_unit).in_units("code_length").value
+		y = container.center[1].in_units("code_length").value - ytsnap.arr(depth[0],axis_unit).in_units("code_length").value
+		z = container.center[2].in_units("code_length").value - ytsnap.arr(width[0][0],axis_unit).in_units("code_length").value
+		left = [x,y,z]
+
+		x = container.center[0].in_units("code_length").value + ytsnap.arr(width[1][0],axis_unit).in_units("code_length").value
+		y = container.center[1].in_units("code_length").value + ytsnap.arr(depth[0],axis_unit).in_units("code_length").value
+		z = container.center[2].in_units("code_length").value + ytsnap.arr(width[0][0],axis_unit).in_units("code_length").value
+		right = [x,y,z]
+
+	if axis==2:
+
+		x = container.center[0].in_units("code_length").value - ytsnap.arr(width[0][0],axis_unit).in_units("code_length").value
+		y = container.center[1].in_units("code_length").value - ytsnap.arr(width[1][0],axis_unit).in_units("code_length").value
+		z = container.center[2].in_units("code_length").value - ytsnap.arr(depth[0],axis_unit).in_units("code_length").value
+		left = [x,y,z]
+
+		x = container.center[0].in_units("code_length").value + ytsnap.arr(width[0][0],axis_unit).in_units("code_length").value
+		y = container.center[1].in_units("code_length").value + ytsnap.arr(width[1][0],axis_unit).in_units("code_length").value
+		z = container.center[2].in_units("code_length").value + ytsnap.arr(depth[0],axis_unit).in_units("code_length").value
+		right = [x,y,z]
+
+	data_source = ytsnap.region(container.center, left, right)
+	return data_source
+
+def visualisation(viz_type, container, raw_snapshot, module=config.default_module, gas=True, stars=False, dark=False, gas_fields=["temperature","density"],gas_units=["K","g/cm**3"], dark_fields=[('deposit', 'dark_density')], dark_units=["g/cm**3"], star_fields=[('deposit', 'stars_density')], star_units=["g/cm**3"], filter=None, return_objects=False, callbacks=[], width=width_thing,extra_width=None,depth=depth_thing, name="plot", format=".png", prefix="", normal_vector=[1.0,0.0,0.0], axis=[0,1,2], plot_images = True, weight_field = None, image_width = 1000, extra_image_width=None):
+
+	"""
+	This routine is designed to handle almost all of the visualisation routines that you can think of.
+
+	this has a disgusting amount of kwargs, so lets break everything down
+
+	arguments
+
+	viz_type = slice, projection, off_axis_slice, off_axis_projection. Not available for all modules all these combinations. But it will know what you mean depending on the config that you load
+	container = the data container or object of interest. This will accept either a YT raw snapshot or a pymses raw snapshot
+	module = yt or pymses
+
+	kwargs
+
+	raw_snapshot = the raw snapshot of the simulation (i.e the whole box or a larger portion of the box). This may be used to make an additional cut for the datasource
+	gas = do we want to plot gas data, default to True
+	stars = do we want to plot stellar data, default to false
+	dark = do we want to plot dark matter data, default to false
+
+	gas_fields = a list of strings (or turples for some YT magic) of fields that we want to plot
+	gas_units = the units of those fields
+
+	dark_fields = see above
+	dark_units = see above
+
+	star_fields = see above
+	star_units = see above
+
+	filter = if there needs to be any additonal filters used... but really that should be handled before this, but this is more specific for YT
+	return_objects = whether you wish to return a list of plot objects and images or not for further work
+	callbacks = extra callbacks? this is YT specific
+	
+	width = YTArray containing the width of the image and its unit
+	extra_width = YTArray if you want to do something a bit more fancy with the image dimensions
+
+	depth = projection depth if applicable
+	name = name of the plot if you want to rename it
+	format = the output format
+	
+	normal_vector = the normal vector for the off axis plots
+	axis = axis for on axis plots
+	data_source = YT data source if applicable
+
+	plot_images = if you actually want to plot something
+	"""
+
+	# customise the width etc
+	axis_unit = width.units
+	if extra_width != None:
+		width = ((width.v,width.units),(extra_width.v,width.units))
+	else:
+		width = ((width.v,width.units),(width.v,width.units))
+
+	if extra_image_width != None:
+		image_width = (image_width,extra_image_width)
+	else:
+		image_width = (image_width,image_width) 
+
+	depth = (depth.v,depth.units)
+
+	fields = []
+	fields = fields + gas_fields
+
+	
+	if star_fields:
+		fields + star_fields
+	if dark_fields:
+		fields + dark_fields
+
+	print fields
+	plots = {}
+	frb = {}
+
+	basis_vectors = ortho_find(normal_vector)
+	north_vectors = ortho_find(normal_vector)
+
+	print basis_vectors
+	# select the module
+	if module == "yt":
+
+		# select the type of plot
+		if viz_type == "slice":
+			# axis
+			print "on axis slice plot"
+			if 0 in axis:
+				# x
+				print "plotting axis 0"		
+				print width[0][0], "width"
+				plot = yt.SlicePlot(container.ds,0,fields,center=container.center,width=width)
+				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), image_width[0])
+				
+				plots["0_slice"] = plot
+				frb["0_frb"] = image
+
+				if plot_images:
+					plot.save(name)
+			# y
+			if 1 in axis:
+				# x
+				print "plotting axis 1"		
+				plot = yt.SlicePlot(container.ds,1,fields,center=container.center,width=width)
+				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
+				
+				plots["1_slice"] = plot
+				frb["1_frb"] = image
+
+				if plot_images:
+					plot.save(name)
+			# z
+
+			if 2 in axis:
+				# x
+				print "plotting axis 2"
+				plot = yt.SlicePlot(container.ds,2,fields,center=container.center,width=width)
+				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
+				
+				plots["2_slice"] = plot
+				frb["2_frb"] = image
+
+				if plot_images:
+					plot.save(name )
+
+		if viz_type == "projection":
+
+			# axis
+			print "on axis projection plot"
+			if 0 in axis:
+				# x
+				
+				data_source = gen_data_source(0,container,raw_snapshot,width,depth,axis_unit)
+				print "plotting axis 0"		
+				plot = yt.ProjectionPlot(container.ds,0,fields,center=container.center,width=width,weight_field=weight_field, data_source=data_source)
+				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
+				
+				plots["0_slice"] = plot
+				frb["0_frb"] = image
+
+				if plot_images:
+					plot.save(name)
+			
+				# y
+			if 1 in axis:
+				print "plotting axis 1"
+				data_source = gen_data_source(1,container,raw_snapshot,width,depth,axis_unit)
+				plot = yt.ProjectionPlot(container.ds,1,fields,center=container.center,width=width,weight_field=weight_field, data_source=data_source)
+				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
+				
+				plots["1_slice"] = plot
+				frb["1_frb"] = image
+
+				if plot_images:
+					plot.save(name)
+
+				# z	
+			if 2 in axis:
+				print "plotting axis 2"
+				data_source = gen_data_source(2,container,raw_snapshot,width,depth,axis_unit)
+				plot = yt.ProjectionPlot(container.ds,2,fields,center=container.center,width=width,weight_field=weight_field, data_source=data_source)
+				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
+				
+				plots["2_slice"] = plot
+				frb["2_frb"] = image
+
+				if plot_images:
+					plot.save(name)
+
+
+		if viz_type == "off_axis_slice":
+
+				# off axis.. may as well do all 3
+			print "off axis slice plot"
+			print "plotting axis 0"
+			plot = yt.OffAxisSlicePlot(container.ds,basis_vectors[0],fields,center=container.center,width=width, north_vector=north_vectors[0])
+			image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
+				
+			plots["0_slice"] = plot
+			frb["0_frb"] = image
+
+			if plot_images:
+				plot.save(name + "_axis_0")
+
+			print "plotting axis 1"
+			plot = yt.OffAxisSlicePlot(container.ds,basis_vectors[1],fields,center=container.center,width=width, north_vector=north_vectors[0])
+			image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
+				
+			plots["1_slice"] = plot
+			frb["1_frb"] = image
+
+			if plot_images:
+				plot.save(name + "_axis_1")
+
+			print "plotting axis 2"
+			plot = yt.OffAxisSlicePlot(container.ds,basis_vectors[2],fields,center=container.center,width=width, north_vector=north_vectors[0])
+			image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
+				
+			plots["2_slice"] = plot
+			frb["2_frb"] = image
+
+			if plot_images:
+				plot.save(name + "_axis_2")
+
+		
+
+		if viz_type == "off_axis_projection":
+
+			print "off axis projection plot"
+
+			print "plotting axis 0"
+			data_source = gen_data_source(0,container,raw_snapshot,width,width[0],axis_unit)
+			plot = yt.OffAxisProjectionPlot(data_source.ds,basis_vectors[0],fields,center=container.center,width=width,depth=width[0],weight_field=weight_field, north_vector=north_vectors[0])
+			image = plot.frb
+				
+			plots["0_slice"] = plot
+			frb["0_frb"] = image
+
+			if plot_images:
+				plot.save(name + "_axis_0")
+
+			print "plotting axis 1"
+			data_source = gen_data_source(1,container,raw_snapshot,width,width[0],axis_unit)
+			plot = yt.OffAxisProjectionPlot(data_source.ds,basis_vectors[1],fields,center=container.center,width=width,depth=width[0],weight_field=weight_field, north_vector=north_vectors[0])
+			image = plot.frb
+				
+			plots["0_slice"] = plot
+			frb["0_frb"] = image
+
+			if plot_images:
+				plot.save(name + "_axis_1")
+
+
+			print "plotting axis 2"
+			data_source = gen_data_source(2,container,raw_snapshot,width,width[0],axis_unit)
+			plot = yt.OffAxisProjectionPlot(data_source.ds,basis_vectors[2],fields,center=container.center,width=width,depth=width[0],weight_field=weight_field, north_vector=north_vectors[0])
+			image = plot.frb
+				
+			plots["0_slice"] = plot
+			frb["0_frb"] = image
+
+			if plot_images:
+				plot.save(name + "_axis_2")
+
+
+
+
+	else:
+		print "module not defined, please either use YT, pynbody or pymses"
+		return
+
+	if module == "pymses":
+		from pymses.analysis.visualization import *
+		from ramses_pp.modules.pymses import PymsesProjection
