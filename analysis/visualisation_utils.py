@@ -56,7 +56,7 @@ def gen_data_source(axis,container,ytsnap,width,depth,axis_unit):
 	data_source = ytsnap.region(container.center, left, right)
 	return data_source
 
-def visualisation(viz_type, container, raw_snapshot, module=config.default_module, gas=True, stars=False, dark=False, gas_fields=["temperature","density"],gas_units=["K","g/cm**3"], dark_fields=[('deposit', 'dark_density')], dark_units=["g/cm**3"], star_fields=[('deposit', 'stars_density')], star_units=["g/cm**3"], filter=None, return_objects=False, callbacks=[], width=width_thing,extra_width=None,depth=depth_thing, name="plot", format=".png", prefix="", normal_vector=[1.0,0.0,0.0], axis=[0,1,2], plot_images = True, weight_field = None, image_width = 1000, extra_image_width=None):
+def visualisation(viz_type, container, raw_snapshot, module=config.default_module, gas=True, stars=False, dark=False, gas_fields=["temperature","density"],gas_units=["K","g/cm**3"], dark_fields=[('deposit', 'dark_density')], dark_units=["g/cm**3"], star_fields=[('deposit', 'stars_density')], star_units=["g/cm**3"], filter=None, return_objects=False, return_fields=False, callbacks=[], width=width_thing,extra_width=None,depth=depth_thing, name="plot", format=".png", prefix="", normal_vector=[1.0,0.0,0.0], axis=[0,1,2], plot_images = True, weight_field = None, image_width = 1000, extra_image_width=None):
 
 	"""
 	This routine is designed to handle almost all of the visualisation routines that you can think of.
@@ -121,10 +121,10 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 	fields = fields + gas_fields
 
 	
-	if star_fields:
-		fields + star_fields
-	if dark_fields:
-		fields + dark_fields
+	if star_fields and stars == True:
+		fields = fields + star_fields
+	if dark_fields and dark == True:
+		fields = fields + dark_fields
 
 	print fields
 	plots = {}
@@ -143,12 +143,16 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 			print "on axis slice plot"
 			if 0 in axis:
 				# x
+
+				# to note, a slice plot is pretty irrelevent of the data source.
+				# see e.g https://bpaste.net/show/f08dda811ae0
+				# which will reproduce the same result
 				print "plotting axis 0"		
 				print width[0][0], "width"
 				plot = yt.SlicePlot(container.ds,0,fields,center=container.center,width=width)
 				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), image_width[0])
 				
-				plots["0_slice"] = plot
+				plots["0_plot"] = plot
 				frb["0_frb"] = image
 
 				if plot_images:
@@ -160,7 +164,7 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 				plot = yt.SlicePlot(container.ds,1,fields,center=container.center,width=width)
 				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
 				
-				plots["1_slice"] = plot
+				plots["1_plot"] = plot
 				frb["1_frb"] = image
 
 				if plot_images:
@@ -173,7 +177,7 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 				plot = yt.SlicePlot(container.ds,2,fields,center=container.center,width=width)
 				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
 				
-				plots["2_slice"] = plot
+				plots["2_plot"] = plot
 				frb["2_frb"] = image
 
 				if plot_images:
@@ -186,12 +190,13 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 			if 0 in axis:
 				# x
 				
+				# in this instance.. the depth is along the axis that you are viewing "down".. so in a way is user defined
 				data_source = gen_data_source(0,container,raw_snapshot,width,depth,axis_unit)
 				print "plotting axis 0"		
 				plot = yt.ProjectionPlot(container.ds,0,fields,center=container.center,width=width,weight_field=weight_field, data_source=data_source)
 				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
 				
-				plots["0_slice"] = plot
+				plots["0_plot"] = plot
 				frb["0_frb"] = image
 
 				if plot_images:
@@ -204,7 +209,7 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 				plot = yt.ProjectionPlot(container.ds,1,fields,center=container.center,width=width,weight_field=weight_field, data_source=data_source)
 				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
 				
-				plots["1_slice"] = plot
+				plots["1_plot"] = plot
 				frb["1_frb"] = image
 
 				if plot_images:
@@ -217,7 +222,7 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 				plot = yt.ProjectionPlot(container.ds,2,fields,center=container.center,width=width,weight_field=weight_field, data_source=data_source)
 				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
 				
-				plots["2_slice"] = plot
+				plots["2_plot"] = plot
 				frb["2_frb"] = image
 
 				if plot_images:
@@ -227,36 +232,41 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 		if viz_type == "off_axis_slice":
 
 				# off axis.. may as well do all 3
+				# same rules RE the slice apply here too
 			print "off axis slice plot"
-			print "plotting axis 0"
-			plot = yt.OffAxisSlicePlot(container.ds,basis_vectors[0],fields,center=container.center,width=width, north_vector=north_vectors[0])
-			image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
+			if 0 in axis:
+				print "plotting axis 0"
+				plot = yt.OffAxisSlicePlot(container.ds,basis_vectors[0],fields,center=container.center,width=width, north_vector=north_vectors[0])
+				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
 				
-			plots["0_slice"] = plot
-			frb["0_frb"] = image
+				plots["0_plot"] = plot
+				frb["0_frb"] = image
 
-			if plot_images:
-				plot.save(name + "_axis_0")
+				if plot_images:
+					plot.save(name + "_axis_0")
 
-			print "plotting axis 1"
-			plot = yt.OffAxisSlicePlot(container.ds,basis_vectors[1],fields,center=container.center,width=width, north_vector=north_vectors[0])
-			image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
+			if 1 in axis:
+				print "plotting axis 1"	
+				plot = yt.OffAxisSlicePlot(container.ds,basis_vectors[1],fields,center=container.center,width=width, north_vector=north_vectors[0])
+				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
 				
-			plots["1_slice"] = plot
-			frb["1_frb"] = image
+				plots["1_plot"] = plot
+				frb["1_frb"] = image
 
-			if plot_images:
-				plot.save(name + "_axis_1")
+				if plot_images:
+					plot.save(name + "_axis_1")
 
-			print "plotting axis 2"
-			plot = yt.OffAxisSlicePlot(container.ds,basis_vectors[2],fields,center=container.center,width=width, north_vector=north_vectors[0])
-			image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
+
+			if 2 in axis:
+				print "plotting axis 2"
+				plot = yt.OffAxisSlicePlot(container.ds,basis_vectors[2],fields,center=container.center,width=width, north_vector=north_vectors[0])
+				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
 				
-			plots["2_slice"] = plot
-			frb["2_frb"] = image
+				plots["2_plot"] = plot
+				frb["2_frb"] = image
 
-			if plot_images:
-				plot.save(name + "_axis_2")
+				if plot_images:
+					plot.save(name + "_axis_2")
 
 		
 
@@ -264,39 +274,46 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 
 			print "off axis projection plot"
 
-			print "plotting axis 0"
-			data_source = gen_data_source(0,container,raw_snapshot,width,width[0],axis_unit)
-			plot = yt.OffAxisProjectionPlot(data_source.ds,basis_vectors[0],fields,center=container.center,width=width,depth=width[0],weight_field=weight_field, north_vector=north_vectors[0])
-			image = plot.frb
+
+			if 0 in axis:	
+				print "plotting axis 0"
+				# since there is no way of doing an off axis box.. our data source is essentially a cube.. it ignore depth
+				# oh, and you probably want this rather than your disk dataset
+
+				#TODO make sure filtered datasts carry across... but it seems to be the case here.
+				data_source = gen_data_source(0,container,raw_snapshot,width,width[0],axis_unit)
+				plot = yt.OffAxisProjectionPlot(data_source.ds,basis_vectors[0],fields,center=container.center,width=width,depth=width[0],weight_field=weight_field, north_vector=north_vectors[0])
+				image = plot.frb
 				
-			plots["0_slice"] = plot
-			frb["0_frb"] = image
+				plots["0_plot"] = plot
+				frb["0_frb"] = image
 
-			if plot_images:
-				plot.save(name + "_axis_0")
+				if plot_images:
+					plot.save(name + "_axis_0")
 
-			print "plotting axis 1"
-			data_source = gen_data_source(1,container,raw_snapshot,width,width[0],axis_unit)
-			plot = yt.OffAxisProjectionPlot(data_source.ds,basis_vectors[1],fields,center=container.center,width=width,depth=width[0],weight_field=weight_field, north_vector=north_vectors[0])
-			image = plot.frb
+			if 1 in axis:
+				print "plotting axis 1"
+				data_source = gen_data_source(1,container,raw_snapshot,width,width[0],axis_unit)
+				plot = yt.OffAxisProjectionPlot(data_source.ds,basis_vectors[1],fields,center=container.center,width=width,depth=width[0],weight_field=weight_field, north_vector=north_vectors[0])
+				image = plot.frb
 				
-			plots["0_slice"] = plot
-			frb["0_frb"] = image
+				plots["1_plot"] = plot
+				frb["1_frb"] = image
 
-			if plot_images:
-				plot.save(name + "_axis_1")
+				if plot_images:
+					plot.save(name + "_axis_1")
 
-
-			print "plotting axis 2"
-			data_source = gen_data_source(2,container,raw_snapshot,width,width[0],axis_unit)
-			plot = yt.OffAxisProjectionPlot(data_source.ds,basis_vectors[2],fields,center=container.center,width=width,depth=width[0],weight_field=weight_field, north_vector=north_vectors[0])
-			image = plot.frb
+			if 2 in axis:
+				print "plotting axis 2"
+				data_source = gen_data_source(2,container,raw_snapshot,width,width[0],axis_unit)
+				plot = yt.OffAxisProjectionPlot(data_source.ds,basis_vectors[2],fields,center=container.center,width=width,depth=width[0],weight_field=weight_field, north_vector=north_vectors[0])
+				image = plot.frb
 				
-			plots["0_slice"] = plot
-			frb["0_frb"] = image
+				plots["2_plot"] = plot
+				frb["2_frb"] = image
 
-			if plot_images:
-				plot.save(name + "_axis_2")
+				if plot_images:
+					plot.save(name + "_axis_2")
 
 
 
@@ -308,3 +325,12 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 	if module == "pymses":
 		from pymses.analysis.visualization import *
 		from ramses_pp.modules.pymses import PymsesProjection
+
+	if return_objects == True and return_fields == True:
+		return plots, frb, fields
+
+	if return_objects == True:
+		return plots, frb
+
+	if return_fields == True:
+		return fields

@@ -92,6 +92,9 @@ def plot_position(data,x_field,y_field,z_field,width, depth,filter=None, filter_
 
 
 def plot_profile(data,x_field,y_field,units=["Mpc","km/s"],filter=None,bins=100,weight_profile="ones",abs=False):
+	"""
+	get some x data.. and some y data.. then plot it.. simples
+	"""
 	if filter != None:
 		x = data[x_field][filter].in_units(units[0]).value
 		y = data[y_field][filter].in_units(units[1]).value
@@ -132,6 +135,9 @@ def plot_profile(data,x_field,y_field,units=["Mpc","km/s"],filter=None,bins=100,
 	return x_bins, val_array
 
 def plot_manual_profile(x_field,y_field,units=["Mpc","km/s"],filter=None,bins=100,weight_profile="ones",abs=False):
+	"""
+	works for particles kinda... but super deprecated
+	"""	
 	if filter != None:
 		x = x_field[filter].in_units(units[0]).value
 		y = y_field[filter].in_units(units[1]).value
@@ -184,6 +190,8 @@ def plot_projection(data,x_field,y_field,q_field,width, q_unit,filter=None, filt
 	in xy xz and yz
 	and also does a 3d plot
 	assumes the z field has already beein filtered
+
+	DEPRECATED
 	"""
 
 
@@ -551,4 +559,50 @@ def plot_xy(x,y,x_lab,y_lab,filename,type="line",x_min=None,x_max=None,y_min=Non
 	return
 
 
+def plot_frb_profile(image,width,y_units,x_lab,y_lab,filename,n_bins=50,ylog=True):
+	"""
+	Use this method to plot the 2d radial profile of an FRB image generated from YT
+	"""
+
+
+	n_bins = image.shape[0]
+	bin_width = width.v / float(n_bins)
+	left = - width.v / 2.0
+	right = width.v / 2.0
+	length = np.arange(left,right,bin_width)
+	shift_thing = (length[2] - length[1]) / 2.0
+	length = length + shift_thing
+
+	# to make radial array, we need to calculate the radial distance of each pixel in a 2d array. Namely.
+
+	length_squared = np.power(length,2.0) # power of 2
+	radius_squared = np.add.outer(length_squared, length_squared) # adds as an outer product
+	radius = np.sqrt(radius_squared)
+
+	# now we need to generate some radial bins to histogram.
+
+	radius_bin_width = radius.max() / float(plot_bins)
+	radius_bins = np.arange(0,radius.max(), radius_bin_width)
+
+	# flatten the arrays
+
+	flat_radius = radius.flatten()
+	flat_data = np.array(image.in_units(y_units)).flatten()
+
+	n, _ = np.histogram(flat_radius, bins=radius_bins)
+	sy, _ = np.histogram(flat_radius, bins=radius_bins, weights=flat_data)
+	sy2, _ = np.histogram(flat_radius, bins=radius_bins, weights=flat_data*flat_data)
+	mean = sy / n
+	std = np.sqrt(sy2/n - mean*mean)
+
+	radius_bins = radius_bins + (radius_bin_width / 2.0)
+	radius_bins = np.delete(radius_bins,(len(radius_bins)-1))
+
+
+	plt.plot(radius_bins,mean)
+	if ylog == True:
+		plt.yscale('log')
+	plt.xlabel(x_lab)
+	plt.ylabel(y_lab)
+	plt.savefig(("%s.png" % filename))
 
