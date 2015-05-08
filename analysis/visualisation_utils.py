@@ -15,6 +15,10 @@ from yt.utilities.math_utils import ortho_find
 width_thing = YTArray(100,"kpc")
 depth_thing = YTArray(10,"kpc")
 
+from ramses_pp.analysis import plot_utils
+
+def plot_frb_profile(image,width,y_units,x_lab,y_lab,filename,n_bins=50,ylog=True):
+	return plot_utils.plot_frb_profile(image=image,width=width,y_units=y_units,x_lab=x_lab,y_lab=y_lab,filename=filename,n_bins=n_bins,ylog=ylog):
 
 def gen_data_source(axis,container,ytsnap,width,depth,axis_unit):
 
