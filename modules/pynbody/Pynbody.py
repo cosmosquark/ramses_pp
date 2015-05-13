@@ -17,11 +17,11 @@ from ... import config
 pynbody.ramses.multiprocess_num = 16
 pynbody.config['number_of_threads'] = 16
 
-def load(folder, ioutput=None, **kwargs):
+def load(path, ioutput=None, **kwargs):
 	return PynbodySnapshot(path, ioutput, **kwargs)
 
 class PynbodySnapshot(Snapshot.Snapshot):
-	def __init__(self, path, ioutput, gas=True, **kwargs):
+	def __init__(self, path, ioutput, **kwargs):
 		# gas is default to FALSE since pynbody does weird things with gas conversion to tipsy (pymses/yt is better for the gas data)
 		Snapshot.Snapshot.__init__(self, path, ioutput, "Pynbody", **kwargs)
 		'''
@@ -34,7 +34,10 @@ class PynbodySnapshot(Snapshot.Snapshot):
 			cpus = self.cpu_list(halo.get_bounding_box())
 			self._snapshot = pynbody.load('%s/output_%05d'%(path, ioutput), cpus=cpus **kwargs)
 		else:
-			self._snapshot = pynbody.load('%s/output_%05d'%(path, ioutput), **kwargs)
+			if ioutput == None:
+				self._snapshot = pynbody.load('%s' % (path), **kwargs)
+			else:
+				self._snapshot = pynbody.load('%s/output_%05d'%(path, ioutput), **kwargs)
  	#Implement abstract methods from Snapshot.py
 
 	def output_number(self):
@@ -148,8 +151,9 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		massunit = pynbody.analysis.cosmology.rho_crit(s, z=0, unit='Msol kpc^-3')*lenunit**3
 		timeunit = np.sqrt(1/G_u * lenunit**3/massunit)
 
+		return lenunit, massunit, timeunit
 
-	def tipsy(self, convert=True, gas=True, rewrite=False):
+	def tipsy(self, convert=True, rewrite=False):
 		# note RAMSES-CH does not handle very well with the pynbody conversion... tbh gas converted to particles is bad news anyway
 		#Grab the tipsy output for this snapshot, if it exists
 		ftipsy = self.tipsy_fname()
@@ -200,6 +204,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 				#s['mass'].convert_units('%f Msol'%massunit)
 				s['mass'].convert_units('%f Msol'%massunit)
 
+				gas = True
 				if gas == True and len(s.g) > 0:
 					s.g['rho'].convert_units(m_unit/l_unit**3) # get gas variables
 					s.g['temp']
@@ -226,7 +231,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 
 
 	def tipsy_halos(self, LgridDomain=128, LgridMax=1073741824, VescTune=1.5, Dvir=200, nmin_per_halo = 50,
-		 MaxGatherRad=3.0, num_threads=16, run_ahf=False, rewrite_tipsy=False, gas=False, configloc = True):
+		 MaxGatherRad=3.0, num_threads=16, run_ahf=False, rewrite_tipsy=False, configloc = True):
 		import glob
 		s = self.raw_snapshot()
 		isRamses = (type(s) == pynbody.ramses.RamsesSnap)
@@ -246,7 +251,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 			omega_m_z = cosmo.omega_z(s.properties['omegaM0'], z)
 			#First, convert to tipsy
 
-			if os.path.exists(fname) is False and isRamses: self.tipsy(gas=gas, rewrite=rewrite_tipsy)
+			if os.path.exists(fname) is False and isRamses: self.tipsy(rewrite=rewrite_tipsy)
 			
 			lenunit, massunit, timeunit = self.tipsy_units()
 
@@ -286,7 +291,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 			f.close()			
 
 			os.environ['OMP_NUM_THREADS'] = str(num_threads)
-			os.system("~/apps/bin/AHF-v1.0-075 %s.AHF.input"%fname)
+			os.system("~/apps/bin/AHF-v1.0-084 %s.AHF.input"%fname)
 
 		#Return the halos. We need the tipsy snap now to load them
 		if isRamses:
