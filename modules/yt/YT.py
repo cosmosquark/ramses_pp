@@ -86,7 +86,9 @@ class YTSnapshot(Snapshot.Snapshot):
 			dark = False
 
 		if "patch" in kwargs:
-			self._snapshot = yt.mods.load(os.path.join('%s/output_%05d/info_%05d.txt'%(path, ioutput, ioutput)), patch=patch)
+			if patch != None or patch != "normal":
+				# self._snapshot = yt.mods.load(os.path.join('%s/output_%05d/info_%05d.txt'%(path, ioutput, ioutput), patch=patch))
+				self._snapshot = yt.mods.load(os.path.join('%s/output_%05d/info_%05d.txt'%(path, ioutput, ioutput)))
 		else:
 			self._snapshot = yt.mods.load(os.path.join('%s/output_%05d/info_%05d.txt'%(path, ioutput, ioutput)))
 

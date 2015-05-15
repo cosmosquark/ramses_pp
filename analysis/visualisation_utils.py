@@ -11,6 +11,7 @@ from yt.utilities.physical_constants import G
 import shelve
 from ramses_pp import config
 from yt.utilities.math_utils import ortho_find
+import re
 
 width_thing = YTArray(100,"kpc")
 depth_thing = YTArray(10,"kpc")
@@ -18,7 +19,7 @@ depth_thing = YTArray(10,"kpc")
 from ramses_pp.analysis import plot_utils
 
 def plot_frb_profile(image,width,y_units,x_lab,y_lab,filename,n_bins=50,ylog=True):
-	return plot_utils.plot_frb_profile(image=image,width=width,y_units=y_units,x_lab=x_lab,y_lab=y_lab,filename=filename,n_bins=n_bins,ylog=ylog):
+	return plot_utils.plot_frb_profile(image=image,width=width,y_units=y_units,x_lab=x_lab,y_lab=y_lab,filename=filename,n_bins=n_bins,ylog=ylog)
 
 def gen_data_source(axis,container,ytsnap,width,depth,axis_unit):
 
@@ -105,9 +106,16 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 	data_source = YT data source if applicable
 
 	plot_images = if you actually want to plot something
+
+	TODO use regex to rename dark_deposit with io_deposit if age does not exist
 	"""
 
 	# customise the width etc
+
+#	if not [("all","particle_age")] in container:
+#		print "WARNING, DM only run for particles. Viz may fail since the " + \
+#			"age field does not exist in DM only runs"
+
 	axis_unit = width.units
 	if extra_width != None:
 		width = ((width.v,width.units),(extra_width.v,width.units))
@@ -122,7 +130,9 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 	depth = (depth.v,depth.units)
 
 	fields = []
-	fields = fields + gas_fields
+
+	if gas_fields and gas == False:
+		fields = fields + gas_fields
 
 	
 	if star_fields and stars == True:
@@ -185,7 +195,7 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 				frb["2_frb"] = image
 
 				if plot_images:
-					plot.save(name )
+					plot.save(name)
 
 		if viz_type == "projection":
 
@@ -231,6 +241,8 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 
 				if plot_images:
 					plot.save(name)
+
+				print "done"
 
 
 		if viz_type == "off_axis_slice":
@@ -331,10 +343,11 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 		from ramses_pp.modules.pymses import PymsesProjection
 
 	if return_objects == True and return_fields == True:
+		print plots, frb, fields
 		return plots, frb, fields
 
 	if return_objects == True:
-		return plots, frb
+		return plots, frb, None
 
 	if return_fields == True:
-		return fields
+		return None, None, fields
