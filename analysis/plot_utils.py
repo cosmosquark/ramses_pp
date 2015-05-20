@@ -36,7 +36,7 @@ def subplot_plot(plotno,x,y,lab,title,x_axis,y_axis,alpha=0.5):
 	plt.ylabel(lab)
 	plt.axis(axis_range)
 
-def plot_position(data,x_field,y_field,z_field,width, depth,filter=None, filter_name=None,type="particle", quantity="particle_mass"):
+def plot_position(data,x_field,y_field,z_field,width, depth,filter=None, filter_name=None,type="particle", quantity="particle_mass", galaxy_name=None):
 	"""
 	takes in a YT xyz field and plots the position
 	in xy xz and yz
@@ -86,8 +86,13 @@ def plot_position(data,x_field,y_field,z_field,width, depth,filter=None, filter_
 	else:
 		filter_string = ""
 
+	if galaxy_name:
+		galaxy_string = "_" + galaxy_name
+	else:
+		galaxy_string = ""
+
 	print "plotting position" + type_string + filter_string + ".png"
-	plt.savefig("position" + type_string + filter_string + ".png")
+	plt.savefig("position" + galaxy_name + type_string + filter_string + ".png")
 	plt.close()
 
 
