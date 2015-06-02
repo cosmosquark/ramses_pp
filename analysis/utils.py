@@ -152,8 +152,6 @@ def mass_enclosed_bins(object,snap,r_bins,shape="sphere",type="all",sim_object_t
 
 	m_bins = object.ds.arr(np.zeros(len(r_bins)),"g")
 	invalid = False
-	print r_bins
-	print r_bins[0].in_units("code_length")
 	if sim_object_type == None:
 		print "ramses_pp snapshot"
 		dataset = snap.raw_snapshot()
@@ -170,10 +168,6 @@ def mass_enclosed_bins(object,snap,r_bins,shape="sphere",type="all",sim_object_t
 	except yt.units.unit_object.UnitParseError:
 		min_unit = "cm"
 
-	test = dataset.sphere(object.center,object.ds.arr(r_bins[15],min_unit))
-	print test
-	mass = test.quantities.total_quantity(["particle_mass"])
-	print mass
 
 	for i in range(0,len(r_bins)):
 		if type == "all":
@@ -199,8 +193,6 @@ def mass_enclosed_bins(object,snap,r_bins,shape="sphere",type="all",sim_object_t
 				m_bins[i] = temp['stars','particle_mass'].sum()
 			except:
 				temp = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit))
-				print i
-				print "fuckkkkk", temp['stars','particle_mass']
 				m_bins[i] = object.ds.arr(0.0,"g")
 		elif type == "dark":
 			try:
@@ -209,13 +201,11 @@ def mass_enclosed_bins(object,snap,r_bins,shape="sphere",type="all",sim_object_t
 			except:
 				m_bins[i] = object.ds.arr(0.0,"g")
 		else:
-			print "invalid type"
 			invalid = True
 			break
 	if invalid == True:
 		return None
 	else:
-		print m_bins, "test m bins"
 		return m_bins
 
 
@@ -226,14 +216,12 @@ def vcirc(r_bins,m_bins,data):
 
 	vcirc = data.ds.arr(np.zeros(len(m_bins)))
 	vcirc = (np.sqrt(G * (m_bins) / r_bins))
-	print "vcirc test", vcirc
 	return vcirc
 
 def jcirc_bins(r_bins,v_circ,m_bins,data):
 	""" this computes j_circ for each individual r_bin, v_circ bin and m_bin"""
 	j_circ = data.ds.arr(np.zeros(len(m_bins)))
 	j_circ = r_bins * v_circ
-	print j_circ, "j bins"
 	return j_circ
 
 def jcirc(data, r_indices,v_circ,r_filter,type="all"):
@@ -241,7 +229,6 @@ def jcirc(data, r_indices,v_circ,r_filter,type="all"):
 	j_circ = (data[type, "particle_position_spherical_radius"][r_filter] * (v_circ[r_indices].astype(int)))
 	# j_circ is of the length of data[field][filter]
 
-	print "test jcirc", j_circ
 	return j_circ
 
 
@@ -266,8 +253,6 @@ def vrot(data,type="all",r_filter = None):
 	else:
 		vrot = data[type,"particle_velocity_cylindrical_theta"]
 		rrot = data[type,"particle_position_cylindrical_radius"]
-
-	print "vrot_test", vrot
 	return vrot
 
 def manual_vrot(data,type="all",r_filter = None):
@@ -300,9 +285,11 @@ def jz(data, type="all", r_filter = None):
 	returns jz (its the specific angular momentum in the z axis
 	assuming your object has a centre and a normal vector
 	"""
-	print data[type,"particle_specific_angular_momentum_z"]
-	if data.has_field_parameter("bulk_velocity"):
-		data.field_data.pop((type, 'particle_specific_angular_momentum_z'))
+	try:
+		if data.has_field_parameter("bulk_velocity"):
+			data.field_data.pop((type, 'particle_specific_angular_momentum_z'))
+	except:
+		pass
 		
 
 	try:
@@ -313,11 +300,9 @@ def jz(data, type="all", r_filter = None):
 
 
 	if r_filter != None:
-		print r_filter
 		jz = data[type,"particle_specific_angular_momentum_z"][r_filter].in_units(min_unit)
 	else:
 		jz = data[type,"particle_specific_angular_momentum_z"].in_units(min_unit)
-	print "test jz", jz
 	return jz
 
 def manual_jz(data,type="all",r_filter = None):
@@ -363,8 +348,6 @@ def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_ma
 	j_z = jz(data,r_filter=r_filter,type="stars")
 #	j_z = manual_jz(data,r_filter=r_filter,type="stars")	
 
-	print j_circ, "j"
-	print v_circ, "v"
 
 	try:
 		test = r_bins.in_units("cmcm")
@@ -377,7 +360,6 @@ def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_ma
 		ratio = j_z.in_units("kpccm**2/s") / j_circ.in_units("kpccm**2/s").value
 	else:
 		ratio = j_z.in_units("kpc**2/s") / j_circ.in_units("kpc**2/s").value
-	print ratio
 	# get indices of stars which satisfy the conditions
 
 	# expand ratio into context of origonal array
@@ -495,7 +477,7 @@ def gradient(x,y,col="r",facecolor="blue",label="Fit Line",filename="name",signi
 
 
 # more importantly
-# http://nbviewer.ipython.org/url/bagrow.com/dsv/LEC10_notes_2014-02-13.ipynb
+# http://nbviewer.ipython.org/url/bagrow.com/dsv/LEC10_not_2014-02-13.ipynb
 # http://bagrow.com/dsv/
 	if significance:
 		conf = 0.95

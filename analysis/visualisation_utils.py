@@ -12,6 +12,12 @@ import shelve
 from ramses_pp import config
 from yt.utilities.math_utils import ortho_find
 import re
+import yt.visualization.eps_writer as eps
+from yt.extern.six import iteritems
+
+from yt.funcs import get_image_suffix
+import os
+
 
 width_thing = YTArray(100,"kpc")
 depth_thing = YTArray(10,"kpc")
@@ -20,6 +26,16 @@ from ramses_pp.analysis import plot_utils
 
 def plot_frb_profile(image,width,y_units,x_lab,y_lab,filename,n_bins=50,ylog=True):
 	return plot_utils.plot_frb_profile(image=image,width=width,y_units=y_units,x_lab=x_lab,y_lab=y_lab,filename=filename,n_bins=n_bins,ylog=ylog)
+
+
+def plot_eps_image(plot, name, multi=False, mpl_kwargs = None, suffix=None):
+
+	print name, "thign"
+	eps_fig = eps.single_plot(plot)
+	n = name[0].split(".")[0]
+	n = n + ".pdf"
+	eps_fig.save_fig(name, format='pdf')
+	
 
 def gen_data_source(axis,container,ytsnap,width,depth,axis_unit):
 
@@ -61,7 +77,7 @@ def gen_data_source(axis,container,ytsnap,width,depth,axis_unit):
 	data_source = ytsnap.region(container.center, left, right)
 	return data_source
 
-def visualisation(viz_type, container, raw_snapshot, module=config.default_module, gas=True, stars=False, dark=False, gas_fields=["temperature","density"],gas_units=["K","g/cm**3"], dark_fields=[('deposit', 'dark_density')], dark_units=["g/cm**3"], star_fields=[('deposit', 'stars_density')], star_units=["g/cm**3"], filter=None, return_objects=False, return_fields=False, callbacks=[], width=width_thing,extra_width=None,depth=depth_thing, name="plot", format=".png", prefix="", normal_vector=[1.0,0.0,0.0], axis=[0,1,2], plot_images = True, weight_field = None, image_width = 1000, extra_image_width=None):
+def visualisation(viz_type, container, raw_snapshot, module=config.default_module, gas=True, stars=False, dark=False, gas_fields=["temperature","density"],gas_units=["K","g/cm**3"], dark_fields=[('deposit', 'dark_density')], dark_units=["g/cm**3"], star_fields=[('deposit', 'stars_density')], star_units=["g/cm**3"], filter=None, return_objects=False, return_fields=False, callbacks=[], width=width_thing,extra_width=None,depth=depth_thing, name="plot", format=".png", prefix="", normal_vector=[1.0,0.0,0.0], axis=[0,1,2], plot_images = True, weight_field = None, image_width = 1000, extra_image_width=None, plot_pdf_images=False):
 
 	"""
 	This routine is designed to handle almost all of the visualisation routines that you can think of.
@@ -131,7 +147,7 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 
 	fields = []
 
-	if gas_fields and gas == False:
+	if gas_fields and gas == True:
 		fields = fields + gas_fields
 
 	
@@ -171,6 +187,8 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 
 				if plot_images:
 					plot.save(name)
+					if plot_pdf_images:
+						plot.save(name, suffix = "pdf")
 			# y
 			if 1 in axis:
 				# x
@@ -183,6 +201,8 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 
 				if plot_images:
 					plot.save(name)
+					if plot_pdf_images:
+						plot.save(name, suffix = "pdf")
 			# z
 
 			if 2 in axis:
@@ -196,6 +216,8 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 
 				if plot_images:
 					plot.save(name)
+					if plot_pdf_images:
+						plot.save(name, suffix = "pdf")
 
 		if viz_type == "projection":
 
@@ -215,6 +237,8 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 
 				if plot_images:
 					plot.save(name)
+					if plot_pdf_images:
+						plot.save(name, suffix = "pdf")
 			
 				# y
 			if 1 in axis:
@@ -228,6 +252,8 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 
 				if plot_images:
 					plot.save(name)
+					if plot_pdf_images:
+						plot.save(name, suffix = "pdf")
 
 				# z	
 			if 2 in axis:
@@ -241,6 +267,8 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 
 				if plot_images:
 					plot.save(name)
+					if plot_pdf_images:
+						plot.save(name, suffix = "pdf")
 
 				print "done"
 
@@ -260,6 +288,8 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 
 				if plot_images:
 					plot.save(name + "_axis_0")
+					if plot_pdf_images:
+						plot.save(name + "_axis_0", suffix = "pdf")
 
 			if 1 in axis:
 				print "plotting axis 1"	
@@ -271,6 +301,8 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 
 				if plot_images:
 					plot.save(name + "_axis_1")
+					if plot_pdf_images:
+						plot.save(name + "_axis_1", suffix = "pdf")
 
 
 			if 2 in axis:
@@ -283,7 +315,8 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 
 				if plot_images:
 					plot.save(name + "_axis_2")
-
+					if plot_pdf_images:
+						plot.save(name + "_axis_2", suffix = "pdf")
 		
 
 		if viz_type == "off_axis_projection":
@@ -306,6 +339,8 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 
 				if plot_images:
 					plot.save(name + "_axis_0")
+					if plot_pdf_images:
+						plot.save(name + "_axis_0", suffix = "pdf")
 
 			if 1 in axis:
 				print "plotting axis 1"
@@ -318,6 +353,8 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 
 				if plot_images:
 					plot.save(name + "_axis_1")
+					if plot_pdf_images:
+						plot.save(name + "_axis_1", suffix = "pdf")
 
 			if 2 in axis:
 				print "plotting axis 2"
@@ -330,6 +367,8 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 
 				if plot_images:
 					plot.save(name + "_axis_2")
+					if plot_pdf_images:
+						plot.save(name + "_axis_2", suffix = "pdf")
 
 
 

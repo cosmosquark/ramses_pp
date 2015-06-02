@@ -189,7 +189,7 @@ def plot_manual_profile(x_field,y_field,units=["Mpc","km/s"],filter=None,bins=10
 
 
 
-def plot_projection(data,x_field,y_field,q_field,width, q_unit,filter=None, filter_name=None,type="particle", bins=100, r_bins=10, density=False, density_scale=1000.0):
+def plot_projection_deprecated(data,x_field,y_field,q_field,width, q_unit,filter=None, filter_name=None,type="particle", bins=100, r_bins=10, extra="mean", density_scale=1.0):
 	"""
 	takes in a YT xyz field and plots the position
 	in xy xz and yz
@@ -262,8 +262,15 @@ def plot_projection(data,x_field,y_field,q_field,width, q_unit,filter=None, filt
 
 
         # density
-	if density:
-    	     val_array = val_array / (freq_array * (x_size * density_scale * y_size * density_scale)) # mass divided by the area of each radial bin
+	if extra == "density":
+		# here we care about the physical densitiy/dimensions of everything		
+		val_array = val_array / (freq_array * (x_size * density_scale * y_size * density_scale)) # mass divided by the area of each radial bin
+
+	if extra == "mean":
+		# here we do not care about the physical size of everything
+		val_array = val_array / freq_array
+
+	
         return r_bins, val_array, 
 
 
@@ -308,6 +315,7 @@ def plot_sfr(sphere, plot_name="selene", n_bins=50):
 		plt.xlabel('Time  [Gyr]')
 		plt.ylabel('SFR')
 		plt.savefig(("%s_sfr.png" % plot_name))
+		plt.savefig(("%s_sfr.pdf" % plot_name))
 		plt.close()
 
 	return time, sfr
@@ -525,6 +533,7 @@ def plot_standard_vcirc(sphere,cylinder,snap,galaxy_name,r_min=None,r_max=None,d
 
 	plt.legend()
 	plt.savefig(("%s_rot_circ.png" % galaxy_name))
+	plt.savefig(("%s_rot_circ.pdf" % galaxy_name))
 	plt.close()
 
 def plot_xy(x,y,x_lab,y_lab,filename,type="line",x_min=None,x_max=None,y_min=None,y_max=None,label=None,y_err=None):
@@ -610,4 +619,25 @@ def plot_frb_profile(image,width,y_units,x_lab,y_lab,filename,n_bins=50,ylog=Tru
 	plt.xlabel(x_lab)
 	plt.ylabel(y_lab)
 	plt.savefig(("%s.png" % filename))
+
+def plot_particle_projection(x_field, y_field, z_field, weight_field="mean", density=False):
+	"""
+	This method takes in a series of particle data in a 3D volume
+	Then projects it into a 2D image
+	And then can be followed on with some further routines
+
+	Data must be in YT arrays
+
+	if weight field = "mean"... it will just calculate the mean
+	if density = True, it will also take into account the physical dimensions of each bin too.
+	"""
+	return None
+
+	
+
+
+
+
+
+
 
