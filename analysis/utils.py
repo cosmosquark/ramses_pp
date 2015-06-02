@@ -42,23 +42,23 @@ def compute_star_met(object, ref=None, type="stars"):
 
 	if type != None:
 
-		FeH = np.log10(object[type,"particle_Fe"].value / object[type,"particle_H"].value) - np.log10(sol_abund["Fe"] / sol_abund["H"])
-		OFe = np.log10(object[type,"particle_O"].value / object[type,"particle_Fe"].value) - np.log10(sol_abund["O"] / sol_abund["Fe"])
-		MgFe = np.log10(object[type,"particle_Mg"].value / object[type,"particle_Fe"].value) - np.log10(sol_abund["Mg"] / sol_abund["Fe"])
-		CFe = np.log10(object[type,"particle_C"].value / object[type,"particle_Fe"].value) - np.log10(sol_abund["C"] / sol_abund["Fe"])
-		NFe = np.log10(object[type,"particle_N"].value / object[type,"particle_Fe"].value) - np.log10(sol_abund["N"] / sol_abund["Fe"])
-		NeFe = np.log10(object[type,"particle_Ne"].value / object[type,"particle_Fe"].value) - np.log10(sol_abund["Ne"] / sol_abund["Fe"])
-		SiFe = np.log10(object[type,"particle_Si"].value / object[type,"particle_Fe"].value) - np.log10(sol_abund["Si"] / sol_abund["Fe"])
+		FeH = np.log10(object[type,"particle_Fe_fraction"].value / object[type,"particle_H_fraction"].value) - np.log10(sol_abund["Fe"] / sol_abund["H"])
+		OFe = np.log10(object[type,"particle_O_fraction"].value / object[type,"particle_Fe_fraction"].value) - np.log10(sol_abund["O"] / sol_abund["Fe"])
+		MgFe = np.log10(object[type,"particle_Mg_fraction"].value / object[type,"particle_Fe_fraction"].value) - np.log10(sol_abund["Mg"] / sol_abund["Fe"])
+		CFe = np.log10(object[type,"particle_C_fraction"].value / object[type,"particle_Fe_fraction"].value) - np.log10(sol_abund["C"] / sol_abund["Fe"])
+		NFe = np.log10(object[type,"particle_N_fraction"].value / object[type,"particle_Fe_fraction"].value) - np.log10(sol_abund["N"] / sol_abund["Fe"])
+		NeFe = np.log10(object[type,"particle_Ne_fraction"].value / object[type,"particle_Fe_fraction"].value) - np.log10(sol_abund["Ne"] / sol_abund["Fe"])
+		SiFe = np.log10(object[type,"particle_Si_fraction"].value / object[type,"particle_Fe_fraction"].value) - np.log10(sol_abund["Si"] / sol_abund["Fe"])
 	
 	else:
 
-		FeH = np.log10(object["particle_Fe"].value / object["particle_H"].value) - np.log10(sol_abund["Fe"] / sol_abund["H"])
-		OFe = np.log10(object["particle_O"].value / object["particle_Fe"].value) - np.log10(sol_abund["O"] / sol_abund["Fe"])
-		MgFe = np.log10(object["particle_Mg"].value / object["particle_Fe"].value) - np.log10(sol_abund["Mg"] / sol_abund["Fe"])
-		CFe = np.log10(object["particle_C"].value / object["particle_Fe"].value) - np.log10(sol_abund["C"] / sol_abund["Fe"])
-		NFe = np.log10(object["particle_N"].value / object["particle_Fe"].value) - np.log10(sol_abund["N"] / sol_abund["Fe"])
-		NeFe = np.log10(object["particle_Ne"].value / object["particle_Fe"].value) - np.log10(sol_abund["Ne"] / sol_abund["Fe"])
-		SiFe = np.log10(object["particle_Si"].value / object["particle_Fe"].value) - np.log10(sol_abund["Si"] / sol_abund["Fe"])
+		FeH = np.log10(object["particle_Fe_fraction"].value / object["particle_H_fraction"].value) - np.log10(sol_abund["Fe"] / sol_abund["H"])
+		OFe = np.log10(object["particle_O_fraction"].value / object["particle_Fe_fraction"].value) - np.log10(sol_abund["O"] / sol_abund["Fe"])
+		MgFe = np.log10(object["particle_Mg_fraction"].value / object["particle_Fe_fraction"].value) - np.log10(sol_abund["Mg"] / sol_abund["Fe"])
+		CFe = np.log10(object["particle_C_fraction"].value / object["particle_Fe_fraction"].value) - np.log10(sol_abund["C"] / sol_abund["Fe"])
+		NFe = np.log10(object["particle_N_fraction"].value / object["particle_Fe_fraction"].value) - np.log10(sol_abund["N"] / sol_abund["Fe"])
+		NeFe = np.log10(object["particle_Ne_fraction"].value / object["particle_Fe_fraction"].value) - np.log10(sol_abund["Ne"] / sol_abund["Fe"])
+		SiFe = np.log10(object["particle_Si_fraction"].value / object["particle_Fe_fraction"].value) - np.log10(sol_abund["Si"] / sol_abund["Fe"])
 
 
 	data = {
