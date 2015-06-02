@@ -21,7 +21,18 @@ from ramses_pp.analysis import read_utils, filter_utils, plot_utils
 import scipy as sp
 
 
-def compute_star_met(object, ref=None):
+import weakref, copy
+import abc
+import re, uuid
+import abc
+
+
+def compute_star_met(object, ref=None, type="stars"):
+	"""
+	Computes the metallicities from either a YT dataset
+	Or a dictionary of YT Arrays
+	"""
+
 
 	## Anders & Grevesse 1989 as default values
 	sol_abund = {"H":0.706, "He":0.275, "C":3.03e-3, "N":1.11e-3, "O":9.59e-3, "Ne":0.00000001, "Mg":5.15e-4, "Si":6.53e-4, "Fe":1.17e-3,"Z":0.019}
@@ -29,13 +40,26 @@ def compute_star_met(object, ref=None):
 	if ref=="asplund":
 		sol_abund = {"H":0.715, "He":0.270, "C": 0.0024, "N":0.000728 , "O":0.006, "Ne":0.0013, "Mg":0.000742, "Si":0.0007, "Fe":0.00135,  "Z":0.0143}
 
-	FeH = np.log10(object["stars","particle_Fe"].value / object["stars","particle_H"].value) - np.log10(sol_abund["Fe"] / sol_abund["H"])
-	OFe = np.log10(object["stars","particle_O"].value / object["stars","particle_Fe"].value) - np.log10(sol_abund["O"] / sol_abund["Fe"])
-	MgFe = np.log10(object["stars","particle_Mg"].value / object["stars","particle_Fe"].value) - np.log10(sol_abund["Mg"] / sol_abund["Fe"])
-	CFe = np.log10(object["stars","particle_C"].value / object["stars","particle_Fe"].value) - np.log10(sol_abund["C"] / sol_abund["Fe"])
-	NFe = np.log10(object["stars","particle_N"].value / object["stars","particle_Fe"].value) - np.log10(sol_abund["N"] / sol_abund["Fe"])
-	NeFe = np.log10(object["stars","particle_Ne"].value / object["stars","particle_Fe"].value) - np.log10(sol_abund["Ne"] / sol_abund["Fe"])
-	SiFe = np.log10(object["stars","particle_Si"].value / object["stars","particle_Fe"].value) - np.log10(sol_abund["Si"] / sol_abund["Fe"])
+	if type != None:
+
+		FeH = np.log10(object[type,"particle_Fe"].value / object[type,"particle_H"].value) - np.log10(sol_abund["Fe"] / sol_abund["H"])
+		OFe = np.log10(object[type,"particle_O"].value / object[type,"particle_Fe"].value) - np.log10(sol_abund["O"] / sol_abund["Fe"])
+		MgFe = np.log10(object[type,"particle_Mg"].value / object[type,"particle_Fe"].value) - np.log10(sol_abund["Mg"] / sol_abund["Fe"])
+		CFe = np.log10(object[type,"particle_C"].value / object[type,"particle_Fe"].value) - np.log10(sol_abund["C"] / sol_abund["Fe"])
+		NFe = np.log10(object[type,"particle_N"].value / object[type,"particle_Fe"].value) - np.log10(sol_abund["N"] / sol_abund["Fe"])
+		NeFe = np.log10(object[type,"particle_Ne"].value / object[type,"particle_Fe"].value) - np.log10(sol_abund["Ne"] / sol_abund["Fe"])
+		SiFe = np.log10(object[type,"particle_Si"].value / object[type,"particle_Fe"].value) - np.log10(sol_abund["Si"] / sol_abund["Fe"])
+	
+	else:
+
+		FeH = np.log10(object["particle_Fe"].value / object["particle_H"].value) - np.log10(sol_abund["Fe"] / sol_abund["H"])
+		OFe = np.log10(object["particle_O"].value / object["particle_Fe"].value) - np.log10(sol_abund["O"] / sol_abund["Fe"])
+		MgFe = np.log10(object["particle_Mg"].value / object["particle_Fe"].value) - np.log10(sol_abund["Mg"] / sol_abund["Fe"])
+		CFe = np.log10(object["particle_C"].value / object["particle_Fe"].value) - np.log10(sol_abund["C"] / sol_abund["Fe"])
+		NFe = np.log10(object["particle_N"].value / object["particle_Fe"].value) - np.log10(sol_abund["N"] / sol_abund["Fe"])
+		NeFe = np.log10(object["particle_Ne"].value / object["particle_Fe"].value) - np.log10(sol_abund["Ne"] / sol_abund["Fe"])
+		SiFe = np.log10(object["particle_Si"].value / object["particle_Fe"].value) - np.log10(sol_abund["Si"] / sol_abund["Fe"])
+
 
 	data = {
 		"FeH": FeH,
@@ -107,11 +131,14 @@ def radial_indices(field,data,r_min=None,r_max=None,dr_factor=1):
 	r_bins = data.ds.arr(np.zeros(int(r_indices.max() + 1)),"code_length")
 	for i in range(0,len(r_bins)):
 		r_bins[i] = ( (i * dr_factor) + 1) * r_min.in_units("code_length")
-	r_bins = r_bins.in_units("cmcm")
+	try:
+		r_bins = r_bins.in_units("cmcm")
+	except yt.units.unit_object.UnitParseError:
+		r_bins = r_bins.in_units("cm")
 	return r_indices, r_bins, r_filter, r_truths
 
 
-def mass_enclosed_bins(object,snap,r_bins,shape="sphere",type="all"):
+def mass_enclosed_bins(object,snap,r_bins,shape="sphere",type="all",sim_object_type=None):
 	"""
 	extending radial_indices, this function can find the enclosed mass of
 	of a particular field (stars, dm, gas, total or custom)
@@ -127,26 +154,57 @@ def mass_enclosed_bins(object,snap,r_bins,shape="sphere",type="all"):
 	invalid = False
 	print r_bins
 	print r_bins[0].in_units("code_length")
+	if sim_object_type == None:
+		print "ramses_pp snapshot"
+		dataset = snap.raw_snapshot()
+	elif sim_object_type == "ad":
+		print "ytsnapshot"
+		dataset = snap.ds
+	else:
+		print "using object as snapshot"
+		dataset = object.ds
+
+	try:
+		test = r_bins.in_units("cmcm")
+		min_unit = "cmcm"
+	except yt.units.unit_object.UnitParseError:
+		min_unit = "cm"
+
+	test = dataset.sphere(object.center,object.ds.arr(r_bins[15],min_unit))
+	print test
+	mass = test.quantities.total_quantity(["particle_mass"])
+	print mass
+
 	for i in range(0,len(r_bins)):
 		if type == "all":
-			try:
-				m_bins[i] = snap.raw_snapshot().sphere(object.center,object.ds.arr(r_bins[i],"cmcm")).quantities.total_quantity(["particle_mass"]) + snap.raw_snapshot().sphere(object.center,object.ds.arr(r_bins[i],"cmcm")).quantities.total_quantity(["cell_mass"])
-			except:
-				m_bins[i] = object.ds.arr(0.0,"g")
+			if "cell_mass" in object.ds.field_list:
+				try:
+					m_bins[i] = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit)).quantities.total_quantity(["particle_mass"]) + dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit)).quantities.total_quantity(["cell_mass"])
+				except:
+					m_bins[i] = object.ds.arr(0.0,"g")
+			else:
+				try:
+					m_bins[i] = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit)).quantities.total_quantity(["particle_mass"])
+				except:
+					m_bins[i] = object.ds.arr(0.0,"g")
 		elif type == "gas":
-			m_bins[i] = snap.raw_snapshot().sphere(object.center,object.ds.arr(r_bins[i],"cmcm")).quantities.total_quantity(["cell_mass"])
+			if "cell_mass" in object.ds.field_list:
+				m_bins[i] = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit)).quantities.total_quantity(["cell_mass"])
+			else:
+				temp = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit))
+				m_bins[i] = temp['gas','particle_mass'].sum()
 		elif type == "stars":
 			try:
-				temp = snap.raw_snapshot().sphere(object.center,object.ds.arr(r_bins[i],"cmcm"))
+				temp = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit))
 				m_bins[i] = temp['stars','particle_mass'].sum()
 			except:
-				temp = snap.raw_snapshot().sphere(object.center,object.ds.arr(r_bins[i],"cmcm"))
+				temp = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit))
 				print i
 				print "fuckkkkk", temp['stars','particle_mass']
 				m_bins[i] = object.ds.arr(0.0,"g")
 		elif type == "dark":
 			try:
-				temp = snap.raw_snapshot().sphere(object.center,object.ds.arr(r_bins[i],"cmcm"))
+				temp = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit))
 				m_bins[i] = temp['dark','particle_mass'].sum()
 			except:
 				m_bins[i] = object.ds.arr(0.0,"g")
@@ -157,6 +215,7 @@ def mass_enclosed_bins(object,snap,r_bins,shape="sphere",type="all"):
 	if invalid == True:
 		return None
 	else:
+		print m_bins, "test m bins"
 		return m_bins
 
 
@@ -167,20 +226,22 @@ def vcirc(r_bins,m_bins,data):
 
 	vcirc = data.ds.arr(np.zeros(len(m_bins)))
 	vcirc = (np.sqrt(G * (m_bins) / r_bins))
+	print "vcirc test", vcirc
 	return vcirc
 
 def jcirc_bins(r_bins,v_circ,m_bins,data):
 	""" this computes j_circ for each individual r_bin, v_circ bin and m_bin"""
 	j_circ = data.ds.arr(np.zeros(len(m_bins)))
 	j_circ = r_bins * v_circ
-	print j_circ, "j"
+	print j_circ, "j bins"
 	return j_circ
 
 def jcirc(data, r_indices,v_circ,r_filter,type="all"):
 	""" this computes j_circ for each individual r_bin, v_circ bin and m_bin"""
-	star_count = len(data['particle_age'] != 0)
 	j_circ = (data[type, "particle_position_spherical_radius"][r_filter] * (v_circ[r_indices].astype(int)))
 	# j_circ is of the length of data[field][filter]
+
+	print "test jcirc", j_circ
 	return j_circ
 
 
@@ -205,6 +266,8 @@ def vrot(data,type="all",r_filter = None):
 	else:
 		vrot = data[type,"particle_velocity_cylindrical_theta"]
 		rrot = data[type,"particle_position_cylindrical_radius"]
+
+	print "vrot_test", vrot
 	return vrot
 
 def manual_vrot(data,type="all",r_filter = None):
@@ -218,8 +281,8 @@ def manual_vrot(data,type="all",r_filter = None):
 
 	if r_filter != None:
 		r = np.sqrt(np.power(data[type,"particle_position_relative_x"][r_filter],2) + np.power(data[type,"particle_position_relative_y"][r_filter],2))
-		vrot = (data[type,"particle_position_relative_y"][r_filter] * data[type,"particle_velocity_relative_x"][r_filter])
-		vrot = vrot - (data[type,"particle_position_relative_x"][r_filter] * data[type,"particle_velocity_relative_y"][r_filter])
+		vrot = - (data[type,"particle_position_relative_y"][r_filter] * data[type,"particle_velocity_relative_x"][r_filter])
+		vrot = vrot + (data[type,"particle_position_relative_x"][r_filter] * data[type,"particle_velocity_relative_y"][r_filter])
 		vrot = vrot / r
 
 
@@ -242,12 +305,19 @@ def jz(data, type="all", r_filter = None):
 		data.field_data.pop((type, 'particle_specific_angular_momentum_z'))
 		
 
+	try:
+		test = data[type,"particle_specific_angular_momentum_z"].in_units("cmcm")
+		min_unit = "kpccm**2/s"
+	except yt.units.unit_object.UnitParseError:
+		min_unit = "kpc**2/s"
+
 
 	if r_filter != None:
 		print r_filter
-		jz = data[type,"particle_specific_angular_momentum_z"][r_filter].in_units("kpccm**2/s")
+		jz = data[type,"particle_specific_angular_momentum_z"][r_filter].in_units(min_unit)
 	else:
-		jz = data[type,"particle_specific_angular_momentum_z"].in_units("kpccm**2/s")
+		jz = data[type,"particle_specific_angular_momentum_z"].in_units(min_unit)
+	print "test jz", jz
 	return jz
 
 def manual_jz(data,type="all",r_filter = None):
@@ -270,7 +340,7 @@ def manual_jz(data,type="all",r_filter = None):
 	return jz
 
 
-def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_max=None,spline=False):
+def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_max=None,spline=False,sim_object_type=None):
 	"""
 	At the moment, this technique can only filter for disk stars
 	This is computed by calculating the ratio of Jz/Jcirc
@@ -286,16 +356,27 @@ def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_ma
        		data.ds.add_particle_filter("stars")
 	print "decomposing stars into disk and non-disk, please wait"
 	r_indices, r_bins, r_filter, r_truths = radial_indices(("stars","particle_spherical_position_radius"),data,r_min,r_max)
-	m_bins = mass_enclosed_bins(data,snap,r_bins,shape="sphere",type="all")
+	m_bins = mass_enclosed_bins(data,snap,r_bins,shape="sphere",type="all",sim_object_type=sim_object_type)
 	v_circ = vcirc(r_bins,m_bins,data)
 	j_circ = jcirc(data,r_indices,v_circ,r_filter,type="stars")
 
-#	j_z = jz(data,r_filter=r_filter,type="stars")
-	j_z = manual_jz(data,r_filter=r_filter,type="stars")	
+	j_z = jz(data,r_filter=r_filter,type="stars")
+#	j_z = manual_jz(data,r_filter=r_filter,type="stars")	
 
 	print j_circ, "j"
 	print v_circ, "v"
-	ratio = j_z.in_units("kpccm**2/s") / j_circ.in_units("kpccm**2/s").value
+
+	try:
+		test = r_bins.in_units("cmcm")
+		min_unit = "cmcm"
+	except yt.units.unit_object.UnitParseError:
+		min_unit = "cm"
+
+
+	if min_unit == "cmcm":
+		ratio = j_z.in_units("kpccm**2/s") / j_circ.in_units("kpccm**2/s").value
+	else:
+		ratio = j_z.in_units("kpc**2/s") / j_circ.in_units("kpc**2/s").value
 	print ratio
 	# get indices of stars which satisfy the conditions
 
@@ -314,6 +395,8 @@ def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_ma
 	y = np.where(x == True)
 	disk_star_indices = ratio_expanded[y]
 	disk_star = data["stars","particle_index"][y]
+
+	print "NUMBER OF DISK STARS", len(disk_star)
 
 	if plot != None:
 
