@@ -138,7 +138,7 @@ def radial_indices(field,data,r_min=None,r_max=None,dr_factor=1):
 	return r_indices, r_bins, r_filter, r_truths
 
 
-def mass_enclosed_bins(object,snap,r_bins,shape="sphere",type="all",sim_object_type=None):
+def mass_enclosed_bins(object,snap,r_bins,shape="sphere",type="all",sim_object_type=None, AMR=True):
 	"""
 	extending radial_indices, this function can find the enclosed mass of
 	of a particular field (stars, dm, gas, total or custom)
@@ -171,7 +171,8 @@ def mass_enclosed_bins(object,snap,r_bins,shape="sphere",type="all",sim_object_t
 
 	for i in range(0,len(r_bins)):
 		if type == "all":
-			if "cell_mass" in object.ds.field_list:
+			#print object.ds.field_list
+			if AMR == True:
 				try:
 					m_bins[i] = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit)).quantities.total_quantity(["particle_mass"]) + dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit)).quantities.total_quantity(["cell_mass"])
 				except:
@@ -182,7 +183,7 @@ def mass_enclosed_bins(object,snap,r_bins,shape="sphere",type="all",sim_object_t
 				except:
 					m_bins[i] = object.ds.arr(0.0,"g")
 		elif type == "gas":
-			if "cell_mass" in object.ds.field_list:
+			if AMR == True:
 				m_bins[i] = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit)).quantities.total_quantity(["cell_mass"])
 			else:
 				temp = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit))
@@ -280,7 +281,7 @@ def manual_vrot(data,type="all",r_filter = None):
 	return vrot
 
 
-def jz(data, type="all", r_filter = None):
+def jz(data, type="all", r_filter = None, reverse_orientation = False):
 	"""
 	returns jz (its the specific angular momentum in the z axis
 	assuming your object has a centre and a normal vector
@@ -293,16 +294,22 @@ def jz(data, type="all", r_filter = None):
 		
 
 	try:
-		test = data[type,"particle_specific_angular_momentum_z"].in_units("cmcm")
+		test = data[type,"particle_specific_angular_momentum_z"].in_units("kpcc**2/s")
 		min_unit = "kpccm**2/s"
 	except yt.units.unit_object.UnitParseError:
 		min_unit = "kpc**2/s"
 
 
 	if r_filter != None:
-		jz = data[type,"particle_specific_angular_momentum_z"][r_filter].in_units(min_unit)
+		if reverse_orientation == True:
+			jz = -data[type,"particle_specific_angular_momentum_z"][r_filter].in_units(min_unit)
+		else:
+			jz = data[type,"particle_specific_angular_momentum_z"][r_filter].in_units(min_unit)
 	else:
-		jz = data[type,"particle_specific_angular_momentum_z"].in_units(min_unit)
+		if reverse_orientation == True:
+			jz = -data[type,"particle_specific_angular_momentum_z"].in_units(min_unit)
+		else:
+			jz = data[type,"particle_specific_angular_momentum_z"].in_units(min_unit)
 	return jz
 
 def manual_jz(data,type="all",r_filter = None):
@@ -315,17 +322,17 @@ def manual_jz(data,type="all",r_filter = None):
 #		data.field_data.pop((type, 'particle_velocity_relative_y'))
 
 	if r_filter != None:
-		vrot = (data[type,"particle_position_relative_y"][r_filter] * data[type,"particle_velocity_relative_x"][r_filter])
-		vrot = vrot - (data[type,"particle_position_relative_x"][r_filter] * data[type,"particle_velocity_relative_y"][r_filter])
+		vrot = (data[type,"particle_position_relative_x"][r_filter] * data[type,"particle_velocity_relative_y"][r_filter])
+		vrot = vrot - (data[type,"particle_position_relative_y"][r_filter] * data[type,"particle_velocity_relative_x"][r_filter])
 	else:
-		vrot = (data[type,"particle_position_relative_y"] * data[type,"particle_velocity_relative_x"])
-		vrot = vrot - (data[type,"particle_position_relative_x"] * data[type,"particle_velocity_relative_y"])
+		vrot = (data[type,"particle_position_relative_x"] * data[type,"particle_velocity_relative_y"])
+		vrot = vrot - (data[type,"particle_position_relative_y"] * data[type,"particle_velocity_relative_x"])
 
 	jz = vrot
 	return jz
 
 
-def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_max=None,spline=False,sim_object_type=None):
+def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_max=None,spline=False,sim_object_type=None, manual_jz_flag = False, reverse_orientation=True, AMR = True):
 	"""
 	At the moment, this technique can only filter for disk stars
 	This is computed by calculating the ratio of Jz/Jcirc
@@ -341,12 +348,16 @@ def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_ma
        		data.ds.add_particle_filter("stars")
 	print "decomposing stars into disk and non-disk, please wait"
 	r_indices, r_bins, r_filter, r_truths = radial_indices(("stars","particle_spherical_position_radius"),data,r_min,r_max)
-	m_bins = mass_enclosed_bins(data,snap,r_bins,shape="sphere",type="all",sim_object_type=sim_object_type)
+	m_bins = mass_enclosed_bins(data,snap,r_bins,shape="sphere",type="all",sim_object_type=sim_object_type, AMR = AMR)
 	v_circ = vcirc(r_bins,m_bins,data)
 	j_circ = jcirc(data,r_indices,v_circ,r_filter,type="stars")
 
-	j_z = jz(data,r_filter=r_filter,type="stars")
-#	j_z = manual_jz(data,r_filter=r_filter,type="stars")	
+	print "FLAGS", manual_jz_flag, reverse_orientation
+
+	if manual_jz_flag == False:
+		j_z = jz(data,r_filter=r_filter,type="stars", reverse_orientation=reverse_orientation)
+	else:
+		j_z = manual_jz(data,r_filter=r_filter,type="stars")	
 
 
 	try:

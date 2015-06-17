@@ -146,15 +146,19 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 	depth = (depth.v,depth.units)
 
 	fields = []
+	units = []
 
 	if gas_fields and gas == True:
 		fields = fields + gas_fields
-
+		units = units + gas_units
 	
 	if star_fields and stars == True:
 		fields = fields + star_fields
+		units = units + star_units
+
 	if dark_fields and dark == True:
 		fields = fields + dark_fields
+		units = units + dark_units
 
 	print fields
 	plots = {}
@@ -281,6 +285,9 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 			if 0 in axis:
 				print "plotting axis 0"
 				plot = yt.OffAxisSlicePlot(container.ds,basis_vectors[0],fields,center=container.center,width=width, north_vector=north_vectors[0])
+
+
+				
 				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
 				
 				plots["0_plot"] = plot
@@ -332,6 +339,12 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 				#TODO make sure filtered datasts carry across... but it seems to be the case here.
 				data_source = gen_data_source(0,container,raw_snapshot,width,width[0],axis_unit)
 				plot = yt.OffAxisProjectionPlot(data_source.ds,basis_vectors[0],fields,center=container.center,width=width,depth=width[0],weight_field=weight_field, north_vector=north_vectors[0])
+
+				# set the units
+				plot.set_axes_unit("kpc")
+				for i in range(0,len(fields)):
+					plot.set_unit(fields[i],units[i])
+
 				image = plot.frb
 				
 				plots["0_plot"] = plot
