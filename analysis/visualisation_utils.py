@@ -77,7 +77,7 @@ def gen_data_source(axis,container,ytsnap,width,depth,axis_unit):
 	data_source = ytsnap.region(container.center, left, right)
 	return data_source
 
-def visualisation(viz_type, container, raw_snapshot, module=config.default_module, gas=True, stars=False, dark=False, gas_fields=["temperature","density"],gas_units=["K","g/cm**3"], dark_fields=[('deposit', 'dark_density')], dark_units=["g/cm**3"], star_fields=[('deposit', 'stars_density')], star_units=["g/cm**3"], filter=None, return_objects=False, return_fields=False, callbacks=[], width=width_thing,extra_width=None,depth=depth_thing, name="plot", format=".png", prefix="", normal_vector=[1.0,0.0,0.0], axis=[0,1,2], plot_images = True, weight_field = None, image_width = 1000, extra_image_width=None, plot_pdf_images=False):
+def visualisation(viz_type, container, raw_snapshot, module=config.default_module, gas=True, stars=False, dark=False, gas_fields=["temperature","density"],gas_units=["K","g/cm**3"], gas_extrema=[[None,None],[None,None]], dark_fields=[('deposit', 'dark_density')], dark_units=["g/cm**3"], dark_extrema=[[None,None]], star_fields=[('deposit', 'stars_density')], star_units=["g/cm**3"], star_extrema=[[None,None]], filter=None, return_objects=False, return_fields=False, callbacks=[], width=width_thing,extra_width=None,depth=depth_thing, name="plot", format=".png", prefix="", normal_vector=[1.0,0.0,0.0], axis=[0,1,2], plot_images = True, weight_field = None, image_width = 1000, extra_image_width=None, plot_pdf_images=False):
 
 	"""
 	This routine is designed to handle almost all of the visualisation routines that you can think of.
@@ -147,18 +147,37 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 
 	fields = []
 	units = []
+	extrema = []
 
 	if gas_fields and gas == True:
 		fields = fields + gas_fields
 		units = units + gas_units
-	
+		extrema = extrema + gas_extrema	
+
 	if star_fields and stars == True:
 		fields = fields + star_fields
 		units = units + star_units
+		extrema = extrema + star_extrema
 
 	if dark_fields and dark == True:
 		fields = fields + dark_fields
 		units = units + dark_units
+		extrema = extrema + dark_extrema
+
+	# correct length of the extrema
+	# usually if this is the case, then we obviously don't care
+
+	if len(fields) > len(extrema):
+		diff = len(fields) - len(extrema)
+		for i in range(0,diff):
+			extrema = extrema + [[None, None]]
+
+	for i in range(0, len(extrema)):
+		if extrema[i][0] == None:
+			extrema[i][0] = "min"
+		if extrema[i][1] == None:
+			extrema[i][1] = "max"
+
 
 	print fields
 	plots = {}
@@ -185,7 +204,13 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 				print width[0][0], "width"
 				plot = yt.SlicePlot(container.ds,0,fields,center=container.center,width=width)
 				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), image_width[0])
-				
+
+				# set the units
+				plot.set_axes_unit("kpc")
+				for i in range(0,len(fields)):
+					plot.set_unit(fields[i],units[i])
+					plot.set_zlim(fields[i],extrema[i][0],extrema[i][1])
+
 				plots["0_plot"] = plot
 				frb["0_frb"] = image
 
@@ -199,7 +224,13 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 				print "plotting axis 1"		
 				plot = yt.SlicePlot(container.ds,1,fields,center=container.center,width=width)
 				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
-				
+
+				# set the units
+				plot.set_axes_unit("kpc")
+				for i in range(0,len(fields)):
+					plot.set_unit(fields[i],units[i])
+					plot.set_zlim(fields[i],extrema[i][0],extrema[i][1])
+
 				plots["1_plot"] = plot
 				frb["1_frb"] = image
 
@@ -214,7 +245,13 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 				print "plotting axis 2"
 				plot = yt.SlicePlot(container.ds,2,fields,center=container.center,width=width)
 				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
-				
+
+				# set the units
+				plot.set_axes_unit("kpc")
+				for i in range(0,len(fields)):
+					plot.set_unit(fields[i],units[i])
+					plot.set_zlim(fields[i],extrema[i][0],extrema[i][1])
+
 				plots["2_plot"] = plot
 				frb["2_frb"] = image
 
@@ -235,7 +272,13 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 				print "plotting axis 0"		
 				plot = yt.ProjectionPlot(container.ds,0,fields,center=container.center,width=width,weight_field=weight_field, data_source=data_source)
 				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
-				
+
+				# set the units
+				plot.set_axes_unit("kpc")
+				for i in range(0,len(fields)):
+					plot.set_unit(fields[i],units[i])
+					plot.set_zlim(fields[i],extrema[i][0],extrema[i][1])
+
 				plots["0_plot"] = plot
 				frb["0_frb"] = image
 
@@ -250,7 +293,13 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 				data_source = gen_data_source(1,container,raw_snapshot,width,depth,axis_unit)
 				plot = yt.ProjectionPlot(container.ds,1,fields,center=container.center,width=width,weight_field=weight_field, data_source=data_source)
 				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
-				
+
+				# set the units
+				plot.set_axes_unit("kpc")
+				for i in range(0,len(fields)):
+					plot.set_unit(fields[i],units[i])
+					plot.set_zlim(fields[i],extrema[i][0],extrema[i][1])
+
 				plots["1_plot"] = plot
 				frb["1_frb"] = image
 
@@ -265,6 +314,12 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 				data_source = gen_data_source(2,container,raw_snapshot,width,depth,axis_unit)
 				plot = yt.ProjectionPlot(container.ds,2,fields,center=container.center,width=width,weight_field=weight_field, data_source=data_source)
 				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
+
+				# set the units
+				plot.set_axes_unit("kpc")
+				for i in range(0,len(fields)):
+					plot.set_unit(fields[i],units[i])
+					plot.set_zlim(fields[i],extrema[i][0],extrema[i][1])
 				
 				plots["2_plot"] = plot
 				frb["2_frb"] = image
@@ -285,10 +340,13 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 			if 0 in axis:
 				print "plotting axis 0"
 				plot = yt.OffAxisSlicePlot(container.ds,basis_vectors[0],fields,center=container.center,width=width, north_vector=north_vectors[0])
-
-
-				
 				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
+
+				# set the units
+				plot.set_axes_unit("kpc")
+				for i in range(0,len(fields)):
+					plot.set_unit(fields[i],units[i])
+					plot.set_zlim(fields[i],extrema[i][0],extrema[i][1])
 				
 				plots["0_plot"] = plot
 				frb["0_frb"] = image
@@ -303,6 +361,12 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 				plot = yt.OffAxisSlicePlot(container.ds,basis_vectors[1],fields,center=container.center,width=width, north_vector=north_vectors[0])
 				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
 				
+				# set the units
+				plot.set_axes_unit("kpc")
+				for i in range(0,len(fields)):
+					plot.set_unit(fields[i],units[i])
+					plot.set_zlim(fields[i],extrema[i][0],extrema[i][1])
+
 				plots["1_plot"] = plot
 				frb["1_frb"] = image
 
@@ -317,6 +381,12 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 				plot = yt.OffAxisSlicePlot(container.ds,basis_vectors[2],fields,center=container.center,width=width, north_vector=north_vectors[0])
 				image = plot.data_source.to_frb(yt.YTQuantity(width[0][0], axis_unit), [image_width[0], image_width[1]])
 				
+				# set the units
+				plot.set_axes_unit("kpc")
+				for i in range(0,len(fields)):
+					plot.set_unit(fields[i],units[i])
+					plot.set_zlim(fields[i],extrema[i][0],extrema[i][1])
+
 				plots["2_plot"] = plot
 				frb["2_frb"] = image
 
@@ -344,6 +414,7 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 				plot.set_axes_unit("kpc")
 				for i in range(0,len(fields)):
 					plot.set_unit(fields[i],units[i])
+					plot.set_zlim(fields[i],extrema[i][0],extrema[i][1])
 
 				image = plot.frb
 				
@@ -359,6 +430,14 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 				print "plotting axis 1"
 				data_source = gen_data_source(1,container,raw_snapshot,width,width[0],axis_unit)
 				plot = yt.OffAxisProjectionPlot(data_source.ds,basis_vectors[1],fields,center=container.center,width=width,depth=width[0],weight_field=weight_field, north_vector=north_vectors[0])
+
+				# set the units
+				plot.set_axes_unit("kpc")
+				for i in range(0,len(fields)):
+					plot.set_unit(fields[i],units[i])
+					plot.set_zlim(fields[i],extrema[i][0],extrema[i][1])
+
+
 				image = plot.frb
 				
 				plots["1_plot"] = plot
@@ -373,6 +452,14 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 				print "plotting axis 2"
 				data_source = gen_data_source(2,container,raw_snapshot,width,width[0],axis_unit)
 				plot = yt.OffAxisProjectionPlot(data_source.ds,basis_vectors[2],fields,center=container.center,width=width,depth=width[0],weight_field=weight_field, north_vector=north_vectors[0])
+
+
+				# set the units
+				plot.set_axes_unit("kpc")
+				for i in range(0,len(fields)):
+					plot.set_unit(fields[i],units[i])
+					plot.set_zlim(fields[i],extrema[i][0],extrema[i][1])
+
 				image = plot.frb
 				
 				plots["2_plot"] = plot

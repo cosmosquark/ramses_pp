@@ -59,7 +59,7 @@ def dark_filter(pfilter,data):
 	return filter
 
 def young_star_filter(pfilter,data):
-	filter = np.logical_and(data["particle_age"] != 0, data["particle_birth_epoch"].in_units("Gyr") <= data["particle_birth_epoch"].in_units("Gyr").min() + data.ds.arr("200","Myr"))
+	filter = np.logical_and(data["particle_age"] != 0, data["particle_birth_epoch"].in_units("Gyr") <= data["particle_birth_epoch"].in_units("Gyr").min() + data.ds.arr("2000","Myr"))
 	return filter
 
 
@@ -207,6 +207,7 @@ class YTSnapshot(Snapshot.Snapshot):
 		if finder=='rockstar':
 			return halos.RockstarCatalogue(self)
 		elif finder=='AHF':
+			print "YT AHF"
 			return halos.AHFCatalogue(self, **kwargs)
 		elif finder == 'hop':
 			return self.hop_halos()

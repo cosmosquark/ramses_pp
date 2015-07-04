@@ -35,9 +35,9 @@ class PynbodySnapshot(Snapshot.Snapshot):
 			self._snapshot = pynbody.load('%s/output_%05d'%(path, ioutput), cpus=cpus **kwargs)
 		else:
 			if ioutput == None:
-				self._snapshot = pynbody.load('%s' % (path), **kwargs)
+				self._snapshot = pynbody.load('%s' % (path), force_gas=False, **kwargs)
 			else:
-				self._snapshot = pynbody.load('%s/output_%05d'%(path, ioutput), **kwargs)
+				self._snapshot = pynbody.load('%s/output_%05d'%(path, ioutput), force_gas=False, **kwargs)
  	#Implement abstract methods from Snapshot.py
 
 	def output_number(self):
@@ -204,7 +204,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 				#s['mass'].convert_units('%f Msol'%massunit)
 				s['mass'].convert_units('%f Msol'%massunit)
 
-				gas = True
+				gas = False
 				if gas == True and len(s.g) > 0:
 					s.g['rho'].convert_units(m_unit/l_unit**3) # get gas variables
 					s.g['temp']

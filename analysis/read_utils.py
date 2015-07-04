@@ -14,7 +14,81 @@ from ramses_pp import config
 object_storage = config.yt_object_dir
 
 
+def read_yield_table(filename):
 
+	# first find the number of "metallicity" values
+
+	initial = np.genfromtxt(filename, skiprows=0, usecols=(0), comments=None, dtype="string")
+
+	# find the "metallicity" values
+	metal_indices = np.char.startswith(initial,"#")
+
+	# filters them
+	metal_table = initial[metal_indices]
+	# convert metals into floats
+	split = np.char.partition(metal_table,"#")
+
+	# we want the numbers... i.e the values AFTER the partition
+	# and convert into floats
+	metal_table = np.array(split[:,2], dtype="float")
+	metal_length = len(metal_table)
+	# now extract the size of each of the yield table info for each metal... this is really a 3D array
+	
+	# now how many rows are there in each element
+	yield_length = len(initial) - metal_length
+	yield_tab_length = int(yield_length / metal_length)
+
+
+	# array of dictionarys
+	# first value being the metallicity Z
+	# rest being a dictionary of values
+	yield_table = np.zeros((metal_length,2))
+	#data = np.loadtxt(filename, skiprows=1)
+	# lets start to populate the yield table
+
+	# this bit is easy
+	yield_table[:,0] = metal_table[:]
+	yield_table = yield_table.tolist() # so we can actually stick in dictionary data
+	# i.e populating the first column with the metal values
+
+
+	# now for the harder part. since we want to load yield_tab_length rows at a time]
+	## well we can simply use # as comments
+
+	data = np.loadtxt(filename,comments="#")
+
+
+	# seperate data into columns
+
+	#;time, H-2, He, C-4, N, O-6, Ne, Mg-8, Si, Fe-10, M Ejecta-11, MZ-12, Nb of SNII-13, Nb of SNIa-14, mass of SNII, mass of SNIa-16
+	# time = Gyr
+	# everything else mass of that elements ejected up to that time entry per initial solar mass
+	for i in range(0,yield_length,yield_tab_length):
+		first = i
+		last = (i + yield_tab_length)		
+		yield_no = int(np.divide(i,yield_tab_length))
+
+		yield_info = { "time": data[first:last,0],
+				"H": data[first:last,1],
+				"He": data[first:last,2],
+				"C": data[first:last,3],
+				"N": data[first:last,4],
+				"O": data[first:last,5],
+				"Ne": data[first:last,6],
+				"Mg": data[first:last,7],
+				"Si": data[first:last,8],
+				"Fe": data[first:last,9],
+				"M_ejecta": data[first:last,10],
+				"MZ": data[first:last,11],
+				"N_SNII": data[first:last,12],
+				"N_SNIa": data[first:last,13],
+				"M_SNII": data[first:last,14],
+				"M_SNIa": data[first:last,15],
+				}
+		yield_table[yield_no][1] = yield_info
+		yield_table[yield_no][0] = np.float(yield_table[yield_no][0])
+
+	return np.array(yield_table) # much better handled as a numpy array
 	
 
 def load_disk_data(snap, sim_name, sim_patch, halo_id = 0, snapno = None, n_disks=1, disk_h=None, disk_w=None, cylinder_w=None, cylinder_h=None,extra=None,overwrite=False,save=True, center = None, normal = None):
@@ -96,8 +170,14 @@ def lazy_load_galaxy(sim_name,sim_patch="normal",snap_no=None,halo_id=None,retur
 
 
 	ytsnap = snap.raw_snapshot()
+	all_data = ytsnap.all_data()
+
 	halos = snap.halos()
+	print halos
+	print halos[0]["pos"], halos[0]["Rvir"]
 	galaxy_halo = halos[halo_id]
+	print galaxy_halo
+	print "getting halo sphere"
 	halo_sphere = ytsnap.sphere(galaxy_halo["pos"],galaxy_halo["Rvir"])
 	add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
 	halo_sphere.ds.add_particle_filter("stars")
