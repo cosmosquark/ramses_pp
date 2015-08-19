@@ -233,7 +233,7 @@ def supernova(yield_file,formation_time,mass_formation,metallicity, no_bins = 10
 			tab[i,1] = tab[i,1] / wgt[i] # averaging part
 
 
-	return dx, tab[:jjmax,0], tab[:jjmax,1]
+	return np.array(dx), np.array(tab[:jjmax,0]), np.array(tab[:jjmax,1])
 	
 
 
@@ -261,6 +261,19 @@ def mstar_mhalo(ytsnap):
 
 	x = np.log10(dm_mass.value)
 	return x, mass_log
+
+def make_pdf(x, plotname, x_lab, y_lab="PDF", x_min=-1.0, x_max=1.5, nbins=100, spline=False):
+	"""
+	This function plots the PDF of a distribution x, usually for Jz/Jcirc cuts
+	"""
+
+	# filter x between the min and max values
+
+	filter = np.logical_and(x >= x_min, x <= x_max)
+	x = x[filter]
+	weights = np.ones_like(x)/len(x)
+	hist, bins = np.histogram(x,bins=nbins,weights=weights)
+	return hist, bins
 
 
 def ks_law(ytdataset,raw_snapshot,width,max_age,image_width=800,field="stars",n_bins=100, r_max = None):
@@ -339,9 +352,173 @@ def ks_law(ytdataset,raw_snapshot,width,max_age,image_width=800,field="stars",n_
 	return gas_density, star_density
 
 
+def ks_law_new(gas_cylinder,star_cylinder,ytsnap,star_center,image_width=800,field="stars",n_bins=100, r_max = None):
+	# hard coded things
+	# really should be some sort of config
+	width = ytsnap.arr(80,"kpc")
+	depth = ytsnap.arr(20,"kpc")
+
+	age = ytsnap.arr(3,"Gyr")  # increasing this increases the number of resolved points (reduces the "artificial lines")
+	max_age = age.in_units("yr").value
 
 
-def vcirc(ytdataset, fields=["all","stars","dark","gas"],r_min=None,r_max=None,dr_factor=2):
+
+	weight_field = None
+
+	if r_max == None:
+		r_max = gas_cylinder.ds.arr(15,"kpc") # reducing this reduces the width of the artificial lines
+	
+	print "Computing KS law"
+	print "ks 1) Gathering initial projections"
+
+	# todo.. make the output a histogram
+
+	width = ((width.v,width.units),(width.v,width.units))
+	image_width = (image_width,image_width) 
+
+	# slice of the star particle mass
+	normal = gas_cylinder.get_field_parameter("normal")
+	data_source = gen_data_source(0,gas_cylinder,ytsnap,width,width[0],"kpc")
+
+	plot = yt.OffAxisProjectionPlot(data_source.ds,normal,[("gas","density"),],center=gas_cylinder.center,width=width,depth=width[0],weight_field=weight_field, north_vector=normal)
+	# set the units
+#	plot.set_axes_unit("kpc")
+#	plot.set_unit(("gas","density"),"Msun/pc**2")
+#	plot.set_zlim(("gas","density"),10**(-3),10**4)
+	images = plot.frb
+	gas_image = images[('gas', 'density')]
+
+#	plot = yt.ProjectionPlot(star_cylinder,2,[("deposit","io_cic"),("deposit","io_density")],center=star_center,width=width[0],weight_field=None)
+#	# set the units
+#	plot.set_axes_unit("kpc")
+#	plot.set_unit(("deposit","io_cic"),"Msun/pc**2")
+#	plot.set_zlim(("deposit","io_cic"),10**(-3),10**8)
+ ##       plot.save("test_star_cylinder")
+#	plot.annotate_particles(width=(20,"kpc"), p_size=2.0, col='k', marker='o', stride=1.0, ptype="io", minimum_mass=None, alpha=1.0)
+#	plot.save("test_star_cylinder_stars")
+##	plot.set_unit(("deposit","io_cic"),"Msun/kpc**2")
+#	plot.set_unit(("deposit","io_density"),"Msun/kpc**2")
+	images = plot.frb
+	star_image = images[('deposit', 'io_cic')]
+
+	print "ks 2) collecting data"
+
+	# filtering things withing the first 15 kpc does the trick usuall
+
+
+	n_bins = gas_image.shape[0]
+	bin_width = width[0][0] / float(n_bins)
+	left = - width[0][0] / 2.0
+	right = width[0][0] / 2.0
+	length = np.arange(left,right,bin_width)
+	shift_thing = (length[2] - length[1]) / 2.0
+	length = length + shift_thing
+
+	# to make radial array, we need to calculate the radial distance of each pixel in a 2d array. Namely.
+
+	length_squared = np.power(length,2.0) # power of 2
+	radius_squared = np.add.outer(length_squared, length_squared) # adds as an outer product
+	radius = np.sqrt(radius_squared)
+
+	# now we need to generate some radial bins
+
+	radius_bin_width = radius.max() / float(n_bins)
+	radius_bins = np.arange(0,radius.max(), radius_bin_width)
+
+	# flatten the arrays
+
+	flat_radius = radius.flatten()
+
+	# now need to find the indices in which radius is maximum
+	radius_filter = (flat_radius < r_max.in_units("kpc").v)
+
+	# ok, now get the data
+	gas_density = np.array(gas_image.in_units("Msun/pc**2").value).flatten()
+	star_density = np.array(star_image.in_units("Msun/kpc**2").value).flatten()
+
+	# filter by radius
+	gas_density = np.log10(gas_density[radius_filter])
+	star_density = np.log10(star_density[radius_filter] / max_age )
+
+	return gas_density, star_density
+
+#	plt.scatter(gas_density,star_density,lw=0,s=3,label="data",c="black")
+##
+#	# create power law to plot
+#	n_ks_index = 1.4		
+#
+#	# generate efficiency lines
+#
+##	x_ks = np.logspace(-3,5,num=200)
+#	x_ks_power = np.power(x_ks,n_ks_index)
+#
+##	y_ks_one = 0.01 * x_ks_power
+#	y_ks_ten = 0.1 * x_ks_power
+##	y_ks_hundred = 1.0 * x_ks_power
+#
+#	# into logspace
+#
+#	fig = plt.figure(1)
+#	fig.set_size_inches(8.5,6.5)
+#	plt.plot(np.log10(x_ks),np.log10(y_ks_one),ls="--",label=r"$\epsilon_{*} = 1\%$")
+##	plt.plot(np.log10(x_ks),np.log10(y_ks_ten),ls="--",label=r"$\epsilon_{*} = 10\%$")
+#	plt.plot(np.log10(x_ks),np.log10(y_ks_hundred),ls="--", label = r"$\epsilon_{*} = 100\%$")
+#
+#	# generate some sample data
+##
+#	plt.xlabel("Log $\Sigma_{gas}$ ( $M_{\odot}$ pc$^{-2}$ )")
+#	plt.ylabel("Log $\Sigma_{SFR}$ ( $M_{\odot}$ yr$^{-1}$ kpc$^{-2}$ )")
+#	plt.xlim([-2.0,4.0])
+#	plt.ylim([-6.0,6.0])
+#	plt.legend(loc="best")
+##
+#	filename = galaxy_name + "-k-s-new-2.png"
+#	print "saving K-S law plot"
+##	plt.savefig(filename)
+#	plt.close()
+#
+	
+
+
+
+
+def dummy_datasets(dataset, field):
+
+	normal = dataset.get_field_parameter("normal")
+
+	min_pos_x = abs(dataset[field,'particle_position_relative_x'].in_units("cm").value.min())
+	min_pos_y = abs(dataset[field,'particle_position_relative_y'].in_units("cm").value.min())
+	min_pos_z = abs(dataset[field,'particle_position_relative_z'].in_units("cm").value.min())
+
+	sim_data_verb = {"particle_mass": dataset.ds.arr(dataset[field,"particle_mass"].in_units("g").value,"g"),
+				"particle_age_flip": dataset.ds.arr(dataset[field,'particle_age_flip'].in_units("s").value, "s"),
+				"particle_position_x": dataset.ds.arr(dataset[field,'particle_position_relative_x'].in_units("cm").value + min_pos_x, "cm"),
+				"particle_position_y": dataset.ds.arr(dataset[field,'particle_position_relative_y'].in_units("cm").value + min_pos_y, "cm"),
+				"particle_position_z": dataset.ds.arr(dataset[field,'particle_position_relative_z'].in_units("cm").value + min_pos_z, "cm"),
+				"particle_velocity_x": dataset.ds.arr(dataset[field,'particle_velocity_relative_x'].in_units("cm/s").value, "cm/s"),
+				"particle_velocity_y": dataset.ds.arr(dataset[field,'particle_velocity_relative_x'].in_units("cm/s").value, "cm/s"),
+				"particle_velocity_z": dataset.ds.arr(dataset[field,'particle_velocity_relative_x'].in_units("cm/s").value, "cm/s"),
+				}
+
+	box_min = np.hstack((sim_data_verb["particle_position_x"].v, sim_data_verb["particle_position_y"].v, sim_data_verb["particle_position_z"].v)).min()
+	box_max = np.hstack((sim_data_verb["particle_position_x"].v, sim_data_verb["particle_position_y"].v, sim_data_verb["particle_position_z"].v)).max()
+
+	bbox = 1.0 * np.array([[box_min,box_max],
+				[box_min,box_max],
+				[box_min,box_max]])
+
+
+	ds = yt.load_particles(sim_data_verb, length_unit="cm", mass_unit="g", time_unit="s", bbox=bbox, n_ref=1)
+
+	ad = ds.all_data()
+
+	new_center = ad.ds.arr([min_pos_x,min_pos_y,min_pos_z],"cm")
+
+	return ds, new_center
+
+
+
+def vcirc(ytdataset, fields=["all","stars","dark","gas"],r_min=None,r_max=None,dr_factor=2,AMR=True):
 	"""
 	Inputs:
 		Ytdataset (either particles or not).. with "stars", "dark", and "gas" defined (or not)
@@ -375,29 +552,29 @@ def vcirc(ytdataset, fields=["all","stars","dark","gas"],r_min=None,r_max=None,d
 	for field in fields:
 
 		if field == "all":
-			m_bins = utils.mass_enclosed_bins(ytdataset,ytdataset,r_bins,shape="sphere",type=field,sim_object_type="ad", AMR=True)
+			m_bins = utils.mass_enclosed_bins(ytdataset,ytdataset,r_bins,shape="sphere",type=field,sim_object_type="ad", AMR=AMR)
 			vcirc = utils.vcirc(r_bins,m_bins,ytdataset)
 
 			vcirc_list.append(vcirc.in_units("km/s").value)
 			r_bins_list.append(r_bins.in_units("kpc").value)
 
 		if field == "stars":
-			m_bins = utils.mass_enclosed_bins(ytdataset,ytdataset,r_bins,shape="sphere",type=field,sim_object_type="ad", AMR=True)
+			m_bins = utils.mass_enclosed_bins(ytdataset,ytdataset,r_bins,shape="sphere",type=field,sim_object_type="ad", AMR=AMR)
 			vcirc = utils.vcirc(r_bins,m_bins,ytdataset)
 
 			vcirc_list.append(vcirc.in_units("km/s").value)
 			r_bins_list.append(r_bins.in_units("kpc").value)
 
 		if field == "dark":
-			m_bins = utils.mass_enclosed_bins(ytdataset,ytdataset,r_bins,shape="sphere",type=field,sim_object_type="ad", AMR = True)
+			m_bins = utils.mass_enclosed_bins(ytdataset,ytdataset,r_bins,shape="sphere",type=field,sim_object_type="ad", AMR=AMR)
 			vcirc = utils.vcirc(r_bins,m_bins,ytdataset)
-
+			print "vcirc dark"
 			vcirc_list.append(vcirc.in_units("km/s").value)
 			r_bins_list.append(r_bins.in_units("kpc").value)
 
 
 		if field == "gas":
-			m_bins = utils.mass_enclosed_bins(ytdataset,ytdataset,r_bins,shape="sphere",type=field,sim_object_type="ad", AMR=True)
+			m_bins = utils.mass_enclosed_bins(ytdataset,ytdataset,r_bins,shape="sphere",type=field,sim_object_type="ad", AMR=AMR)
 			vcirc = utils.vcirc(r_bins,m_bins,ytdataset)
 
 			vcirc_list.append(vcirc.in_units("km/s").value)
@@ -407,7 +584,7 @@ def vcirc(ytdataset, fields=["all","stars","dark","gas"],r_min=None,r_max=None,d
 	return r_bins_list, vcirc_list
 
 
-def vrot(ytdataset, fields=["stars","young_stars","disk_stars","gas","cold_gas"],n_bins=50, AMR=True):
+def vrot(datadict, field_labels,  ytdataset, fields=["stars","young_stars","disk_stars","gas","cold_gas"],n_bins=50, AMR=True, manual=False):
 
 
 	"""
@@ -432,7 +609,7 @@ def vrot(ytdataset, fields=["stars","young_stars","disk_stars","gas","cold_gas"]
 		if field == "gas" and AMR == True:
 			vrot = yt.ProfilePlot(ytdataset,'cylindrical_r',["velocity_cylindrical_theta"],weight_field="cell_mass",n_bins=n_bins,x_log=False,y_log={"velocity_cylindrical_theta":False})
 			r_binned = vrot.profiles[0].x.in_units("kpc").value
-			vrot_binned = np.abs(vrot.profiles[0]["velocity_cylindrical_theta"]).in_units("km/s").value # this overwrites the yt plot object
+			vrot_binned = - vrot.profiles[0]["velocity_cylindrical_theta"].in_units("km/s").value # this overwrites the yt plot object
 		
 
 		elif field == "cold_gas" and AMR == True:
@@ -440,47 +617,63 @@ def vrot(ytdataset, fields=["stars","young_stars","disk_stars","gas","cold_gas"]
 			cold_disk = ytdataset.cut_region(["obj['temperature'] < 1e4"])
 			vrot = yt.ProfilePlot(cold_disk,'cylindrical_r',["velocity_cylindrical_theta"],weight_field="cell_mass",n_bins=n_bins,x_log=False,y_log={"velocity_cylindrical_theta":False})
 			r_binned = vrot.profiles[0].x.in_units("kpc").value
-			vrot_binned = np.abs(vrot.profiles[0]["velocity_cylindrical_theta"]).in_units("km/s").value	
+			vrot_binned = - vrot.profiles[0]["velocity_cylindrical_theta"].in_units("km/s").value	
 
 		else:
+			if manual == False:
 
-			if field != "disk_stars":
-				vrot = yt.ProfilePlot(ytdataset,(field,'particle_position_cylindrical_radius'),[(field,'particle_velocity_cylindrical_theta')],weight_field=(field,'particle_mass'),n_bins=n_bins,x_log=False,y_log={(field,'particle_velocity_cylindrical_theta'):False})	
+			#	vrot = yt.create_profile(ytdataset,[(field,'particle_position_cylindrical_radius')],[(field,'particle_velocity_cylindrical_theta')],logs={"particle_position_cylindrical_radius":False, 'particle_velocity_cylindrical_theta':False}, weight_field='particle_mass')
+			#	r_binned = vrot.x.in_units("kpc").value
+			#	vrot_binned = vrot[(field,'particle_velocity_cylindrical_theta')].in_units("km/s").value
+				#vrot = yt.ProfilePlot(ytdataset,(field,'particle_position_cylindrical_radius'),[(field,'particle_velocity_cylindrical_theta')],weight_field=(field,'particle_mass'),n_bins=n_bins,x_log=False,y_log={(field,'particle_velocity_cylindrical_theta'):False})
+				vrot = yt.ProfilePlot(ytdataset,(field,'particle_position_cylindrical_radius'),[(field,'particle_vtheta')],weight_field=(field,'particle_mass'),n_bins=n_bins,x_log=False,y_log={(field,'particle_vtheta'):False})		
 				r_binned = vrot.profiles[0].x.in_units("kpc").value
-				vrot_binned = np.abs(vrot.profiles[0][(field,'particle_velocity_cylindrical_theta')]).in_units("km/s").value
+				vrot_binned = - vrot.profiles[0][(field,'particle_vtheta')].in_units("km/s").value
 			
 			else:
-				# manual profile plot
+		#		# manual profile plot
 				hist, bins = np.histogram(ytdataset[field,'particle_position_cylindrical_radius'].in_units("kpc").value, bins=n_bins)
+				print hist, bins, field
 				inds = np.digitize(ytdataset[field,'particle_position_cylindrical_radius'].in_units("kpc").value, bins=bins)
 				width = (bins[:-1] + bins[1:]) / 2.0
-      				  #time = time[:i1]
+      		#		  #time = time[:i1]
 				# want to compute the mass weight ... vrot * mass_i / mass_mean in each bin
 				#  average of sum of (vrot * mass_i)  / mass_tot
 
 				
 
-				vrot_thing = np.array([ np.sum(ytdataset[field,"particle_velocity_cylindrical_theta"][inds == j].in_units("km/s").value * ytdataset[field,"particle_mass"][inds == j].in_units("Msun").value) for j in range(len(bins))])
+				#vrot_thing = np.array([ np.sum(ytdataset[field,"particle_velocity_cylindrical_theta"][inds == j].in_units("km/s").value * ytdataset[field,"particle_mass"][inds == j].in_units("Msun").value) for j in range(len(bins))])
+				vrot_thing = np.array([ np.sum(ytdataset[field,"particle_vtheta"][inds == j].in_units("km/s").value * ytdataset[field,"particle_mass"][inds == j].in_units("Msun").value) for j in range(len(bins))])
 				vrot_binned = vrot_thing / np.array([ (ytdataset[field,"particle_mass"][inds == j].in_units("Msun").value).sum()  for j in range(len(bins))])
-
-				#vrot_binned[vrot_binned == 0] = np.nan
+#
+#				#vrot_binned[vrot_binned == 0] = np.nan
 				vrot_binned[vrot_binned == np.nan] = 0.0
 				vrot_binned = abs(vrot_binned)
-			
+#			
 				r_binned = bins
 				
 
 			# make things pretty
 	#	r_binned, vrot_binned = flatten_line(r_binned,vrot_binned,no_nan=True,append_max=True,double_zero=True,extra_x = r_bins.in_units("kpc").max())
 		
-		vrot_list.append(vrot_binned)
-		rbins_list.append(r_binned)
+		datadict.update({"vrot_r_%s" % field : r_binned,
+				"vrot_v_%s" % field : vrot_binned,
+				})
+
+
+		field_labels.update({"vrot_r_%s" % field : ("Radius ( kpc )", None),
+					"vrot_v_%s" % field : ("Rotational Velocity ( km/s )",  r"$V_{rot,%s}$" % field.replace("_"," ")),})
+
 								
 	
-	return rbins_list, vrot_list
+	return datadict, field_labels
 
 
-def velocity_dispersion(ytdataset, fields=["stars","disk_stars","solar_stars"], max_age = 14.5, bins = 30, AMR=True, time_field="particle_birth_epoch"):
+
+
+
+
+def velocity_dispersion(datadict, field_labels, ytdataset, fields=["stars","young_stars","disk_stars","gas","cold_gas"], max_age = 14.5, bins = 30, AMR=True, time_field="particle_birth_epoch"):
 
 
 	"""
@@ -500,42 +693,97 @@ def velocity_dispersion(ytdataset, fields=["stars","disk_stars","solar_stars"], 
 			sig_u
 			sig_v
 			sig_w
+
+	returns a dictionary of data
 	"""
-
-	age_fields = []
-	vel_disp_fields = []
-	vel_err_fields = []
-
 
 	for field in fields:
 
 		if field == "gas" and AMR == True:
-			u = ytdataset["velocity_cylindrical_radius"].in_units("km/s").value
-			v = ytdataset["velocity_cylindrical_theta"].in_units("km/s").value
-			w = ytdataset["velocity_cylindrical_z"].in_units("km/s").value
-			age_fields.append(u)
-			vel_disp_fields.append(v)
-			vel_err_fields.append(w)
+			u = np.std(ytdataset["velocity_cylindrical_radius"].in_units("km/s").value)
+			v = np.std(ytdataset["velocity_cylindrical_theta"].in_units("km/s").value)
+			w = np.std(ytdataset["velocity_cylindrical_z"].in_units("km/s").value)
+			sigma = np.sqrt(np.power(u,2.0) + np.power(v,2.0) + np.power(w,2.0))
+
+			datadict.update({"vdisp_age_u_%s" % field: np.array([u,u]),
+						"vdisp_age_v_%s" % field: np.array([v,v]),
+						"vdisp_age_w_%s" % field: np.array([w,w]),
+						"vdisp_age_sigma_%s" % field: np.array([sigma,sigma]),
+						"vdisp_age_%s" % field: np.array([0.0,max_age]),
+						"vdisp_age_u_err_%s" % field: np.array([0.0,0.0]),
+						"vdisp_age_v_err_%s" % field: np.array([0.0,0.0]),
+						"vdisp_age_w_err_%s" % field: np.array([0.0,0.0]),
+						"vdisp_age_sigma_err_%s" % field: np.array([0.0,0.0]),
+						})
 
 		elif field == "cold_gas" and AMR == True:
 			cold_cylinder = ytdataset.cut_region(["obj['temperature'] < 1.0e4"])
-			u = cold_cylinder["velocity_cylindrical_radius"].in_units("km/s").value
-			v = cold_cylinder["velocity_cylindrical_theta"].in_units("km/s").value
-			w = cold_cylinder["velocity_cylindrical_z"].in_units("km/s").value
+			u = np.std(cold_cylinder["velocity_cylindrical_radius"].in_units("km/s").value)
+			v = np.std(cold_cylinder["velocity_cylindrical_theta"].in_units("km/s").value)
+			w = np.std(cold_cylinder["velocity_cylindrical_z"].in_units("km/s").value)
+			sigma = np.sqrt(np.power(u,2.0) + np.power(v,2.0) + np.power(w,2.0))
 
-			age_fields.append(u)
-			vel_disp_fields.append(v)
-			vel_err_fields.append(w)
+			datadict.update({"vdisp_age_u_%s" % field: np.array([u,u]),
+						"vdisp_age_v_%s" % field: np.array([v,v]),
+						"vdisp_age_w_%s" % field: np.array([w,w]),
+						"vdisp_age_sigma_%s" % field: np.array([sigma,sigma]),
+						"vdisp_age_%s" % field: np.array([0.0,max_age]),
+						"vdisp_age_u_err_%s" % field: np.array([0.0,0.0]),
+						"vdisp_age_v_err_%s" % field: np.array([0.0,0.0]),
+						"vdisp_age_w_err_%s" % field: np.array([0.0,0.0]),
+						"vdisp_age_sigma_err_%s" % field: np.array([0.0,0.0]),
+						})
+
+		elif field == "gas" and AMR == False:
+		#	u = np.std(ytdataset[field,"particle_velocity_cylindrical_radius"].in_units("km/s").value)
+	#		v = np.std(ytdataset[field,"particle_velocity_cylindrical_theta"].in_units("km/s").value)
+	#		w = np.std(ytdataset[field,"particle_velocity_cylindrical_z"].in_units("km/s").value)
+			u = np.std(ytdataset[field,"particle_vr"].in_units("km/s").value)
+			v = np.std(ytdataset[field,"particle_vtheta"].in_units("km/s").value)
+			w = np.std(ytdataset[field,"particle_velocity_relative_z"].in_units("km/s").value)
+			sigma = np.sqrt(np.power(u,2.0) + np.power(v,2.0) + np.power(w,2.0))
+
+			datadict.update({"vdisp_age_u_%s" % field: np.array([u,u]),
+						"vdisp_age_v_%s" % field: np.array([v,v]),
+						"vdisp_age_w_%s" % field: np.array([w,w]),
+						"vdisp_age_sigma_%s" % field: np.array([sigma,sigma]),
+						"vdisp_age_%s" % field: np.array([0.0,max_age]),
+						"vdisp_age_u_err_%s" % field: np.array([0.0,0.0]),
+						"vdisp_age_v_err_%s" % field: np.array([0.0,0.0]),
+						"vdisp_age_w_err_%s" % field: np.array([0.0,0.0]),
+						"vdisp_age_sigma_err_%s" % field: np.array([0.0,0.0]),
+						})
+
+		elif field == "cold_gas" and AMR == False:
+		#	u = np.std(ytdataset[field,"particle_velocity_cylindrical_radius"].in_units("km/s").value)
+	#		v = np.std(ytdataset[field,"particle_velocity_cylindrical_theta"].in_units("km/s").value)
+	#		w = np.std(ytdataset[field,"particle_velocity_cylindrical_z"].in_units("km/s").value)
+			u = np.std(ytdataset[field,"particle_vr"].in_units("km/s").value)
+			v = np.std(ytdataset[field,"particle_vtheta"].in_units("km/s").value)
+			w = np.std(ytdataset[field,"particle_velocity_relative_z"].in_units("km/s").value)
+			sigma = np.sqrt(np.power(u,2.0) + np.power(v,2.0) + np.power(w,2.0))
+
+			datadict.update({"vdisp_age_u_%s" % field: np.array([u,u]),
+						"vdisp_age_v_%s" % field: np.array([v,v]),
+						"vdisp_age_w_%s" % field: np.array([w,w]),
+						"vdisp_age_sigma_%s" % field: np.array([sigma,sigma]),
+						"vdisp_age_%s" % field: np.array([0.0,max_age]),
+						"vdisp_age_u_err_%s" % field: np.array([0.0,0.0]),
+						"vdisp_age_v_err_%s" % field: np.array([0.0,0.0]),
+						"vdisp_age_w_err_%s" % field: np.array([0.0,0.0]),
+						"vdisp_age_sigma_err_%s" % field: np.array([0.0,0.0]),
+						})
 
 		else:
-			u = ytdataset[field,"particle_velocity_cylindrical_radius"].in_units("km/s").value
-			v = ytdataset[field,"particle_velocity_cylindrical_theta"].in_units("km/s").value
-			w = ytdataset[field,"particle_velocity_cylindrical_z"].in_units("km/s").value
+		#	u = np.std(ytdataset[field,"particle_velocity_cylindrical_radius"].in_units("km/s").value)
+	#		v = np.std(ytdataset[field,"particle_velocity_cylindrical_theta"].in_units("km/s").value)
+	#		w = np.std(ytdataset[field,"particle_velocity_cylindrical_z"].in_units("km/s").value)
+			print field
+			u = ytdataset[field,"particle_vr"].in_units("km/s").value
+			v = ytdataset[field,"particle_vtheta"].in_units("km/s").value
+			w = ytdataset[field,"particle_velocity_relative_z"].in_units("km/s").value
+			print u
 			age = abs(ytdataset[field,time_field].in_units("Gyr").value)
-
-			sig_u = np.std(u)
-			sig_v = np.std(v)
-			sig_w = np.std(w)
 
 			bin_things = np.linspace(0.0,max_age,bins)
 			hist, bin_edges = np.histogram(age,bins=bin_things) # gets the distribution
@@ -556,10 +804,11 @@ def velocity_dispersion(ytdataset, fields=["stars","disk_stars","solar_stars"], 
 
 
 			#	temp_age = age
-			sig_age_temp = sig_u_age
-			age_bins, sig_u_age = kill_first_nan(bin_edges,sig_u_age)
-			age_bins, sig_v_age = kill_first_nan(bin_edges,sig_v_age)
-			age_bins, sig_w_age = kill_first_nan(bin_edges,sig_w_age)
+			age_bins = bin_edges
+		#	sig_age_temp = sig_u_age
+		#	age_bins, sig_u_age = kill_first_nan(bin_edges,sig_u_age)
+		#	age_bins, sig_v_age = kill_first_nan(bin_edges,sig_v_age)
+		#	age_bins, sig_w_age = kill_first_nan(bin_edges,sig_w_age)
 			
 			#	freq_hist, dud = plot_utils.kill_first_nan(hist, sig_age_temp)
 			freq_hist = hist
@@ -583,16 +832,35 @@ def velocity_dispersion(ytdataset, fields=["stars","disk_stars","solar_stars"], 
 			# add the errors
 			vel_disp_err = vel_dispersion / np.sqrt(freq_hist)
 
+			datadict.update({"vdisp_age_u_%s" % field: sig_u_age,
+						"vdisp_age_v_%s" % field: sig_v_age,
+						"vdisp_age_w_%s" % field: sig_w_age,
+						"vdisp_age_sigma_%s" % field: vel_dispersion,
+						"vdisp_age_%s" % field: age_bins,
+						"vdisp_age_u_err_%s" % field: sig_u_age_err,
+						"vdisp_age_v_err_%s" % field: sig_v_age_err,
+						"vdisp_age_w_err_%s" % field: sig_w_age_err,
+						"vdisp_age_sigma_err_%s" % field: vel_disp_err,
+						})
 
-			age_fields.append(age_bins)
-			vel_disp_fields.append(vel_dispersion)
-			vel_err_fields.append(vel_disp_err)
+		# add the labels
+		field_labels.update({"vdisp_age_u_%s" % field:  ("Velocity Dispersion ( km/s )",  r"$V_{\sigma_{U},%s}$" % field.replace("_"," ")),
+						"vdisp_age_v_%s" % field: ("Velocity Dispersion ( km/s )",  r"$V_{\sigma_{V},%s}$" % field.replace("_"," ")),
+						"vdisp_age_w_%s" % field: ("Velocity Dispersion ( km/s )",  r"$V_{\sigma_{W},%s}$" % field.replace("_"," ")),
+						"vdisp_age_sigma_%s" % field: ("Velocity Dispersion ( km/s )",  r"$V_{\sigma,%s}$" % field.replace("_"," ")),
+						"vdisp_age_%s" % field: ("Age ( Gyr )", None),
+						"vdisp_age_u_err_%s" % field: (None, None),
+						"vdisp_age_v_err_%s" % field: (None, None),
+						"vdisp_age_w_err_%s" % field: (None, None),
+						"vdisp_age_sigma_err_%s" % field: (None, None),
+						})
+
 		
-	return age_fields, vel_disp_fields, vel_err_fields
+	return datadict, field_labels
 
 
 
-def velocity_dispersion_r(ytdataset, fields=["stars","disk_stars","solar_stars"], max_radius = 30, bins = 30, AMR=True):
+def velocity_dispersion_r(datadict, field_labels, ytdataset, fields=["stars","young_stars","disk_stars","gas","cold_gas"], max_radius = 30.0, bins = 30, AMR=True):
 
 
 	"""
@@ -614,10 +882,6 @@ def velocity_dispersion_r(ytdataset, fields=["stars","disk_stars","solar_stars"]
 			sig_w
 	"""
 
-	rad_fields = []
-	vel_disp_fields = []
-	vel_err_fields = []
-
 
 	for field in fields:
 
@@ -625,82 +889,105 @@ def velocity_dispersion_r(ytdataset, fields=["stars","disk_stars","solar_stars"]
 			u = ytdataset["velocity_cylindrical_radius"].in_units("km/s").value
 			v = ytdataset["velocity_cylindrical_theta"].in_units("km/s").value
 			w = ytdataset["velocity_cylindrical_z"].in_units("km/s").value
-			rad_fields.append(u)
-			vel_disp_fields.append(v)
-			vel_err_fields.append(w)
+			rad = ytdataset["cylindrical_radius"].in_units("kpc").value
+
 
 		elif field == "cold_gas" and AMR == True:
 			cold_cylinder = ytdataset.cut_region(["obj['temperature'] < 1.0e4"])
 			u = cold_cylinder["velocity_cylindrical_radius"].in_units("km/s").value
 			v = cold_cylinder["velocity_cylindrical_theta"].in_units("km/s").value
 			w = cold_cylinder["velocity_cylindrical_z"].in_units("km/s").value
-
-			rad_fields.append(u)
-			vel_disp_fields.append(v)
-			vel_err_fields.append(w)
+			rad = cold_cylinder["cylindrical_radius"].in_units("kpc").value
 
 		else:
-			u = ytdataset[field,"particle_velocity_cylindrical_radius"].in_units("km/s").value
-			v = ytdataset[field,"particle_velocity_cylindrical_theta"].in_units("km/s").value
-			w = ytdataset[field,"particle_velocity_cylindrical_z"].in_units("km/s").value
+		#	u = np.std(ytdataset[field,"particle_velocity_cylindrical_radius"].in_units("km/s").value)
+	#		v = np.std(ytdataset[field,"particle_velocity_cylindrical_theta"].in_units("km/s").value)
+	#		w = np.std(ytdataset[field,"particle_velocity_cylindrical_z"].in_units("km/s").value)
+			u = ytdataset[field,"particle_vr"].in_units("km/s").value
+			v = ytdataset[field,"particle_vtheta"].in_units("km/s").value
+			w = ytdataset[field,"particle_velocity_relative_z"].in_units("km/s").value
 			rad = ytdataset[field,"particle_position_cylindrical_radius"].in_units("kpc").value
 
-			sig_u = np.std(u)
-			sig_v = np.std(v)
-			sig_w = np.std(w)
+		print u, "field"		
 
-			bin_things = np.linspace(0.0,max_rad,bins)
-			hist, bin_edges = np.histogram(rad,bins=bin_things) # gets the distribution
-			inds = np.digitize(rad, bins=bin_edges) # put the rads into the right bins
-			inds = inds - 1.0
+		sig_u = np.std(u)
+		sig_v = np.std(v)
+		sig_w = np.std(w)
+
+		bin_things = np.linspace(0.0,max_radius,bins)
+		hist, bin_edges = np.histogram(rad,bins=bin_things) # gets the distribution
+		inds = np.digitize(rad, bins=bin_edges) # put the rads into the right bins
+		inds = inds - 1.0
 	
-			bin_edges = np.delete(bin_edges,len(bin_edges)-1) # deletes the last bin edge elemtn
+		bin_edges = np.delete(bin_edges,len(bin_edges)-1) # deletes the last bin edge elemtn
 
-			sig_u_rad = np.zeros((bins-1))
-			sig_v_rad = np.zeros((bins-1))
-			sig_w_rad = np.zeros((bins-1))
+		sig_u_rad = np.zeros((bins-1))
+		sig_v_rad = np.zeros((bins-1))
+		sig_w_rad = np.zeros((bins-1))
 
-			for i in range(0,len(sig_u_rad)):
-				rad_inds = np.where(inds == i) # find the index locations of stars of this rad
-				sig_u_rad[i] = np.std(u[rad_inds[0]])
-				sig_v_rad[i] = np.std(v[rad_inds[0]])
-				sig_w_rad[i] = np.std(w[rad_inds[0]])
+		for i in range(0,len(sig_u_rad)):
+			rad_inds = np.where(inds == i) # find the index locations of stars of this rad
+			sig_u_rad[i] = np.std(u[rad_inds[0]])
+			sig_v_rad[i] = np.std(v[rad_inds[0]])
+			sig_w_rad[i] = np.std(w[rad_inds[0]])
 
+		print sig_u_rad, "sigma_u"
 
 			#	temp_rad = rad
-			sig_rad_temp = sig_u_rad
-			rad_bins, sig_u_rad = kill_first_nan(bin_edges,sig_u_rad)
-			rad_bins, sig_v_rad = kill_first_nan(bin_edges,sig_v_rad)
-			rad_bins, sig_w_rad = kill_first_nan(bin_edges,sig_w_rad)
+#		sig_rad_temp = sig_u_rad
+#		rad_bins, sig_u_rad = kill_first_nan(bin_edges,sig_u_rad)
+#		rad_bins, sig_v_rad = kill_first_nan(bin_edges,sig_v_rad)
+#		rad_bins, sig_w_rad = kill_first_nan(bin_edges,sig_w_rad)
+
+		rad_bins = bin_edges
 			
 			#	freq_hist, dud = plot_utils.kill_first_nan(hist, sig_age_temp)
-			freq_hist = hist
+		freq_hist = hist
 
 			# errors
-			sig_u_rad_err = sig_u_rad / np.sqrt(freq_hist)
-			sig_v_rad_err = sig_v_rad / np.sqrt(freq_hist)
-			sig_w_rad_err = sig_w_rad / np.sqrt(freq_hist)
+		sig_u_rad_err = sig_u_rad / np.sqrt(freq_hist)
+		sig_v_rad_err = sig_v_rad / np.sqrt(freq_hist)
+		sig_w_rad_err = sig_w_rad / np.sqrt(freq_hist)
 
-			vel_dispersion = np.sqrt(np.power(sig_u_rad,2) + np.power(sig_v_rad,2) + np.power(sig_w_rad,2))
+		vel_dispersion = np.sqrt(np.power(sig_u_rad,2) + np.power(sig_v_rad,2) + np.power(sig_w_rad,2))
 
-			# power errors
-			# http://www.rit.edu/cos/uphysics/uncertainties/Uncertaintiespart2.html
-			u_err_power = (sig_u_rad_err * sig_u_rad * 2.0) 
-			v_err_power = (sig_v_rad_err * sig_v_rad * 2.0)
-			w_err_power = (sig_w_rad_err * sig_w_rad * 2.0)
+		# power errors
+		# http://www.rit.edu/cos/uphysics/uncertainties/Uncertaintiespart2.html
+		u_err_power = (sig_u_rad_err * sig_u_rad * 2.0) 
+		v_err_power = (sig_v_rad_err * sig_v_rad * 2.0)
+		w_err_power = (sig_w_rad_err * sig_w_rad * 2.0)
 
-			uvw_err_sq = np.sqrt(np.power(sig_u_rad_err,2) + np.power(sig_v_rad_err,2) + np.power(sig_w_rad,2))
-			vel_disp_err = (uvw_err_sq * (0.5)) / vel_dispersion
+		uvw_err_sq = np.sqrt(np.power(sig_u_rad_err,2) + np.power(sig_v_rad_err,2) + np.power(sig_w_rad,2))
+		vel_disp_err = (uvw_err_sq * (0.5)) / vel_dispersion
 
-			# add the errors
-			vel_disp_err = vel_dispersion / np.sqrt(freq_hist)
+		# add the errors
+		vel_disp_err = vel_dispersion / np.sqrt(freq_hist)
 
 
-			rad_fields.append(rad_bins)
-			vel_disp_fields.append(vel_dispersion)
-			vel_err_fields.append(vel_disp_err)
+		datadict.update({"vdisp_r_u_%s" % field: sig_u_rad,
+						"vdisp_r_v_%s" % field: sig_v_rad,
+						"vdisp_r_w_%s" % field: sig_w_rad,
+						"vdisp_r_sigma_%s" % field: vel_dispersion,
+						"vdisp_r_%s" % field: rad_bins,
+						"vdisp_r_u_err_%s" % field: sig_u_rad_err,
+						"vdisp_r_v_err_%s" % field: sig_v_rad_err,
+						"vdisp_r_w_err_%s" % field: sig_w_rad_err,
+						"vdisp_r_sigma_err_%s" % field: vel_disp_err,
+					})
+
+		field_labels.update({"vdisp_r_u_%s" % field:  ("Velocity Dispersion ( km/s )",  r"$V_{\sigma_{U},%s}$" % field.replace("_"," ")),
+						"vdisp_r_v_%s" % field: ("Velocity Dispersion ( km/s )",  r"$V_{\sigma_{V},%s}$" % field.replace("_"," ")),
+						"vdisp_r_w_%s" % field: ("Velocity Dispersion ( km/s )",  r"$V_{\sigma_{W},%s}$" % field.replace("_"," ")),
+						"vdisp_r_sigma_%s" % field: ("Velocity Dispersion ( km/s )",  r"$V_{\sigma,%s}$" % field.replace("_"," ")),
+						"vdisp_r_%s" % field: ("Radius ( kpc )", None),
+						"vdisp_r_u_err_%s" % field: (None, None),
+						"vdisp_r_v_err_%s" % field: (None, None),
+						"vdisp_r_w_err_%s" % field: (None, None),
+						"vdisp_r_sigma_err_%s" % field: (None, None),
+						})
+
+
 		
-	return rad_fields, vel_disp_fields, vel_err_fields
-
+	return datadict, field_labels
 
 

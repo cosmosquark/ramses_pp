@@ -88,8 +88,10 @@ def radial_indices(field,data,r_min=None,r_max=None,dr_factor=1):
 	"""
 
 
-
+	r_min_used = True
+	r_max_used = True
 	if r_min == None:
+		r_min_used = False
 		if data[field].min() > data.ds.index.get_smallest_dx():
 			r_min = data[field].min() 
 		else:
@@ -101,6 +103,7 @@ def radial_indices(field,data,r_min=None,r_max=None,dr_factor=1):
 		else:
 			r_min = data.ds.index.get_smallest_dx() #+ data.ds.arr(0.0001,"code_length")
 	if r_max == None:
+		r_max_used = False
 		r_max = data[field].max()
 	
 	# filter in the selection range
@@ -111,22 +114,30 @@ def radial_indices(field,data,r_min=None,r_max=None,dr_factor=1):
 		filter_r = field
 		type = None
 
-	r_truths = filter_utils.min_max_truths(data,filter_r,r_min,r_max,type=type)
-	r_filter = filter_utils.min_max_filter(data,filter_r,r_min,r_max,extra_filter=None,type=type)
+	if r_min_used == True or r_max_used == True:
+		r_truths = filter_utils.min_max_truths(data,filter_r,r_min,r_max,type=type)
+		r_filter = filter_utils.min_max_filter(data,filter_r,r_min,r_max,extra_filter=None,type=type)
 
-	# with that filter added, this array is not going to be the same length as the origonal data
-	# hence the need to return the filter
-	# r_indices is of the same length as the data array *after* applying r_filter,
-	# r_indicies contains the bin indexes of the filtered field for whatever quantity that field should belong to 
-	# r_truths retains the context of the origional array size and states whether a field is filtered or not
+	else:
+		# basically returns a length of arrays that
+		r_truths = np.ones(len(data[field]), dtype=bool)
+		r_filter = np.arange(0,len(data[field]))
 
-	# tl'dr 
-	# r_indices contains the bin indicies of each filtered field for which property in y belongs to bin x
-	# e.g the particle indicies belonging to each bin
-	# f_filter contains additional filter
-	# r_truths is what you need to apply to the origional array and maintains the same size as the origional array
+		# with that filter added, this array is not going to be the same length as the origonal data
+		# hence the need to return the filter
+		# r_indices is of the same length as the data array *after* applying r_filter,
+		# r_indicies contains the bin indexes of the filtered field for whatever quantity that field should belong to 
+		# r_truths retains the context of the origional array size and states whether a field is filtered or not
+
+		# tl'dr 
+		# r_indices contains the bin indicies of each filtered field for which property in y belongs to bin x
+		# e.g the particle indicies belonging to each bin
+		# f_filter contains additional filter
+		# r_truths is what you need to apply to the origional array and maintains the same size as the origional array
 
 
+	print "len of the truths and filter arrays"
+	print len(r_truths), len(r_filter)
 	r_indices = np.floor(data[field][r_filter].in_units("code_length").value / (dr_factor * r_min.in_units("code_length").value)).astype(int)
 	r_bins = data.ds.arr(np.zeros(int(r_indices.max() + 1)),"code_length")
 	for i in range(0,len(r_bins)):
@@ -179,21 +190,27 @@ def mass_enclosed_bins(object,snap,r_bins,shape="sphere",type="all",sim_object_t
 					m_bins[i] = object.ds.arr(0.0,"g")
 			else:
 				try:
-					m_bins[i] = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit)).quantities.total_quantity(["particle_mass"])
+					temp = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit))
+					m_bins[i] = temp['all','particle_mass'].sum()
 				except:
 					m_bins[i] = object.ds.arr(0.0,"g")
 		elif type == "gas":
 			if AMR == True:
-				m_bins[i] = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit)).quantities.total_quantity(["cell_mass"])
+				try:
+					m_bins[i] = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit)).quantities.total_quantity(["cell_mass"])
+				except:
+					m_bins[i] = object.ds.arr(0.0,"g")
 			else:
-				temp = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit))
-				m_bins[i] = temp['gas','particle_mass'].sum()
+				try:
+					temp = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit))
+					m_bins[i] = temp['gas','particle_mass'].sum()
+				except:
+					m_bins[i] = object.ds.arr(0.0,"g")
 		elif type == "stars":
 			try:
 				temp = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit))
 				m_bins[i] = temp['stars','particle_mass'].sum()
 			except:
-				temp = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit))
 				m_bins[i] = object.ds.arr(0.0,"g")
 		elif type == "dark":
 			try:
@@ -225,9 +242,24 @@ def jcirc_bins(r_bins,v_circ,m_bins,data):
 	j_circ = r_bins * v_circ
 	return j_circ
 
-def jcirc(data, r_indices,v_circ,r_filter,type="all"):
+def jcirc(data, r_indices,v_circ,r_filter,type="all", AMR = True):
 	""" this computes j_circ for each individual r_bin, v_circ bin and m_bin"""
-	j_circ = (data[type, "particle_position_spherical_radius"][r_filter] * (v_circ[r_indices].astype(int)))
+	if AMR == True and type=="gas":
+		print r_filter
+		print data["index","spherical_radius"]
+		print r_indices
+		print v_circ[r_indices]
+		print r_filter.shape, data["index","spherical_radius"].shape
+		print data["index","spherical_radius"][r_filter] 
+		if r_filter != None:
+			j_circ = (data["index","spherical_radius"][r_filter] * (v_circ[r_indices].astype(int)))
+		else:
+			j_circ = (data["index","spherical_radius"] * (v_circ[r_indices].astype(int)))
+	else:
+		if r_filter != None:
+			j_circ = (data[type, "particle_position_spherical_radius"][r_filter] * (v_circ[r_indices].astype(int)))
+		else:
+			j_circ = (data[type, "particle_position_spherical_radius"] * (v_circ[r_indices].astype(int)))
 	# j_circ is of the length of data[field][filter]
 
 	return j_circ
@@ -256,7 +288,7 @@ def vrot(data,type="all",r_filter = None):
 		rrot = data[type,"particle_position_cylindrical_radius"]
 	return vrot
 
-def manual_vrot(data,type="all",r_filter = None):
+def manual_vrot(data,type="all",r_filter = None,AMR = True):
 
 	# vx * y - yv * x
 #	if data.has_field_parameter("bulk_velocity"):
@@ -281,7 +313,7 @@ def manual_vrot(data,type="all",r_filter = None):
 	return vrot
 
 
-def jz(data, type="all", r_filter = None, reverse_orientation = False):
+def jz(data, type="all", r_filter = None, reverse_orientation = False,AMR = True):
 	"""
 	returns jz (its the specific angular momentum in the z axis
 	assuming your object has a centre and a normal vector
@@ -312,7 +344,7 @@ def jz(data, type="all", r_filter = None, reverse_orientation = False):
 			jz = data[type,"particle_specific_angular_momentum_z"].in_units(min_unit)
 	return jz
 
-def manual_jz(data,type="all",r_filter = None):
+def manual_jz(data,type="all",r_filter = None,AMR = True):
 
 	# vx * y - yv * x
 #	if data.has_field_parameter("bulk_velocity"):
@@ -321,18 +353,37 @@ def manual_jz(data,type="all",r_filter = None):
 #		data.field_data.pop((type, 'particle_velocity_relative_x'))
 #		data.field_data.pop((type, 'particle_velocity_relative_y'))
 
-	if r_filter != None:
-		vrot = (data[type,"particle_position_relative_x"][r_filter] * data[type,"particle_velocity_relative_y"][r_filter])
-		vrot = vrot - (data[type,"particle_position_relative_y"][r_filter] * data[type,"particle_velocity_relative_x"][r_filter])
-	else:
-		vrot = (data[type,"particle_position_relative_x"] * data[type,"particle_velocity_relative_y"])
-		vrot = vrot - (data[type,"particle_position_relative_y"] * data[type,"particle_velocity_relative_x"])
+	if AMR == True and type == "gas":
+		from yt.utilities.math_utils import modify_reference_frame
+		from yt.units.yt_array import ucross
 
-	jz = vrot
+		if data.has_field_parameter("normal"):
+			normal = data.get_field_parameter("normal")
+		else:
+			normal = data.ds.arr([0.0,0.0,1.0],"code_length") # default to simulation axis
+		bv = data.get_field_parameter("bulk_velocity")
+		pos = data.ds.arr([data["%s" % ax] for ax in "xyz"]).T
+		vel = data.ds.arr([data["gas", "velocity_%s" % ax] - bv[iax] for iax, ax in enumerate("xyz")]).T
+		center = data.get_field_parameter('center')
+		L, r_vec, v_vec = modify_reference_frame(center, normal, P=pos, V=vel)
+		ang_momentum = -ucross(r_vec, v_vec, registry=data.ds.unit_registry)
+		jz = ang_momentum[:, "2"]
+		if r_filter != None:
+			jz = jz[r_filter]
+
+	else:
+		if r_filter != None:
+			vrot = (data[type,"particle_position_relative_x"][r_filter] * data[type,"particle_velocity_relative_y"][r_filter])
+			vrot = vrot - (data[type,"particle_position_relative_y"][r_filter] * data[type,"particle_velocity_relative_x"][r_filter])
+		else:
+			vrot = (data[type,"particle_position_relative_x"] * data[type,"particle_velocity_relative_y"])
+			vrot = vrot - (data[type,"particle_position_relative_y"] * data[type,"particle_velocity_relative_x"])
+
+		jz = vrot
 	return jz
 
 
-def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_max=None,spline=False,sim_object_type=None, manual_jz_flag = False, reverse_orientation=True, AMR = True):
+def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_max=None,spline=False,sim_object_type=None, manual_jz_flag = False, reverse_orientation=True, AMR = True, type="stars"):
 	"""
 	At the moment, this technique can only filter for disk stars
 	This is computed by calculating the ratio of Jz/Jcirc
@@ -347,17 +398,26 @@ def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_ma
 		add_particle_filter("stars", function=star_filter, filtered_type="all", requires=["particle_age"])
        		data.ds.add_particle_filter("stars")
 	print "decomposing stars into disk and non-disk, please wait"
-	r_indices, r_bins, r_filter, r_truths = radial_indices(("stars","particle_spherical_position_radius"),data,r_min,r_max)
+	if AMR == True and type=="gas":
+		print "step on the gas"
+		print "field len", len(data["index","spherical_radius"])
+		r_indices, r_bins, r_filter, r_truths = radial_indices(("index","spherical_radius"),data,r_min,r_max)
+	else:
+		print "stars"
+		print "field len", len(data[type,"particle_spherical_position_radius"])
+		r_indices, r_bins, r_filter, r_truths = radial_indices((type,"particle_spherical_position_radius"),data,r_min,r_max)
+	print "LENGTHS"
+	print len(r_indices), len(r_bins), len(r_filter), len(r_truths)
 	m_bins = mass_enclosed_bins(data,snap,r_bins,shape="sphere",type="all",sim_object_type=sim_object_type, AMR = AMR)
 	v_circ = vcirc(r_bins,m_bins,data)
-	j_circ = jcirc(data,r_indices,v_circ,r_filter,type="stars")
+	j_circ = jcirc(data,r_indices,v_circ,r_filter,type=type, AMR = AMR)
 
 	print "FLAGS", manual_jz_flag, reverse_orientation
 
 	if manual_jz_flag == False:
-		j_z = jz(data,r_filter=r_filter,type="stars", reverse_orientation=reverse_orientation)
+		j_z = jz(data,r_filter=r_filter,type=type, reverse_orientation=reverse_orientation, AMR=AMR)
 	else:
-		j_z = manual_jz(data,r_filter=r_filter,type="stars")	
+		j_z = manual_jz(data,r_filter=r_filter,type=type, AMR=AMR)	
 
 
 	try:
@@ -366,15 +426,24 @@ def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_ma
 	except yt.units.unit_object.UnitParseError:
 		min_unit = "cm"
 
+	print "test lengths"
+	print len(j_z), "j_z"
+	print len(j_circ), "j_circ"
+	print len(r_truths), "r_truths"
+	print len(r_indices), "r_indices"
 
 	if min_unit == "cmcm":
-		ratio = j_z.in_units("kpccm**2/s") / j_circ.in_units("kpccm**2/s").value
+		ratio = data.ds.arr(j_z.in_units("kpccm**2/s").value / j_circ.in_units("kpccm**2/s").value, "dimensionless")
 	else:
-		ratio = j_z.in_units("kpc**2/s") / j_circ.in_units("kpc**2/s").value
+		ratio = data.ds.arr(j_z.in_units("kpc**2/s").value / j_circ.in_units("kpc**2/s").value, "dimensionless")
 	# get indices of stars which satisfy the conditions
 
 	# expand ratio into context of origonal array
-	ratio_expanded = np.zeros((len(data["stars","particle_index"])))
+	if AMR == True and type=="gas":
+		ratio_expanded = np.zeros((len(data["gas","cell_mass"])))	
+	else:
+		ratio_expanded = np.zeros((len(data[type,"particle_spherical_position_radius"])))
+	print len(ratio_expanded), "ratio_expanded", AMR, type
 	j = 0
 	for i in range(0, len(r_truths)):
 		# if false, insert a dummy value that will never get through the filter
@@ -387,9 +456,15 @@ def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_ma
 	x = np.logical_and(ratio_expanded >= disk_min, ratio_expanded <= disk_max)
 	y = np.where(x == True)
 	disk_star_indices = ratio_expanded[y]
-	disk_star = data["stars","particle_index"][y]
 
-	print "NUMBER OF DISK STARS", len(disk_star)
+	if AMR == True and type=="gas":
+		disk_star = data["gas","cell_mass"][y]
+	else:
+		disk_star = data[type,"particle_index"][y]
+		
+	
+
+	print "NUMBER OF DISK", len(disk_star)
 
 	if plot != None:
 

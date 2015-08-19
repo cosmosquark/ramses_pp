@@ -40,39 +40,71 @@ def plot_eps_image(plot, name, multi=False, mpl_kwargs = None, suffix=None):
 def gen_data_source(axis,container,ytsnap,width,depth,axis_unit):
 
 	if axis==0:
-		x = container.center[0].in_units("code_length").value - ytsnap.arr(depth[0],axis_unit).in_units("code_length").value
-		y = container.center[1].in_units("code_length").value - ytsnap.arr(width[0][0],axis_unit).in_units("code_length").value
-		z = container.center[2].in_units("code_length").value - ytsnap.arr(width[1][0],axis_unit).in_units("code_length").value
-		left = [x,y,z]
+		try:
+			x = container.center[0].in_units("code_length").value - ytsnap.arr(depth[0],axis_unit).in_units("code_length").value
+			y = container.center[1].in_units("code_length").value - ytsnap.arr(width[0][0],axis_unit).in_units("code_length").value
+			z = container.center[2].in_units("code_length").value - ytsnap.arr(width[1][0],axis_unit).in_units("code_length").value
+			left = [x,y,z]
 
-		x = container.center[0].in_units("code_length").value + ytsnap.arr(depth[0],axis_unit).in_units("code_length").value
-		y = container.center[1].in_units("code_length").value + ytsnap.arr(width[0][0],axis_unit).in_units("code_length").value
-		z = container.center[2].in_units("code_length").value + ytsnap.arr(width[1][0],axis_unit).in_units("code_length").value
-		right = [x,y,z]
+			x = container.center[0].in_units("code_length").value + ytsnap.arr(depth[0],axis_unit).in_units("code_length").value
+			y = container.center[1].in_units("code_length").value + ytsnap.arr(width[0][0],axis_unit).in_units("code_length").value
+			z = container.center[2].in_units("code_length").value + ytsnap.arr(width[1][0],axis_unit).in_units("code_length").value
+			right = [x,y,z]
+		except:
+			x = container.center[0].in_units(axis_unit).value - ytsnap.arr(depth[0],axis_unit).in_units(axis_unit).value
+			y = container.center[1].in_units(axis_unit).value - ytsnap.arr(width[0][0],axis_unit).in_units(axis_unit).value
+			z = container.center[2].in_units(axis_unit).value - ytsnap.arr(width[1][0],axis_unit).in_units(axis_unit).value
+			left = [x,y,z]
+
+			x = container.center[0].in_units(axis_unit).value + ytsnap.arr(depth[0],axis_unit).in_units(axis_unit).value
+			y = container.center[1].in_units(axis_unit).value + ytsnap.arr(width[0][0],axis_unit).in_units(axis_unit).value
+			z = container.center[2].in_units(axis_unit).value + ytsnap.arr(width[1][0],axis_unit).in_units(axis_unit).value
+			right = [x,y,z]			
 
 	if axis==1:
 	
-		x = container.center[0].in_units("code_length").value - ytsnap.arr(width[1][0],axis_unit).in_units("code_length").value
-		y = container.center[1].in_units("code_length").value - ytsnap.arr(depth[0],axis_unit).in_units("code_length").value
-		z = container.center[2].in_units("code_length").value - ytsnap.arr(width[0][0],axis_unit).in_units("code_length").value
-		left = [x,y,z]
+		try:
+			x = container.center[0].in_units("code_length").value - ytsnap.arr(width[1][0],axis_unit).in_units("code_length").value
+			y = container.center[1].in_units("code_length").value - ytsnap.arr(depth[0],axis_unit).in_units("code_length").value
+			z = container.center[2].in_units("code_length").value - ytsnap.arr(width[0][0],axis_unit).in_units("code_length").value
+			left = [x,y,z]
 
-		x = container.center[0].in_units("code_length").value + ytsnap.arr(width[1][0],axis_unit).in_units("code_length").value
-		y = container.center[1].in_units("code_length").value + ytsnap.arr(depth[0],axis_unit).in_units("code_length").value
-		z = container.center[2].in_units("code_length").value + ytsnap.arr(width[0][0],axis_unit).in_units("code_length").value
-		right = [x,y,z]
+			x = container.center[0].in_units("code_length").value + ytsnap.arr(width[1][0],axis_unit).in_units("code_length").value
+			y = container.center[1].in_units("code_length").value + ytsnap.arr(depth[0],axis_unit).in_units("code_length").value
+			z = container.center[2].in_units("code_length").value + ytsnap.arr(width[0][0],axis_unit).in_units("code_length").value
+			right = [x,y,z]
+		except:
+			x = container.center[0].in_units(axis_unit).value - ytsnap.arr(width[1][0],axis_unit).in_units(axis_unit).value
+			y = container.center[1].in_units(axis_unit).value - ytsnap.arr(depth[0],axis_unit).in_units(axis_unit).value
+			z = container.center[2].in_units(axis_unit).value - ytsnap.arr(width[0][0],axis_unit).in_units(axis_unit).value
+			left = [x,y,z]
 
+			x = container.center[0].in_units(axis_unit).value + ytsnap.arr(width[1][0],axis_unit).in_units(axis_unit).value
+			y = container.center[1].in_units(axis_unit).value + ytsnap.arr(depth[0],axis_unit).in_units(axis_unit).value
+			z = container.center[2].in_units(axis_unit).value + ytsnap.arr(width[0][0],axis_unit).in_units(axis_unit).value
+			right = [x,y,z]
 	if axis==2:
 
-		x = container.center[0].in_units("code_length").value - ytsnap.arr(width[0][0],axis_unit).in_units("code_length").value
-		y = container.center[1].in_units("code_length").value - ytsnap.arr(width[1][0],axis_unit).in_units("code_length").value
-		z = container.center[2].in_units("code_length").value - ytsnap.arr(depth[0],axis_unit).in_units("code_length").value
-		left = [x,y,z]
+		try:
+			x = container.center[0].in_units("code_length").value - ytsnap.arr(width[0][0],axis_unit).in_units("code_length").value
+			y = container.center[1].in_units("code_length").value - ytsnap.arr(width[1][0],axis_unit).in_units("code_length").value
+			z = container.center[2].in_units("code_length").value - ytsnap.arr(depth[0],axis_unit).in_units("code_length").value
+			left = [x,y,z]
 
-		x = container.center[0].in_units("code_length").value + ytsnap.arr(width[0][0],axis_unit).in_units("code_length").value
-		y = container.center[1].in_units("code_length").value + ytsnap.arr(width[1][0],axis_unit).in_units("code_length").value
-		z = container.center[2].in_units("code_length").value + ytsnap.arr(depth[0],axis_unit).in_units("code_length").value
-		right = [x,y,z]
+			x = container.center[0].in_units("code_length").value + ytsnap.arr(width[0][0],axis_unit).in_units("code_length").value
+			y = container.center[1].in_units("code_length").value + ytsnap.arr(width[1][0],axis_unit).in_units("code_length").value
+			z = container.center[2].in_units("code_length").value + ytsnap.arr(depth[0],axis_unit).in_units("code_length").value
+			right = [x,y,z]
+		except:
+			x = container.center[0].in_units(axis_unit).value - ytsnap.arr(width[0][0],axis_unit).in_units(axis_unit).value
+			y = container.center[1].in_units(axis_unit).value - ytsnap.arr(width[1][0],axis_unit).in_units(axis_unit).value
+			z = container.center[2].in_units(axis_unit).value - ytsnap.arr(depth[0],axis_unit).in_units(axis_unit).value
+			left = [x,y,z]
+
+			x = container.center[0].in_units(axis_unit).value + ytsnap.arr(width[0][0],axis_unit).in_units(axis_unit).value
+			y = container.center[1].in_units(axis_unit).value + ytsnap.arr(width[1][0],axis_unit).in_units(axis_unit).value
+			z = container.center[2].in_units(axis_unit).value + ytsnap.arr(depth[0],axis_unit).in_units(axis_unit).value
+			right = [x,y,z]
 
 	data_source = ytsnap.region(container.center, left, right)
 	return data_source
@@ -185,6 +217,13 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 
 	basis_vectors = ortho_find(normal_vector)
 	north_vectors = ortho_find(normal_vector)
+
+	print "basis_vectors", basis_vectors
+
+	# check if basis vectors are in right units
+
+	basis_vectors = YTArray(basis_vectors,"g*kpc**2/s")
+	north_vectors = YTArray(north_vectors,"g*kpc**2/s")
 
 	print basis_vectors
 	# select the module
