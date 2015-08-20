@@ -334,7 +334,7 @@ class Snapshot():
 			return (time_simu - tform)/(h0*1e5/3.08e24)/(365.*24.*3600.*1e9)
 
 		ntable = len(axp_out)-1
-		if config.verbose: print 'ntable = %d'%ntable
+		#if config.verbose: print 'ntable = %d'%ntable
 
 		output = np.zeros(len(tform))
 		for j in range(0, len(tform)-1):

@@ -454,7 +454,7 @@ class Halo():
 			
 		Rvir = self["Rvir"]
 		if normal == None:
-			for i in range(0,10):
+			for i in range(0,9):
 				Rvir_fact = 1.0 - (i * 0.1) # shrink virial radius by 0.1 upon each run.. center on the new CoM
 				try:
 					sphere = ds.sphere(center, (Rvir*Rvir_fact))
@@ -464,7 +464,7 @@ class Halo():
 #				sphere_cool = sphere
 #				L = sphere_cool.quantities.angular_momentum_vector(use_gas=True,use_particles=True)
 
-				sphere_cool = sphere.cut_region(["obj['temperature'] < 1e5"])
+				sphere_cool = sphere.cut_region(["obj['temperature'] < 1e4"])
 				L = sphere_cool.quantities.angular_momentum_vector(use_gas=True,use_particles=False)
 				print L
 		# simple galaxy disk for height and width work
@@ -498,7 +498,8 @@ class Halo():
 
 		cylinder = ds.disk(center,L,cylinder_w,cylinder_h)
 		if bulk_vel:
-			bv = cylinder.quantities.bulk_velocity(use_gas=True, use_particles=True)
+			sphere = ds.sphere(center, Rvir)
+			bv = sphere.quantities.bulk_velocity(use_gas=True, use_particles=True)
 			cylinder.set_field_parameter("bulk_velocity", bv)
 
 		for i in range(0,stacks):

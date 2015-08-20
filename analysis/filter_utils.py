@@ -16,6 +16,8 @@ from ramses_pp import config
 from ramses_pp.analysis import read_utils
 from ramses_pp.modules import Simulation
 
+
+
 def triple_filter_function(data,filter_r,filter_z,filter_theta,r_min,r_max,z_min,z_max,theta_min,theta_max,extra_filter=None, type=None):
 	"""
 	filters a function by two seperate boundaries
@@ -64,11 +66,7 @@ def triple_filter_function(data,filter_r,filter_z,filter_theta,r_min,r_max,z_min
 def filter_function(data,filter_r,filter_z,r_min,r_max,z_min,z_max,extra_filter=None, type=None):
 	"""
 	filters a function by two seperate boundaries
-	"""
-	print "lol"
-	print data[type,filter_r].in_units(r_min.units)
-	print r_min, r_max, z_min, z_max
-	print extra_filter	
+	"""	
 	if type != None:
 		if extra_filter == None:
 			filter = (data[type,filter_r].in_units(r_min.units).value >= r_min.value ) & \

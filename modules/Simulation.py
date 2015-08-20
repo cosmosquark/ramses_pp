@@ -9,6 +9,9 @@ TODO: Add features similar to Hamu i.e Automatic generation of axis labels for p
 @author: dsullivan, bthompson
 '''
 from __future__ import division
+import yt as yt_package
+
+
 from .. import config
 pymses_loaded = config.pymses_enabled
 pynbody_loaded = config.pynbody_enabled
@@ -16,6 +19,8 @@ yt_loaded = config.yt_enabled
 import numpy as np
 import json, os, glob, uuid
 import re
+
+
 
 def load(name):
 	'''
@@ -261,6 +266,7 @@ class Simulation():
 		
 		return snapshot_number
 
+
 	def iterable(self, module=config.default_module, min_i=1, max_i=None):
 		'''
 		Return an iterable of snapshots
@@ -488,6 +494,11 @@ class Simulation():
 		while nline <= 18:
 			line = f.readline()
 			if(nline == 10): aexp = np.float32(line.split("=")[1])
+			if(nline == 11): H = np.float32(line.split("=")[1])
+			if(nline == 12): O_m = np.float32(line.split("=")[1])
+			if(nline == 13): O_l = np.float32(line.split("=")[1])
+			if(nline == 14): O_k = np.float32(line.split("=")[1])
+			if(nline == 15): O_b = np.float32(line.split("=")[1])
 			if(nline == 16): lunit = np.float32(line.split("=")[1])
 			if(nline == 17): dunit = np.float32(line.split("=")[1])
 			if(nline == 18): tunit = np.float32(line.split("=")[1])
@@ -499,17 +510,23 @@ class Simulation():
 			'aexp': aexp,
 			'lunit': lunit,
 			'dunit': dunit,
+			'H0': H / 100.0,
+			'Omega_m':O_m,
+			'Omega_l':O_l,
+			'Omega_k':O_k,
+			'Omega_b':O_b,
 			'z':z,
 			}
 		return infodata
 
-	def info(self):
+	def info_deprecated(self):
 		'''
 		List all snapshots with some basic info
 		'''
 		num = self.num_snapshots(count=True)
+		print num
 
-		print "## Output        aexp           z        unit_l        unit_d        unit_t"
+		print "## Output        aexp           z    t(Gyr)      unit_l        unit_d        unit_t"
 		for ioutput in range(1, num+1):
 			info = ("%s/output_%05d/info_%05d.txt" % (self._path, ioutput, ioutput))
 			f = open(info, 'r')
@@ -523,3 +540,40 @@ class Simulation():
 				nline += 1
 			z = (1.0/aexp) - 1.0
 			print "    %5d  %10.5f  %10.5f  %12.5e  %12.5e  %12.5e" % (ioutput, aexp, z, lunit, dunit, tunit)
+
+	def info(self, reverse=False):
+
+		outputs = self.output_numbers()
+		# order output list
+		outputs.sort(reverse=reverse)
+		print "-----------------------------"
+		print "Simulation Info"
+		# grab any snapshot
+		iout = self.num_snapshots(count=False)	
+		infodata = self.info_snap(iout)
+		print "h \t O_m \t O_l \t O_k \t O_b"
+		print "%.8f\t%.8f\t%.8f\t%.8f\t%.8f\t" % (infodata["H0"], infodata['Omega_m'], infodata['Omega_l'], infodata['Omega_k'],infodata['Omega_b'] )
+
+		import proxy.proxy as proxy
+		Cosmology = proxy.get_cosmology()
+		cosmo = Cosmology(infodata["H0"],infodata['Omega_m'], infodata['Omega_l'], infodata['Omega_k'])
+
+		
+		print "## Output        aexp           z          t(Gyr)      unit_l        unit_d        unit_t"
+		for ioutput in outputs:
+			info = ("%s/output_%05d/info_%05d.txt" % (self._path, ioutput, ioutput))
+			f = open(info, 'r')
+			nline = 1
+			while nline <= 18:
+				line = f.readline()
+				if(nline == 10): aexp = np.float32(line.split("=")[1])
+				if(nline == 16): lunit = np.float32(line.split("=")[1])
+				if(nline == 17): dunit = np.float32(line.split("=")[1])
+				if(nline == 18): tunit = np.float32(line.split("=")[1])
+				nline += 1
+			z = (1.0/aexp) - 1.0
+			
+			t = cosmo.hubble_time(z).in_units("Gyr")
+			print "    %5d  %10.5f  %10.5f %.8f %12.5e  %12.5e  %12.5e" % (ioutput, aexp, z, t, lunit, dunit, tunit)
+		
+
