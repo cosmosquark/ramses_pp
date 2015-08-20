@@ -298,9 +298,12 @@ class PynbodySnapshot(Snapshot.Snapshot):
 			#print 'Warning: Analysis of RAMSES output with tipsy halos can result in unexpected results...'
 			s = self.tipsy().raw_snapshot()
 
-		halos = s.halos()
-		print 'Loaded %d halos'%len(halos)
-
+		try:
+			halos = s.halos()
+			print 'Loaded %d halos'%len(halos)
+		except:
+			print "no halos to load"
+			halos = None
 		return halos
 
 	def halos(self, finder=config.default_finder, filename=None):

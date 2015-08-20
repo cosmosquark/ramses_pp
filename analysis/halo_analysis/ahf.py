@@ -19,8 +19,8 @@ class AHF():
 		"""
 		for i in range(1,self.num_snapshots()):
 			shot = self.snapshot(i, module="pynbody")
-			shot.tipsy(convert=True,gas=gas)
-			shot.halos()
+			shot.tipsy(convert=True)
+			shot.tipsy_halos(run_ahf=True)
 		return
 
 	@staticmethod
