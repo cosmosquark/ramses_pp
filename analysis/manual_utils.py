@@ -761,6 +761,7 @@ def velocity_dispersion(datadict, field_labels, ytdataset, fields=["stars","youn
 			u = np.std(ytdataset[field,"particle_vr"].in_units("km/s").value)
 			v = np.std(ytdataset[field,"particle_vtheta"].in_units("km/s").value)
 			w = np.std(ytdataset[field,"particle_velocity_relative_z"].in_units("km/s").value)
+			print "COLD GAS W", w
 			sigma = np.sqrt(np.power(u,2.0) + np.power(v,2.0) + np.power(w,2.0))
 
 			datadict.update({"vdisp_age_u_%s" % field: np.array([u,u]),
@@ -855,7 +856,7 @@ def velocity_dispersion(datadict, field_labels, ytdataset, fields=["stars","youn
 						"vdisp_age_sigma_err_%s" % field: (None, None),
 						})
 
-		
+
 	return datadict, field_labels
 
 
@@ -990,4 +991,47 @@ def velocity_dispersion_r(datadict, field_labels, ytdataset, fields=["stars","yo
 		
 	return datadict, field_labels
 
+def metal_dispersion(datadict, field_labels, ytdataset, field="solar_stars", max_age = 14.5, bins = 30, time_field="particle_birth_epoch"):
+		
 
+		met = ytdataset[field,"particle_FeH"].in_units("dimensionless").value
+		age = abs(ytdataset[field,time_field].in_units("Gyr").value)
+
+		
+		
+
+		bin_things = np.linspace(0.0,max_age,bins)
+		hist, bin_edges = np.histogram(age,bins=bin_things) # gets the distribution
+		inds = np.digitize(age, bins=bin_edges) # put the ages into the right bins
+		inds = inds - 1.0
+	
+		bin_edges = np.delete(bin_edges,len(bin_edges)-1) # deletes the last bin edge elemtn
+
+		sig_met = np.zeros((bins-1))
+		
+		for i in range(0,len(sig_met)):
+			ages_inds = np.where(inds == i) # find the index locations of stars of this gage
+			sig_met[i] = np.std(met[ages_inds[0]])
+	
+
+		age_bins = bin_edges
+		freq_hist = hist
+		sig_met_err = sig_met / np.sqrt(freq_hist)
+
+		datadict.update({"mdisp_age_%s" % field: age_bins,
+						"mdisp_age_vals_%s" % field: sig_met,
+						"mdisp_age_errs_%s" % field: sig_met_err,
+				})
+
+		field_labels.update({"mdisp_age_%s" % field: (None, None),
+						"mdisp_age_vals_%s" % field: (None, None),
+						"mdisp_age_errs_%s" % field: (None, None),
+				})
+
+		return datadict, field_labels
+
+		# blur by gaia-eso
+
+
+
+		
