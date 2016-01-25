@@ -357,6 +357,8 @@ class Snapshot():
 	def integrate_friedman(self, aexp=None, store=False):
 		from ..fortran import friedman as fm
 
+		print "integrating friedman, please wait"
+
 		cosmology = self.cosmology()
 		omega_m_0 = cosmology['omega_m_0']
 		omega_l_0 = cosmology['omega_l_0']
@@ -366,7 +368,7 @@ class Snapshot():
 
 		alpha=1e-6
 		axpmin=1e-3
-		ntable=1000
+		ntable=2000
 
 		axp_out, hexp_out, tau_out, t_out, age_tot = fm.friedman(omega_m_0, omega_l_0, omega_k_0, alpha, axpmin, ntable)
 
@@ -379,7 +381,15 @@ class Snapshot():
 		time_simu = t_out[i] * (aexp - axp_out[i-1])/(axp_out[i]-axp_out[i-1]) + \
 			t_out[i-1]*(aexp - axp_out[i])/(axp_out[i-1] - axp_out[i])
 
-		age_simu = (time_simu+age_tot)/(h0*1e5/3.08e24)/(365*24*3600*1e9)
+		age_simu = (time_simu+age_tot)/(h0*1e5/3.08e24)/(365.25*24.0*60.0*60.0*1e9)
+
+		i = 1
+		aexp_zero = max(1.0,0.0) # todo.. if a final snapshot exists, make this the age of the final snapshot.
+
+		time_simu_zero = t_out[i] * (aexp_zero  - axp_out[i-1])/(axp_out[i]-axp_out[i-1]) + \
+			t_out[i-1]*(aexp_zero  - axp_out[i])/(axp_out[i-1] - axp_out[i])
+
+		age_simu_zero = (time_simu_zero+age_tot)/(h0*1e5/3.08e24)/(365.25*24*60.0*60.0*1e9)
 
 		friedman = {
 				'axp_out':axp_out,
@@ -388,7 +398,10 @@ class Snapshot():
 				't_out':t_out,
 				'age_tot':age_tot,
 				'age_simu':age_simu,
-				'time_simu':time_simu
+				'time_simu':time_simu,
+				'age_simu_zero':age_simu_zero,
+				'time_simu_zero':time_simu_zero,
+				'age_simu_diff':age_simu_zero - age_simu
 			}
 
 		if store:
