@@ -43,7 +43,11 @@ def sfr(formation_time, mass_formation, n_bins=80, time_range = [-1.0,14.0], fli
 	else:
 		age = time
 
+	print "sfr output"
 
+	print age
+	print age.min(), age.max()
+	print sfr
 	return age, sfr 
 
 
@@ -249,17 +253,17 @@ def mstar_mhalo(ytsnap):
 
 	Returns the result of the mass ratio of the DM to the stellar matter and the corresponding x value
 	"""
-	dm_mass = ytsnap["dark","particle_mass"].sum().in_units("Msun")
-	stellar_mass = ytsnap["stars","particle_mass"].sum().in_units("Msun")
+	dm_mass = ytsnap["dark","particle_mass"].in_units("Msun").value.sum()
+	stellar_mass = ytsnap["stars","particle_mass"].in_units("Msun").value.sum()
 
 	mass_ratio = stellar_mass / dm_mass
 	mass_log = np.log10(mass_ratio)
 
 	print mass_ratio, "mass_ratio"
 	print mass_log, "mass_log"
-	print np.log10(dm_mass.value), "dm mass log"
+	print np.log10(dm_mass), "dm mass log"
 
-	x = np.log10(dm_mass.value)
+	x = np.log10(dm_mass)
 	return x, mass_log
 
 def make_pdf(x, plotname, x_lab, y_lab="PDF", x_min=-1.0, x_max=1.5, nbins=100, spline=False):
