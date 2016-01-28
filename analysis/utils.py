@@ -670,6 +670,8 @@ def sig_uvw(cylinder,galaxy_name,snap,solar=True,disk=True,cold=True):
 	hist, bin_edges = np.histogram(age,bins=bin_things) # gets the distribution
 	inds = np.digitize(age, bins=bin_edges) # put the ages into the right bins
 	inds = inds - 1.0
+	# include the max values in the last bin
+	inds[np.argmax(inds)] = inds.max() - 1
 
 	bin_edges = np.delete(bin_edges,len(bin_edges)-1) # deletes the last bin edge elemtn
 
