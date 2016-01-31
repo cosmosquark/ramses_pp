@@ -301,6 +301,9 @@ def plot_sfr(sphere, plot_name="selene", n_bins=50, dir_name=None):
         #print formation_time, "this"
 	hist, bins = np.histogram(formation_time, bins=n_bins, range=time_range,)
 	inds = np.digitize(formation_time, bins=bins)
+	# include the max values in the last bin
+	inds = inds - 1
+	inds[np.argmax(inds)] = inds.max() - 1
 
         #ime = max(time) - time
 	time = (bins[:-1] + bins[1:]) / 2.0

@@ -31,6 +31,8 @@ def sfr(formation_time, mass_formation, n_bins=80, time_range = [-1.0,14.0], fli
 	hist, bins = np.histogram(formation_time, bins=n_bins, range=time_range,)
 	inds = np.digitize(formation_time, bins=bins)
 	inds = inds - 1  # shifts everything down one.
+	# include the max values in the last bin
+	inds[np.argmax(inds)] = inds.max() - 1
 
 	time = (bins[:-1] + bins[1:]) / 2.0
 
@@ -639,6 +641,11 @@ def vrot(datadict, field_labels,  ytdataset, fields=["stars","young_stars","disk
 				hist, bins = np.histogram(ytdataset[field,'particle_position_cylindrical_radius'].in_units("kpc").value, bins=n_bins)
 				print hist, bins, field
 				inds = np.digitize(ytdataset[field,'particle_position_cylindrical_radius'].in_units("kpc").value, bins=bins)
+				# shifts down to index 0
+				inds = inds - 1
+				# include the max values in the last bin
+				inds[np.argmax(inds)] = inds.max() - 1
+
 				width = (bins[:-1] + bins[1:]) / 2.0
       		#		  #time = time[:i1]
 				# want to compute the mass weight ... vrot * mass_i / mass_mean in each bin
@@ -793,7 +800,9 @@ def velocity_dispersion(datadict, field_labels, ytdataset, fields=["stars","youn
 			bin_things = np.linspace(0.0,max_age,bins)
 			hist, bin_edges = np.histogram(age,bins=bin_things) # gets the distribution
 			inds = np.digitize(age, bins=bin_edges) # put the ages into the right bins
-			inds = inds - 1.0
+			inds = inds - 1
+			# include the max values in the last bin
+			inds[np.argmax(inds)] = inds.max() - 1
 	
 			bin_edges = np.delete(bin_edges,len(bin_edges)-1) # deletes the last bin edge elemtn
 
@@ -923,6 +932,8 @@ def velocity_dispersion_r(datadict, field_labels, ytdataset, fields=["stars","yo
 		hist, bin_edges = np.histogram(rad,bins=bin_things) # gets the distribution
 		inds = np.digitize(rad, bins=bin_edges) # put the rads into the right bins
 		inds = inds - 1.0
+		# include the max values in the last bin
+		inds[np.argmax(inds)] = inds.max() - 1
 	
 		bin_edges = np.delete(bin_edges,len(bin_edges)-1) # deletes the last bin edge elemtn
 
@@ -1008,6 +1019,8 @@ def metal_dispersion(datadict, field_labels, ytdataset, field="solar_stars", max
 		hist, bin_edges = np.histogram(age,bins=bin_things) # gets the distribution
 		inds = np.digitize(age, bins=bin_edges) # put the ages into the right bins
 		inds = inds - 1.0
+		# include the max values in the last bin
+		inds[np.argmax(inds)] = inds.max() - 1
 	
 		bin_edges = np.delete(bin_edges,len(bin_edges)-1) # deletes the last bin edge elemtn
 

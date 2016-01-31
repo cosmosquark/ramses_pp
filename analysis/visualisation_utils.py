@@ -454,6 +454,7 @@ def visualisation(viz_type, container, raw_snapshot, module=config.default_modul
 				for i in range(0,len(fields)):
 					plot.set_unit(fields[i],units[i])
 					plot.set_zlim(fields[i],extrema[i][0],extrema[i][1])
+					plot.annotate_marker((4.0,6.92820), coord_system='plot',plot_args={'color':'black','s':400})
 
 				image = plot.frb
 				
