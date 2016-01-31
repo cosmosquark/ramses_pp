@@ -5,6 +5,23 @@ cimport numpy as np
 # loop over all the stars for supernova yields
 
 
+def compute_mbins(np.ndarray rad_fields, np.ndarray r_bins, np.ndarray mass_fields, np.ndarray m_bins):
+
+	cdef int i
+	cdef int j
+
+	j = 0
+	for i in range(0,len(mass_fields)):
+		if rad_fields[i] > r_bins[j]:
+			while (rad_fields[i] > r_bins[j]) and j < (len(mass_fields) - 1):
+				j = j + 1
+				m_bins[j] = m_bins[j-1]
+	#			print j
+		m_bins[j] = m_bins[j] + mass_fields[i]
+
+	return m_bins
+	
+
 def cic_sample(np.ndarray ihx, np.ndarray y, np.ndarray x, np.ndarray x_bins, int nbins):
 
 	cdef np.ndarray[dtype="double", ndim=1] pdf = np.zeros((nbins+1))

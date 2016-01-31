@@ -20,6 +20,7 @@ import shelve
 from ramses_pp.analysis import read_utils, filter_utils, plot_utils
 import scipy as sp
 
+from cython_utils import compute_mbins
 
 import weakref, copy
 import abc
@@ -146,6 +147,8 @@ def radial_indices(field,data,r_min=None,r_max=None,dr_factor=1):
 		r_bins = r_bins.in_units("cmcm")
 	except yt.units.unit_object.UnitParseError:
 		r_bins = r_bins.in_units("cm")
+
+
 	return r_indices, r_bins, r_filter, r_truths
 
 
@@ -180,51 +183,97 @@ def mass_enclosed_bins(object,snap,r_bins,shape="sphere",type="all",sim_object_t
 		min_unit = "cm"
 
 
-	for i in range(0,len(r_bins)):
-		if type == "all":
-			#print object.ds.field_list
-			if AMR == True:
-				try:
-					m_bins[i] = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit)).quantities.total_quantity(["particle_mass"]) + dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit)).quantities.total_quantity(["cell_mass"])
-				except:
-					m_bins[i] = object.ds.arr(0.0,"g")
-			else:
-				try:
-					temp = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit))
-					m_bins[i] = temp['all','particle_mass'].sum()
-				except:
-					m_bins[i] = object.ds.arr(0.0,"g")
-		elif type == "gas":
-			if AMR == True:
-				try:
-					m_bins[i] = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit)).quantities.total_quantity(["cell_mass"])
-				except:
-					m_bins[i] = object.ds.arr(0.0,"g")
-			else:
-				try:
-					temp = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit))
-					m_bins[i] = temp['gas','particle_mass'].sum()
-				except:
-					m_bins[i] = object.ds.arr(0.0,"g")
-		elif type == "stars":
-			try:
-				temp = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit))
-				m_bins[i] = temp['stars','particle_mass'].sum()
-			except:
-				m_bins[i] = object.ds.arr(0.0,"g")
-		elif type == "dark":
-			try:
-				temp = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit))
-				m_bins[i] = temp['dark','particle_mass'].sum()
-			except:
-				m_bins[i] = object.ds.arr(0.0,"g")
+	# this function is horribly inefficient
+
+	# 1) grab the fields for the biggest sphere
+
+	sphere_check = dataset.sphere(object.center,object.ds.arr(r_bins[len(r_bins) - 1],min_unit))
+
+	# 2) reorder fields based on radius
+
+	if type == "all":
+		#print object.ds.field_list
+		if AMR == True:
+			mass_fields = sphere_check.ds.arr(np.append(sphere_check["io","particle_mass"].in_units("g").value, sphere_check["gas","cell_mass"].in_units("g").value),"g")
+			rad_fields = sphere_check.ds.arr(np.append(sphere_check["io","particle_position_spherical_radius"].in_units(min_unit).value, sphere_check["index","spherical_radius"].in_units(min_unit).value),min_unit)
 		else:
-			invalid = True
-			break
-	if invalid == True:
-		return None
+			mass_fields = sphere_check.ds.arr(sphere_check["all","particle_mass"].in_units("g").value,"g")
+			rad_fields = sphere_check.ds.arr(sphere_check["all","particle_position_spherical_radius"].in_units(min_unit).value, min_unit)
+	elif type == "gas":
+		if AMR == True:
+			mass_fields = sphere_check.ds.arr(sphere_check["gas","cell_mass"].in_units("g").value,"g")
+			rad_fields = sphere_check.ds.arr(sphere_check["index","spherical_radius"].in_units(min_unit).value,min_unit)
+		else:
+			mass_fields = sphere_check.ds.arr(sphere_check["gas","particle_mass"].in_units("g").value,"g")
+			rad_fields = sphere_check.ds.arr(sphere_check["gas","particle_position_spherical_radius"].in_units(min_unit).value, min_unit)
 	else:
-		return m_bins
+		mass_fields = sphere_check.ds.arr(sphere_check[type,"particle_mass"].in_units("g").value,"g")
+		rad_fields = sphere_check.ds.arr(sphere_check[type,"particle_position_spherical_radius"].in_units(min_unit).value, min_unit)
+
+	sort_indices = np.argsort(rad_fields)
+
+	# reorder
+	mass_fields = mass_fields[sort_indices]
+	rad_fields = rad_fields[sort_indices]
+
+	m_bins = compute_mbins(rad_fields.in_units(min_unit).value, r_bins.in_units(min_unit).value, mass_fields.in_units("g").value, m_bins.in_units("g").value)
+	m_bins = sphere_check.ds.arr(m_bins,"g")
+
+#	for i in range(0,len(mass_fields)):
+#		if rad_fields[i].in_units(min_unit).value > r_bins[j].in_units(min_unit).value:
+#			while (rad_fields[i].in_units(min_unit).value > r_bins[j].in_units(min_unit).value) and j < (len(mass_fields) - 1):
+#				j = j + 1
+#				m_bins[j] = m_bins[j-1]
+#				print j
+#		m_bins[j] = m_bins[j] + mass_fields[i]
+	print "sanity check", m_bins[len(m_bins)-1], mass_fields.sum()
+	return m_bins
+
+#	for i in range(0,len(r_bins)):
+#		if type == "all":
+#			#print object.ds.field_list
+#			if AMR == True:
+#				try:
+#					m_bins[i] = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit)).quantities.total_quantity(["particle_mass"]) + dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit)).quantities.total_quantity(["cell_mass"])
+#				except:
+#					m_bins[i] = object.ds.arr(0.0,"g")
+#			else:
+#				try:
+#					temp = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit))
+#					m_bins[i] = temp['all','particle_mass'].sum()
+#				except:
+#					m_bins[i] = object.ds.arr(0.0,"g")
+#		elif type == "gas":
+#			if AMR == True:
+#				try:
+#					m_bins[i] = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit)).quantities.total_quantity(["cell_mass"])
+#				except:
+#					m_bins[i] = object.ds.arr(0.0,"g")
+#			else:
+#				try:
+#					temp = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit))
+#					m_bins[i] = temp['gas','particle_mass'].sum()
+#				except:
+#					m_bins[i] = object.ds.arr(0.0,"g")
+#		elif type == "stars":
+#			try:
+#				temp = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit))
+#				m_bins[i] = temp['stars','particle_mass'].sum()
+#			except:
+#				m_bins[i] = object.ds.arr(0.0,"g")
+#		elif type == "dark":
+#			try:
+#				temp = dataset.sphere(object.center,object.ds.arr(r_bins[i],min_unit))
+#				m_bins[i] = temp['dark','particle_mass'].sum()
+#			except:
+#				m_bins[i] = object.ds.arr(0.0,"g")
+#		else:
+#			invalid = True
+#			break
+#	if invalid == True:
+#		return None
+#	else:
+#		return m_bins
 
 
 def vcirc(r_bins,m_bins,data):
@@ -245,12 +294,12 @@ def jcirc_bins(r_bins,v_circ,m_bins,data):
 def jcirc(data, r_indices,v_circ,r_filter,type="all", AMR = True):
 	""" this computes j_circ for each individual r_bin, v_circ bin and m_bin"""
 	if AMR == True and type=="gas":
-		print r_filter
-		print data["index","spherical_radius"]
-		print r_indices
-		print v_circ[r_indices]
-		print r_filter.shape, data["index","spherical_radius"].shape
-		print data["index","spherical_radius"][r_filter] 
+#		print r_filter
+#		print data["index","spherical_radius"]
+#		print r_indices
+#		print v_circ[r_indices]
+#		print r_filter.shape, data["index","spherical_radius"].shape
+#		print data["index","spherical_radius"][r_filter] 
 		if r_filter != None:
 			j_circ = (data["index","spherical_radius"][r_filter] * (v_circ[r_indices].astype(int)))
 		else:
@@ -408,11 +457,11 @@ def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_ma
 		r_indices, r_bins, r_filter, r_truths = radial_indices((type,"particle_spherical_position_radius"),data,r_min,r_max)
 	print "LENGTHS"
 	print len(r_indices), len(r_bins), len(r_filter), len(r_truths)
+	# THIS IS NEEDED FOR THE CORRECT JZ AND JCIRC
 	m_bins = mass_enclosed_bins(data,snap,r_bins,shape="sphere",type="all",sim_object_type=sim_object_type, AMR = AMR)
 	v_circ = vcirc(r_bins,m_bins,data)
 	j_circ = jcirc(data,r_indices,v_circ,r_filter,type=type, AMR = AMR)
 
-	print "FLAGS", manual_jz_flag, reverse_orientation
 
 	if manual_jz_flag == False:
 		j_z = jz(data,r_filter=r_filter,type=type, reverse_orientation=reverse_orientation, AMR=AMR)
@@ -443,7 +492,6 @@ def decomp_stars(data,snap,disk_min=0.8, disk_max=1.1,plot=False,r_min=None,r_ma
 		ratio_expanded = np.zeros((len(data["gas","cell_mass"])))	
 	else:
 		ratio_expanded = np.zeros((len(data[type,"particle_spherical_position_radius"])))
-	print len(ratio_expanded), "ratio_expanded", AMR, type
 	j = 0
 	for i in range(0, len(r_truths)):
 		# if false, insert a dummy value that will never get through the filter
@@ -525,14 +573,13 @@ def gradient(x,y,col="r",facecolor="blue",label="Fit Line",filename="name",signi
 	if a plt object is supplied, this data is plotted onto the plot object
 	"""
 	# sort the values
-#	print x, y
+
 	x_sorted_temp = np.array(x)
 	y_sorted_temp = np.array(y)
 	indices = x_sorted_temp.argsort()
 	x_sorted = np.sort(x_sorted_temp)
 	y_sorted = y_sorted_temp[indices]
-#	print "final"
-#	print x_sorted, y_sorted
+
 
                 # predicted values from fitting model
 	slope, intercept, r_value, p_value, std_err = sp.stats.linregress(x_sorted,y_sorted)
@@ -634,7 +681,6 @@ def sig_uvw(cylinder,galaxy_name,snap,solar=True,disk=True,cold=True):
 		z_min = cylinder.ds.arr(-3.0,"kpc")
 		z_max = cylinder.ds.arr(3.0,"kpc")
 
-		print filter, len(filter)
 
 		theta_min = cylinder.ds.arr(0.0,"dimensionless")
 		theta_max = cylinder.ds.arr(np.radians(359.90),"dimensionless")	
@@ -648,7 +694,6 @@ def sig_uvw(cylinder,galaxy_name,snap,solar=True,disk=True,cold=True):
 		else:
 			filter = np.where(new_filter == 1)[0]
 
-		print filter, len(filter)
 		plot_name = plot_name + "_solar"
 
 	# just consider all the stars
