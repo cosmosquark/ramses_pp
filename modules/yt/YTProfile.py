@@ -6,7 +6,6 @@ Based on Pymses.py from the Hamu project https://github.com/samgeen/Hamu
 import yt
 from .. import Profile
 import numpy as np
-from yt.analysis_modules.halo_profiler.api import *
 
 verbose = False
 
@@ -24,21 +23,22 @@ class YTProfile(Profile.Profile):
 	#Implement abstract methods from Profile.py
 
 	def HaloProfiler(self, halos=None):
+		raise NotImplementedError("Not implemented for yt3.0")
 		#Pretty much returns the usual yt halo profiler,
 		#but makes sure halo catalogue exists and points
 		#the profiler at existing catalogue
-		snapshot = self._snapshot
+		#snapshot = self._snapshot
 
-		if halos == None:
-			halos = snapshot.Halos()
+#		if halos == None:
+#			halos = snapshot.Halos()
 
-		if (verbose): print 'Found %d halos'%len(halos)
-		hop_fname = '../hop_dir/out_%05d_hop.out'%snapshot.OutputNumber()
+#		if (verbose): print 'Found %d halos'%len(halos)
+#		hop_fname = '../hop_dir/out_%05d_hop.out'%snapshot.OutputNumber()
 
-		if (verbose): print 'Profiling halos at %s'%hop_fname
+#		if (verbose): print 'Profiling halos at %s'%hop_fname
 
-		hp = HaloProfiler(snapshot.raw_snapshot(), halo_list_file=hop_fname)
-		return hp
+#		hp = HaloProfiler(snapshot.raw_snapshot(), halo_list_file=hop_fname)
+#		return hp
 
 	def fgas_halomass(self, halos=None):
 		snapshot = self._snapshot
@@ -60,9 +60,11 @@ class YTProfile(Profile.Profile):
 				#Get a sphere defining the halo
 				sphere = halo.get_sphere()
 
-				gas_mass, particle_mass = sphere.quantities["TotalQuantity"](
-					["CellMassMsun", "ParticleMassMsun"])
-				total_mass = particle_mass + gas_mass
+				gas_mass, particle_mass = sphere.quantities.total_quantity(
+									   ["cell_mass", "particle_mass"])
+				gas_mass = gas_mass.in_units('Msun')
+				particle_mass = particle_mass.in_units('Msun')
+				total_mass = gas_mass + particle_mass
 
 				if (verbose): print 'gass mass = %e, total mass = %e, fgas = %f'%(gas_mass, total_mass, gas_mass/total_mass)
 

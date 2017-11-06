@@ -1,0 +1,5 @@
+import yt
+
+def get_cosmology():
+	from yt_package.utilities.cosmology import Cosmology
+	return Cosmology

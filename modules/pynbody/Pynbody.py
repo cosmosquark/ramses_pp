@@ -9,29 +9,36 @@ import pynbody
 from pynbody.units import Unit
 from .. import Snapshot
 import sys, os
+import numpy as np
+from ... import config
 
-#Multithreading
+
+# multithreading
 pynbody.ramses.multiprocess_num = 16
 pynbody.config['number_of_threads'] = 16
 
-def load(folder, ioutput=None, **kwargs):
-	return PynbodySnapshot(folder, ioutput, **kwargs)
+def load(path, ioutput=None, **kwargs):
+	return PynbodySnapshot(path, ioutput, **kwargs)
 
 class PynbodySnapshot(Snapshot.Snapshot):
-	def __init__(self, folder, ioutput=None, **kwargs):
-		Snapshot.Snapshot.__init__(self, "Pynbody", **kwargs)
+	def __init__(self, path, ioutput, **kwargs):
+		# gas is default to FALSE since pynbody does weird things with gas conversion to tipsy (pymses/yt is better for the gas data)
+		Snapshot.Snapshot.__init__(self, path, ioutput, "Pynbody", **kwargs)
 		'''
 		Load the snapshot using pymses.RamsesOutput
 		TODO Verify snapshot exists
+		Specify the halo arg to load only the required number of CPUs
 		'''
-		self._path = folder
-		self._ioutput = ioutput
-		if ioutput is not None:
-			self._snapshot = pynbody.load('%s/output_%05d'%(folder, ioutput))
+		if kwargs.has_key('halo'):
+			halo = kwargs['halo']
+			cpus = self.cpu_list(halo.get_bounding_box())
+			self._snapshot = pynbody.load('%s/output_%05d'%(path, ioutput), cpus=cpus **kwargs)
 		else:
-			self._snapshot = pynbody.load(folder)
-
-	#Implement abstract methods from Snapshot.py
+			if ioutput == None:
+				self._snapshot = pynbody.load('%s' % (path), force_gas=False, **kwargs)
+			else:
+				self._snapshot = pynbody.load('%s/output_%05d'%(path, ioutput), force_gas=False, **kwargs)
+ 	#Implement abstract methods from Snapshot.py
 
 	def output_number(self):
 		'''
@@ -75,7 +82,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		#We need the ramses snapshot for this
 		if (type(s) == pynbody.tipsy.TipsySnap):
 			ramses_path = os.path.abspath(os.path.join(self.path(), '../../../'))
-			snap = load(ramses_path, self.output_number())
+			snap = load(ramses_path, self._simulation, self.output_number())
 			s = snap.raw_snapshot()
 					
 		info = s.properties
@@ -102,9 +109,10 @@ class PynbodySnapshot(Snapshot.Snapshot):
 
 	def analytical_mass_function(self, kern='ST'):
 		'''
-		Return the analytical fit to the halo mass function
+		Return the Sheth-Tormen mass function
 		Units: Mpc^-3 h^3 and Msun/h
 		'''
+		
 		s = self._snapshot
 		M, sigma, N = pynbody.analysis.halo_mass_function(s, kern=kern)
 		return M, sigma, N
@@ -132,7 +140,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		#We need the ramses snapshot for this
 		if (type(s) == pynbody.tipsy.TipsySnap):
 			ramses_path = os.path.abspath(os.path.join(self.path(), '../../../'))
-			snap = load(ramses_path, self.output_number())
+			snap = load(ramses_path, self._simulation, self.output_number())
 			s = snap.raw_snapshot()
 
 		# figure out the units			 
@@ -142,16 +150,15 @@ class PynbodySnapshot(Snapshot.Snapshot):
 		lenunit  = s._info['unit_l']*cmtokpc#/s.properties['a']*cmtokpc
 		massunit = pynbody.analysis.cosmology.rho_crit(s, z=0, unit='Msol kpc^-3')*lenunit**3
 		timeunit = np.sqrt(1/G_u * lenunit**3/massunit)
-		print '****************************'
-		print lenunit, massunit, timeunit
-		print '****************************'
+
 		return lenunit, massunit, timeunit
 
-	def tipsy(self, convert=True):
+	def tipsy(self, convert=True, rewrite=False):
+		# note RAMSES-CH does not handle very well with the pynbody conversion... tbh gas converted to particles is bad news anyway
 		#Grab the tipsy output for this snapshot, if it exists
 		ftipsy = self.tipsy_fname()
 
-		if os.path.exists(ftipsy):
+		if os.path.exists(ftipsy) and rewrite == False:
 			t = load(ftipsy)
 			setattr(t, '_ioutput', self.output_number())
 			return t
@@ -160,6 +167,11 @@ class PynbodySnapshot(Snapshot.Snapshot):
 				"""
 				Credit to Rok Roskar (roskar@physik.uzh.ch)
 				"""
+				if rewrite and os.path.exists(self.tipsy_dir()):
+					print "deleting tipsy conversion"
+					rmdir = self.tipsy_dir()
+					os.system('rm -rf %s'%(rmdir))
+
 				s = self.raw_snapshot()
 
 				newdir = self.tipsy_dir()
@@ -191,14 +203,17 @@ class PynbodySnapshot(Snapshot.Snapshot):
 				print 'Writing file %s'%newfile
 				#s['mass'].convert_units('%f Msol'%massunit)
 				s['mass'].convert_units('%f Msol'%massunit)
-				if len(s.g) > 0:
-					s.g['rho'].convert_units(m_unit/l_unit**3)
+
+				gas = False
+				if gas == True and len(s.g) > 0:
+					s.g['rho'].convert_units(m_unit/l_unit**3) # get gas variables
 					s.g['temp']
 					s.g['metals'] = s.g['metal']
-					s['eps'] = s.g['smooth'].min()
+					s['eps'] = s.g['smooth'].min()   # smooth the gas
 					s['eps'].units = s['pos'].units
 					del(s.g['metal'])
 					del(s['smooth'])
+
 				s['pos'].convert_units(l_unit)
 				s['vel'].convert_units(v_unit)
 				
@@ -209,8 +224,14 @@ class PynbodySnapshot(Snapshot.Snapshot):
 			else:
 				raise Exception("Tipsy file not found: %s"%ftipsy)
 
-	def halos(self, LgridDomain=128, LgridMax=16777216, VescTune=1.5, Dvir=200, nmin_per_halo = 50,
-		 MaxGatherRad=3.0, num_threads=16, run_ahf=False, rewrite_tipsy=False):
+
+### AHf halos using the tipsy outputs
+
+# see here for more doccumentation http://pynbody.github.io/pynbody/tutorials/halos.html
+
+
+	def tipsy_halos(self, LgridDomain=128, LgridMax=1073741824, VescTune=1.5, Dvir=200, nmin_per_halo = 50,
+		 MaxGatherRad=3.0, num_threads=16, run_ahf=False, rewrite_tipsy=False, configloc = True):
 		import glob
 		s = self.raw_snapshot()
 		isRamses = (type(s) == pynbody.ramses.RamsesSnap)
@@ -229,11 +250,8 @@ class PynbodySnapshot(Snapshot.Snapshot):
 			z = self.current_redshift()
 			omega_m_z = cosmo.omega_z(s.properties['omegaM0'], z)
 			#First, convert to tipsy
-			if rewrite_tipsy:
-				rmdir = self.tipsy_dir()
-				print 'Would remove %s'%rmdir
-				#os.system('rm -rf %s'%(rmdir))
-			if os.path.exists(fname) is False and isRamses: self.tipsy()
+
+			if os.path.exists(fname) is False and isRamses: self.tipsy(rewrite=rewrite_tipsy)
 			
 			lenunit, massunit, timeunit = self.tipsy_units()
 
@@ -260,30 +278,49 @@ class PynbodySnapshot(Snapshot.Snapshot):
 			f.write('TIPSY_MUNIT   = %e\n'%(massunit*s.properties['h']*(1/omega_m_z)))
 			#f.write('TIPSY_MUNIT   = %e\n'%(s.properties['h']*(1/omega_m_z))) # conversion factor only
 			f.write('TIPSY_OMEGA0  = %f\n'%s.properties['omegaM0'])
-			f.write('TIPSY_LAMBDA0 = %f\n'%s.properties['omegaL0'])
-			
-		 #   velunit = Unit('%f cm'%s._info['unit_l'])/Unit('%f s'%s._info['unit_t'])
-			
-			#f.write('TIPSY_VUNIT   = %e\n'%v_unit.ratio('km s^-1 a', **s.conversion_context()))			
-			f.write('TIPSY_VUNIT   = %e\n'%v_unit.ratio('km s^-1', **s.conversion_context()))			
-		 
-			# the thermal energy in K -> km^2/s^2
-		 
+
+			f.write('TIPSY_LAMBDA0 = %f\n'%s.properties['omegaL0'])			
+
+		 #   velunit = Unit('%f cm'%s._info['unit_l'])/Unit('%f s'%s._info['unit_t'])			
+
+			f.write('TIPSY_VUNIT   = %e\n'%v_unit.ratio('km s^-1 a', **s.conversion_context()))		
+		
+			# the thermal energy in K -> km^2/s^2		 
+
 			f.write('TIPSY_EUNIT   = %e\n'%((pynbody.units.k/pynbody.units.m_p).in_units('km^2 s^-2 K^-1')*5./3.))
 			f.close()			
 
 			os.environ['OMP_NUM_THREADS'] = str(num_threads)
-			os.system("~/apps/bin/AHF-v1.0-075 %s.AHF.input"%fname)
+			os.system("~/apps/bin/AHF-v1.0-084 %s.AHF.input"%fname)
 
 		#Return the halos. We need the tipsy snap now to load them
 		if isRamses:
 			#print 'Warning: Analysis of RAMSES output with tipsy halos can result in unexpected results...'
 			s = self.tipsy().raw_snapshot()
 
-		halos = s.halos()
-		print 'Loaded %d halos'%len(halos)
-
+		try:
+			halos = s.halos()
+			print 'Loaded %d halos'%len(halos)
+		except:
+			print "no halos to load"
+			halos = None
 		return halos
+
+	def halos(self, finder=config.default_finder, filename=None):
+		'''
+		Load a generic halo catalogue - default to rockstar if not overridden
+		Override the snapshot method, and force loading using yt for unit coherence
+		'''
+		simulation = self._attributes['simulation']
+		yt_snap = self.swap_modules(simulation, 'yt')
+		from ...analysis.halo_analysis import halos
+		if finder=='rockstar':
+			return halos.RockstarCatalogue(yt_snap)
+		elif finder=="AHF":
+			return halos.AHFCatalogue(yt_snap, filename=filename)
+		else:
+			raise Exception("Unimplemented finder: %s"%finder)
+
 
 	def halo_cat_exists(self):
 		import glob
@@ -308,7 +345,7 @@ class PynbodySnapshot(Snapshot.Snapshot):
 			if isTipsy:
 				#Switch to the raw ramses output to run AHF
 				ramses_path = os.path.abspath(os.path.join(self.path(), '../../../'))
-				snap = load(ramses_path, self.output_number())
+				snap = load(ramses_path, self._simulation, self.output_number())
 				s = snap.raw_snapshot()
 			else:
 				print 'Warning: Analysis of RAMSES output with tipsy halos can result in unexpected results...'

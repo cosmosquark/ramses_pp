@@ -22,7 +22,7 @@ class Projection():
 		self._snapshot = snapshot
 		self._camera = camera
 
-	@abc.abstractmethod
+#	@abc.abstractmethod
 	def Slice(self, camera):
 		'''
 		Returns a simple slice of the snapshot

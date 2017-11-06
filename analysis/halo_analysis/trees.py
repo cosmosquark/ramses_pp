@@ -13,9 +13,9 @@ OFFSET=30
 
 import numpy as np
 import sys, os.path, glob
-import weakref, copy
+import weakref
 from ramses_pp import config as pp_cfg
-from yt.units.yt_array import YTArray
+#from yt.units.yt_array import YTArray
 from halos import Halo
 #import logging
 
@@ -59,7 +59,7 @@ class MergerHalo(Halo):
 		centre = self['pos']
 		Rvir = self['Rvir']
 		sim = self._halo_catalogue._base()
-		ioutput = self._halo_catalogue['snap_num']+OFFSET
+		ioutput = self._halo_catalogue['snap_num']+self._halo_catalogue.get_offset()
 		snapshot = sim.snapshot(ioutput, module='yt')
 		if not (str(type(snapshot)) == "<class 'ramses_pp.modules.yt.YT.YTSnapshot'>"):
 			raise NotImplementedError("sphere only implemented for YT")
@@ -99,18 +99,18 @@ class MergerTree(object):
 	def __getitem__(self, item):
 		if isinstance(item, slice):
 			indices = item.indices(len(self._halos))
-			[self.calc_item(i + 1) for i in range(*indices)]
+			[self.calc_item(i) for i in range(*indices)]
 			return self._halos[item]
 		else:
 			return self.calc_item(item)
 
 	def _halo_generator(self):
-		i = 1
+		i = 0
 		while True:
 			try:
 				yield self[i]
 				i += 1
-				if i > len(self._halos):
+				if i >= len(self._halos):
 					break
 			except RuntimeError:
 				break
@@ -238,8 +238,8 @@ class RockstarMergerTree(MergerTree):
 		self._nhalo = len(self._tree)
 
 		for h in xrange(self._nhalo):
-			self._halos[h+1] = MergerHalo(self._tree[h]['id'], self)
-			self._halos[h+1].properties = self._tree[h]
+			self._halos[h] = MergerHalo(self._tree[h]['id'], self)
+			self._halos[h].properties = self._tree[h]
 		print 'done!'
 
 	def load_copy(self, i):
@@ -299,6 +299,17 @@ class RockstarMergerTree(MergerTree):
 				return True
 		return False
 
+	def get_offset(self):
+		'''
+		Determine the offset between snap_num in merger tree and actual
+		'''
+		simulation = self._base()
+		num_snapshots = simulation.num_snapshots()
+
+		#Take the first entry in the tree to find last snapshot
+		last_snap = self[0]['snap_num'].value
+		return num_snapshots - last_snap
+
 class RockstarSubCatalogue(MergerTree):
 
 	halo_type = RockstarMergerTree.halo_type
@@ -318,8 +329,8 @@ class RockstarSubCatalogue(MergerTree):
 		self._nhalo = len(tree)
 
 		for h in xrange(self._nhalo):
-			self._halos[h+1] = MergerHalo(self._tree[h]['id'], self)
-			self._halos[h+1].properties = self._tree[h]
+			self._halos[h] = MergerHalo(self._tree[h]['id'], self)
+			self._halos[h].properties = self._tree[h]
 		print 'done!'
 
 	def _get_halo(self, i):
